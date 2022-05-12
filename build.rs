@@ -4,6 +4,7 @@ use std::env;
 use std::path::PathBuf;
 
 fn main() {
+    // TODO: Actaully build this in this build script
     println!("cargo:rustc-link-search=lib/wren/lib");
     println!("cargo:rustc-link-lib=static=wren");
 
