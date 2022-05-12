@@ -4,6 +4,9 @@ use std::env;
 use std::path::PathBuf;
 
 fn main() {
+    const WREN_H: &str = "lib/wren/src/include/wren.h";
+    println!("cargo:rerun-if-changed={}", WREN_H);
+
     // TODO: Actaully build this in this build script
     println!("cargo:rustc-link-search=lib/wren/lib");
     println!("cargo:rustc-link-lib=static=wren");
@@ -14,7 +17,7 @@ fn main() {
     let bindings = bindgen::Builder::default()
         // The input header we would like to generate
         // bindings for.
-        .header("lib/wren/src/include/wren.h")
+        .header(WREN_H)
         // Finish the builder and generate the bindings.
         .generate()
         // Unwrap the Result and panic on failure.

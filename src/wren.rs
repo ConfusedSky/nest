@@ -1,4 +1,5 @@
 use std::{
+    borrow::Cow,
     cell::RefCell,
     ffi::{c_void, CStr, CString},
     mem::MaybeUninit,
@@ -17,10 +18,10 @@ unsafe fn get_user_data<'s, V>(vm: *mut wren_sys::WrenVM) -> Option<&'s mut V> {
 }
 
 unsafe extern "C" fn write_fn<V: VmUserData>(vm: *mut wren_sys::WrenVM, text: *const i8) {
-    let text = CStr::from_ptr(text).to_string_lossy();
-
     let user_data = get_user_data::<V>(vm);
+
     if let Some(user_data) = user_data {
+        let text = CStr::from_ptr(text).to_string_lossy();
         user_data.on_write(text.as_ref());
     }
 }
@@ -32,22 +33,30 @@ unsafe extern "C" fn error_fn<V: VmUserData>(
     line: i32,
     msg: *const i8,
 ) {
-    let module = CStr::from_ptr(module).to_string_lossy();
-    let msg = CStr::from_ptr(msg).to_string_lossy();
-    let context = ErrorContext {
-        module: module.as_ref(),
-        line,
-        msg: msg.as_ref(),
-    };
-    let kind = match error_type {
-        wren_sys::WrenErrorType_WREN_ERROR_COMPILE => ErrorKind::Compile(context),
-        wren_sys::WrenErrorType_WREN_ERROR_RUNTIME => ErrorKind::Runtime(msg.as_ref()),
-        wren_sys::WrenErrorType_WREN_ERROR_STACK_TRACE => ErrorKind::Stacktrace(context),
-        kind => ErrorKind::Unknown(kind, context),
-    };
-
     let user_data = get_user_data::<V>(vm);
     if let Some(user_data) = user_data {
+        let msg = CStr::from_ptr(msg).to_string_lossy();
+        // This lives outside of the if statement so that it can live long enough
+        // to be passed to user_data on error
+        let c_module: Cow<str>;
+        // Runtime doesn't have a valid module so it will crash if it goes any further
+        let kind = if error_type == wren_sys::WrenErrorType_WREN_ERROR_RUNTIME {
+            ErrorKind::Runtime(msg.as_ref())
+        } else {
+            c_module = CStr::from_ptr(module).to_string_lossy();
+            let context = ErrorContext {
+                module: c_module.as_ref(),
+                line,
+                msg: msg.as_ref(),
+            };
+            match error_type {
+                wren_sys::WrenErrorType_WREN_ERROR_COMPILE => ErrorKind::Compile(context),
+                wren_sys::WrenErrorType_WREN_ERROR_RUNTIME => ErrorKind::Runtime(msg.as_ref()),
+                wren_sys::WrenErrorType_WREN_ERROR_STACK_TRACE => ErrorKind::Stacktrace(context),
+                kind => ErrorKind::Unknown(kind, context),
+            }
+        };
+
         user_data.on_error(kind);
     }
 }
