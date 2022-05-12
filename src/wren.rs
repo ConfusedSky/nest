@@ -34,19 +34,16 @@ unsafe extern "C" fn error_fn<V: VmUserData>(
 ) {
     let module = CStr::from_ptr(module).to_string_lossy();
     let msg = CStr::from_ptr(msg).to_string_lossy();
+    let context = ErrorContext {
+        module: module.as_ref(),
+        line,
+        msg: msg.as_ref(),
+    };
     let kind = match error_type {
-        wren_sys::WrenErrorType_WREN_ERROR_COMPILE => ErrorKind::Compile {
-            module: module.as_ref(),
-            line,
-            msg: msg.as_ref(),
-        },
+        wren_sys::WrenErrorType_WREN_ERROR_COMPILE => ErrorKind::Compile(context),
         wren_sys::WrenErrorType_WREN_ERROR_RUNTIME => ErrorKind::Runtime(msg.as_ref()),
-        wren_sys::WrenErrorType_WREN_ERROR_STACK_TRACE => ErrorKind::Stacktrace {
-            module: module.as_ref(),
-            line,
-            msg: msg.as_ref(),
-        },
-        _ => panic!("Should never reach here"),
+        wren_sys::WrenErrorType_WREN_ERROR_STACK_TRACE => ErrorKind::Stacktrace(context),
+        kind => ErrorKind::Unknown(kind, context),
     };
 
     let user_data = get_user_data::<V>(vm);
@@ -55,23 +52,23 @@ unsafe extern "C" fn error_fn<V: VmUserData>(
     }
 }
 
-pub enum ErrorKind<'s> {
-    Compile {
-        module: &'s str,
-        line: i32,
-        msg: &'s str,
-    },
-    Runtime(&'s str),
-    Stacktrace {
-        module: &'s str,
-        line: i32,
-        msg: &'s str,
-    },
+pub struct ErrorContext<'s> {
+    pub module: &'s str,
+    pub line: i32,
+    pub msg: &'s str,
 }
 
-pub enum ResultErrorKind {
+pub enum ErrorKind<'s> {
+    Compile(ErrorContext<'s>),
+    Runtime(&'s str),
+    Stacktrace(ErrorContext<'s>),
+    Unknown(wren_sys::WrenErrorType, ErrorContext<'s>),
+}
+
+pub enum InterpretResultErrorKind {
     Compile,
     Runtime,
+    Unknown(wren_sys::WrenInterpretResult),
 }
 
 #[allow(unused_variables)]
@@ -119,7 +116,7 @@ where
         }
     }
 
-    pub fn interpret<M, S>(&self, module: M, source: S) -> Result<(), ResultErrorKind>
+    pub fn interpret<M, S>(&self, module: M, source: S) -> Result<(), InterpretResultErrorKind>
     where
         M: AsRef<str>,
         S: AsRef<str>,
@@ -131,13 +128,13 @@ where
 
             match result {
                 wren_sys::WrenInterpretResult_WREN_RESULT_COMPILE_ERROR => {
-                    Err(ResultErrorKind::Compile)
+                    Err(InterpretResultErrorKind::Compile)
                 }
                 wren_sys::WrenInterpretResult_WREN_RESULT_RUNTIME_ERROR => {
-                    Err(ResultErrorKind::Runtime)
+                    Err(InterpretResultErrorKind::Runtime)
                 }
                 wren_sys::WrenInterpretResult_WREN_RESULT_SUCCESS => Ok(()),
-                _ => panic!("Unknown Wren Result type"),
+                kind => Err(InterpretResultErrorKind::Unknown(kind)),
             }
         }
     }

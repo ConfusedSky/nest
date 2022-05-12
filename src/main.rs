@@ -5,38 +5,23 @@
 mod wren;
 mod wren_sys;
 
-// unsafe extern "C" fn error_fn(
-// _vm: *mut wren_sys::WrenVM,
-// error_type: wren_sys::WrenErrorType,
-// module: *const i8,
-// line: i32,
-// msg: *const i8,
-// ) {
-// let module = CStr::from_ptr(module).to_string_lossy();
-// let msg = CStr::from_ptr(msg).to_string_lossy();
-// match error_type {
-// wren_sys::WrenErrorType_WREN_ERROR_COMPILE => {
-// println!("[{} line {}] [Error] {}", module, line, msg);
-// }
-// wren_sys::WrenErrorType_WREN_ERROR_RUNTIME => println!("[Runtime Error] {}", msg),
-// wren_sys::WrenErrorType_WREN_ERROR_STACK_TRACE => {
-// println!("[{} line {}] in {}", module, line, msg);
-// }
-// _ => panic!("Should never reach here"),
-// }
-// }
-
 struct MyUserData;
 
 impl wren::VmUserData for MyUserData {
     fn on_error(&mut self, kind: wren::ErrorKind) {
         match kind {
-            wren::ErrorKind::Compile { module, line, msg } => {
-                println!("[{} line {}] [Error] {}", module, line, msg);
+            wren::ErrorKind::Compile(ctx) => {
+                println!("[{} line {}] [Error] {}", ctx.module, ctx.line, ctx.msg);
             }
             wren::ErrorKind::Runtime(msg) => println!("[Runtime Error] {}", msg),
-            wren::ErrorKind::Stacktrace { module, line, msg } => {
-                println!("[{} line {}] in {}", module, line, msg);
+            wren::ErrorKind::Stacktrace(ctx) => {
+                println!("[{} line {}] in {}", ctx.module, ctx.line, ctx.msg);
+            }
+            wren::ErrorKind::Unknown(kind, ctx) => {
+                println!(
+                    "[{} line {}] [Unkown Error {}] {}",
+                    ctx.module, ctx.line, kind, ctx.msg
+                );
             }
         }
     }
@@ -55,7 +40,8 @@ fn main() {
 
     match result {
         Ok(()) => println!("SUCCESS"),
-        Err(wren::ResultErrorKind::Compile) => println!("COMPILE_ERROR"),
-        Err(wren::ResultErrorKind::Runtime) => println!("RUNTIME_ERROR"),
+        Err(wren::InterpretResultErrorKind::Compile) => println!("COMPILE_ERROR"),
+        Err(wren::InterpretResultErrorKind::Runtime) => println!("RUNTIME_ERROR"),
+        Err(wren::InterpretResultErrorKind::Unknown(kind)) => println!("UNKNOWN ERROR: {}", kind),
     }
 }
