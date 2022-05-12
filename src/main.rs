@@ -35,27 +35,70 @@ unsafe extern "C" fn error_fn(
     }
 }
 
-fn main() {
-    unsafe {
-        let mut config: wren_sys::WrenConfiguration = MaybeUninit::zeroed().assume_init();
-        wren_sys::wrenInitConfiguration(&mut config);
+enum ResultErrorKind {
+    Compile,
+    Runtime,
+}
 
-        config.writeFn = Some(write_fn);
-        config.errorFn = Some(error_fn);
+struct VM {
+    vm: *mut wren_sys::WrenVM,
+}
 
-        let vm = wren_sys::wrenNewVM(&mut config);
+impl Drop for VM {
+    fn drop(&mut self) {
+        unsafe { wren_sys::wrenFreeVM(self.vm) }
+    }
+}
 
-        let module = CString::new("my_module").unwrap();
-        let source = CString::new("System.print(\"I am running in Rust!\")").unwrap();
-        let result = wren_sys::wrenInterpret(vm, module.as_ptr(), source.as_ptr());
+impl VM {
+    pub fn new() -> Self {
+        unsafe {
+            let mut config: wren_sys::WrenConfiguration = MaybeUninit::zeroed().assume_init();
+            wren_sys::wrenInitConfiguration(&mut config);
 
-        match result {
-            wren_sys::WrenInterpretResult_WREN_RESULT_COMPILE_ERROR => println!("COMPILE_ERROR"),
-            wren_sys::WrenInterpretResult_WREN_RESULT_RUNTIME_ERROR => println!("RUNTIME_ERROR"),
-            wren_sys::WrenInterpretResult_WREN_RESULT_SUCCESS => println!("SUCCESS!"),
-            _ => panic!("Should never reach here"),
+            config.writeFn = Some(write_fn);
+            config.errorFn = Some(error_fn);
+
+            let vm = wren_sys::wrenNewVM(&mut config);
+
+            Self { vm }
         }
+    }
 
-        wren_sys::wrenFreeVM(vm);
+    pub fn interpret<M, S>(&self, module: M, source: S) -> Result<(), ResultErrorKind>
+    where
+        M: AsRef<str>,
+        S: AsRef<str>,
+    {
+        unsafe {
+            let module = CString::new(module.as_ref()).unwrap();
+            let source = CString::new(source.as_ref()).unwrap();
+            let result = wren_sys::wrenInterpret(self.vm, module.as_ptr(), source.as_ptr());
+
+            match result {
+                wren_sys::WrenInterpretResult_WREN_RESULT_COMPILE_ERROR => {
+                    Err(ResultErrorKind::Compile)
+                }
+                wren_sys::WrenInterpretResult_WREN_RESULT_RUNTIME_ERROR => {
+                    Err(ResultErrorKind::Runtime)
+                }
+                wren_sys::WrenInterpretResult_WREN_RESULT_SUCCESS => Ok(()),
+                _ => panic!("Unknown Wren Result type"),
+            }
+        }
+    }
+}
+
+fn main() {
+    let vm = VM::new();
+    let module = "my_module";
+    let source = "System.print(\"I am running in Rust!\")";
+
+    let result = vm.interpret(module, source);
+
+    match result {
+        Ok(()) => println!("SUCCESS"),
+        Err(ResultErrorKind::Compile) => println!("COMPILE_ERROR"),
+        Err(ResultErrorKind::Runtime) => println!("RUNTIME_ERROR"),
     }
 }
