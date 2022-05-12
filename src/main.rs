@@ -1,6 +1,5 @@
 #![deny(clippy::all)]
-#![warn(clippy::pedantic, clippy::nursery)]
-// #![warn(unsafe_code)]
+#![warn(clippy::pedantic, clippy::nursery, unsafe_code)]
 
 use std::{env, fs, path::PathBuf};
 
