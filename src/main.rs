@@ -2,6 +2,8 @@
 #![warn(clippy::pedantic, clippy::nursery)]
 // #![warn(unsafe_code)]
 
+use std::{env, fs, path::PathBuf};
+
 mod wren;
 mod wren_sys;
 
@@ -31,10 +33,25 @@ impl wren::VmUserData for MyUserData {
 }
 
 fn main() {
+    // There is always the executables name which we can skip
+    let module: Option<String> = env::args().nth(1);
+
+    if module.is_none() {
+        println!("Please pass in the name of a script file to get started");
+        return;
+    }
+
+    let module = module.unwrap();
+    let mut module_path = PathBuf::new();
+    module_path.push("scripts");
+    module_path.push(&module);
+    module_path.set_extension("wren");
+
+    let source = fs::read_to_string(&module_path)
+        .unwrap_or_else(|_| panic!("Ensure {} is a valid module name to continue", &module));
+
     let user_data = MyUserData;
     let vm = wren::Vm::new(user_data);
-    let module = "my_module";
-    let source = "System.print(\"I am running in Rust!\")";
 
     let result = vm.interpret(module, source);
 
