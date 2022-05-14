@@ -3,6 +3,8 @@
 
 use std::{env, fs, path::PathBuf};
 
+use wren::VMPtr;
+
 mod modules;
 mod wren;
 mod wren_sys;
@@ -10,7 +12,7 @@ mod wren_sys;
 struct MyUserData;
 
 impl wren::VmUserData for MyUserData {
-    fn on_error(&mut self, kind: wren::ErrorKind) {
+    fn on_error(&mut self, _: VMPtr, kind: wren::ErrorKind) {
         match kind {
             wren::ErrorKind::Compile(ctx) => {
                 println!("[{} line {}] [Error] {}", ctx.module, ctx.line, ctx.msg);
@@ -27,7 +29,7 @@ impl wren::VmUserData for MyUserData {
             }
         }
     }
-    fn on_write(&mut self, text: &str) {
+    fn on_write(&mut self, _: VMPtr, text: &str) {
         print!("{}", text);
     }
 }

@@ -1,10 +1,10 @@
 #![allow(unsafe_code)]
 
-use std::ptr::NonNull;
+use std::{cell::RefCell, ptr::NonNull};
 
 use crate::{wren, wren_sys};
 
-static mut SCHEDULER: Option<Scheduler> = None;
+static mut SCHEDULER: RefCell<Option<Scheduler>> = RefCell::new(None);
 
 unsafe fn _resume(vm: wren::VMPtr, method: NonNull<wren_sys::WrenHandle>) {
     let result = vm.call(method);
@@ -14,7 +14,7 @@ unsafe fn _resume(vm: wren::VMPtr, method: NonNull<wren_sys::WrenHandle>) {
     }
 }
 #[derive(Debug)]
-struct Scheduler {
+pub struct Scheduler {
     vm: wren::VMPtr,
     // A handle to the "Scheduler" class object. Used to call static methods on it.
     class: NonNull<wren_sys::WrenHandle>,
@@ -64,7 +64,8 @@ pub unsafe fn capture_methods(vm: wren::VMPtr) {
     let resume2 = vm.make_call_handle("resume_(_,_)");
     let resume_error = vm.make_call_handle("resumeError_(_,_)");
 
-    SCHEDULER = Some(Scheduler {
+    let scheduler = SCHEDULER.get_mut();
+    *scheduler = Some(Scheduler {
         vm,
         class,
         resume1,
@@ -74,13 +75,19 @@ pub unsafe fn capture_methods(vm: wren::VMPtr) {
 }
 
 pub unsafe fn shutdown(vm: wren::VMPtr) {
-    if SCHEDULER.is_none() {
+    let scheduler = SCHEDULER.get_mut();
+
+    if scheduler.is_none() {
         return;
     }
 
-    let scheduler = SCHEDULER.take().unwrap();
+    let scheduler = scheduler.take().unwrap();
     vm.release_handle_unchecked(scheduler.class);
     vm.release_handle_unchecked(scheduler.resume1);
     vm.release_handle_unchecked(scheduler.resume2);
     vm.release_handle_unchecked(scheduler.resume_error);
+}
+
+pub unsafe fn get<'s>() -> Option<&'s Scheduler> {
+    SCHEDULER.get_mut().as_ref()
 }

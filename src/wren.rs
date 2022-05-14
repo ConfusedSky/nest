@@ -29,7 +29,7 @@ unsafe extern "C" fn write_fn<V: VmUserData>(vm: *mut WrenVM, text: *const i8) {
 
     if let Some(user_data) = user_data {
         let text = CStr::from_ptr(text).to_string_lossy();
-        user_data.on_write(text.as_ref());
+        user_data.on_write(VMPtr::new_unchecked(vm), text.as_ref());
     }
 }
 
@@ -64,7 +64,7 @@ unsafe extern "C" fn error_fn<V: VmUserData>(
             }
         };
 
-        user_data.on_error(kind);
+        user_data.on_error(VMPtr::new_unchecked(vm), kind);
     }
 }
 
@@ -76,6 +76,10 @@ type Slot = std::os::raw::c_int;
 type Handle = NonNull<WrenHandle>;
 
 impl VMPtr {
+    pub const unsafe fn new_unchecked(vm: *mut WrenVM) -> Self {
+        Self(NonNull::new_unchecked(vm))
+    }
+
     /// SAFETY: Will segfault if an invalid slot
     /// is asked for
     pub unsafe fn set_slot_handle_unchecked(self, slot: Slot, handle: Handle) {
@@ -190,8 +194,24 @@ impl InterpretResultErrorKind {
 #[allow(unused_variables)]
 // We define empty defaults here so that the user can define what they want
 pub trait VmUserData {
-    fn on_write(&mut self, text: &str) {}
-    fn on_error(&mut self, kind: ErrorKind) {}
+    fn load_module(name: &str) -> wren_sys::WrenLoadModuleResult {
+        unsafe { std::mem::zeroed() }
+    }
+    fn bind_foreign_method(
+        module: &str,
+        classname: &str,
+        is_static: bool,
+        signature: &str,
+    ) -> *mut wren_sys::WrenForeignMethodFn {
+        unsafe { std::mem::zeroed() }
+    }
+    // Default behavior is to return a struct with fields nulled out
+    // so this is fine
+    fn bind_foreign_class(module: &str, classname: &str) -> wren_sys::WrenForeignClassMethods {
+        unsafe { std::mem::zeroed() }
+    }
+    fn on_write(&mut self, vm: VMPtr, text: &str) {}
+    fn on_error(&mut self, vm: VMPtr, kind: ErrorKind) {}
 }
 
 pub struct Vm<V> {
