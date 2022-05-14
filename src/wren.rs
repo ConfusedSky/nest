@@ -5,15 +5,14 @@ use std::{
     cell::RefCell,
     ffi::{c_void, CStr, CString},
     mem::MaybeUninit,
-    os::raw,
     pin::Pin,
     ptr::NonNull,
 };
 
 use crate::wren_sys::{
     self, wrenCall, wrenFreeVM, wrenGetUserData, wrenGetVariable, wrenInitConfiguration,
-    wrenInterpret, wrenMakeCallHandle, wrenNewVM, WrenConfiguration, WrenErrorType, WrenHandle,
-    WrenInterpretResult, WrenVM,
+    wrenInterpret, wrenMakeCallHandle, wrenNewVM, wrenReleaseHandle, WrenConfiguration,
+    WrenErrorType, WrenHandle, WrenInterpretResult, WrenVM,
 };
 
 unsafe fn get_user_data<'s, V>(vm: *mut WrenVM) -> Option<&'s mut V> {
@@ -74,10 +73,27 @@ unsafe extern "C" fn error_fn<V: VmUserData>(
 pub struct VMPtr(NonNull<WrenVM>);
 
 type Slot = std::os::raw::c_int;
+type Handle = NonNull<WrenHandle>;
 
 impl VMPtr {
     /// SAFETY: Will segfault if an invalid slot
     /// is asked for
+    pub unsafe fn set_slot_handle_unchecked(self, slot: Slot, handle: Handle) {
+        wren_sys::wrenSetSlotHandle(self.0.as_ptr(), slot, handle.as_ptr());
+    }
+
+    /// SAFETY: Will segfault if an invalid slot
+    /// is set for
+    pub unsafe fn set_slot_string_unchecked<S>(self, slot: Slot, value: S)
+    where
+        S: AsRef<str>,
+    {
+        let text = CString::new(value.as_ref()).unwrap();
+        wren_sys::wrenSetSlotString(self.0.as_ptr(), slot, text.as_ptr());
+    }
+
+    /// SAFETY: Will segfault if an invalid slot
+    /// is set for
     pub unsafe fn set_slot_bool_unchecked(self, slot: Slot, value: bool) {
         wren_sys::wrenSetSlotBool(self.0.as_ptr(), slot, value);
     }
@@ -90,7 +106,7 @@ impl VMPtr {
     /// SAFETY: this is always non null but will segfault if an invalid slot
     /// is asked for
     /// And is not guarenteed to be a valid object
-    pub unsafe fn get_slot_handle_unchecked(self, slot: Slot) -> NonNull<WrenHandle> {
+    pub unsafe fn get_slot_handle_unchecked(self, slot: Slot) -> Handle {
         NonNull::new_unchecked(wren_sys::wrenGetSlotHandle(self.0.as_ptr(), slot))
     }
 
@@ -110,7 +126,7 @@ impl VMPtr {
         wrenGetVariable(vm.as_ptr(), module.as_ptr(), name.as_ptr(), slot);
     }
 
-    pub fn make_call_handle<Signature>(self, signature: Signature) -> NonNull<WrenHandle>
+    pub fn make_call_handle<Signature>(self, signature: Signature) -> Handle
     where
         Signature: AsRef<str>,
     {
@@ -122,11 +138,15 @@ impl VMPtr {
     }
 
     /// Safety: Will segfault if used with an invalid method
-    pub unsafe fn call(self, method: NonNull<WrenHandle>) -> Result<(), InterpretResultErrorKind> {
+    pub unsafe fn call(self, method: Handle) -> Result<(), InterpretResultErrorKind> {
         let vm = self.0;
         let result = wrenCall(vm.as_ptr(), method.as_ptr());
 
         InterpretResultErrorKind::new_from_result(result)
+    }
+
+    pub unsafe fn release_handle_unchecked(self, handle: Handle) {
+        wrenReleaseHandle(self.0.as_ptr(), handle.as_ptr());
     }
 
     pub fn ensure_slots(self, num_slots: Slot) {

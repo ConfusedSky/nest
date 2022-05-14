@@ -4,6 +4,15 @@ use std::ptr::NonNull;
 
 use crate::{wren, wren_sys};
 
+static mut SCHEDULER: Option<Scheduler> = None;
+
+unsafe fn _resume(vm: wren::VMPtr, method: NonNull<wren_sys::WrenHandle>) {
+    let result = vm.call(method);
+
+    if let Err(wren::InterpretResultErrorKind::Runtime) = result {
+        panic!("AHHHHHHHHH")
+    }
+}
 #[derive(Debug)]
 struct Scheduler {
     vm: wren::VMPtr,
@@ -19,21 +28,31 @@ struct Scheduler {
 }
 
 impl Scheduler {
-    fn resume(&mut self) {}
+    unsafe fn resume(&self, fiber: NonNull<wren_sys::WrenHandle>, has_argument: bool) {
+        self.vm.ensure_slots(2 + if has_argument { 1 } else { 0 });
+        self.vm.set_slot_handle_unchecked(0, self.class);
+        self.vm.set_slot_handle_unchecked(1, fiber);
+        self.vm.release_handle_unchecked(fiber);
+
+        if !has_argument {
+            _resume(self.vm, self.resume1);
+        }
+    }
+    unsafe fn finish_resume(&self) {
+        _resume(self.vm, self.resume2);
+    }
+    unsafe fn resume_error<S>(&self, fiber: NonNull<wren_sys::WrenHandle>, error: S)
+    where
+        S: AsRef<str>,
+    {
+        self.resume(fiber, true);
+        self.vm.set_slot_string_unchecked(2, error);
+        _resume(self.vm, self.resume_error);
+    }
 }
 
 unsafe impl Send for Scheduler {}
 unsafe impl Sync for Scheduler {}
-
-static mut SCHEDULER: Option<Scheduler> = None;
-
-unsafe fn _resume(vm: wren::VMPtr, method: NonNull<wren_sys::WrenHandle>) {
-    let result = vm.call(method);
-
-    if let Err(wren::InterpretResultErrorKind::Runtime) = result {
-        panic!("AHHHHHHHHH")
-    }
-}
 
 pub unsafe fn capture_methods(vm: wren::VMPtr) {
     vm.ensure_slots(1);
@@ -52,4 +71,16 @@ pub unsafe fn capture_methods(vm: wren::VMPtr) {
         resume2,
         resume_error,
     });
+}
+
+pub unsafe fn shutdown(vm: wren::VMPtr) {
+    if SCHEDULER.is_none() {
+        return;
+    }
+
+    let scheduler = SCHEDULER.take().unwrap();
+    vm.release_handle_unchecked(scheduler.class);
+    vm.release_handle_unchecked(scheduler.resume1);
+    vm.release_handle_unchecked(scheduler.resume2);
+    vm.release_handle_unchecked(scheduler.resume_error);
 }
