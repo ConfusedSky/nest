@@ -5,13 +5,19 @@ use std::{
     cell::RefCell,
     ffi::{c_void, CStr, CString},
     mem::MaybeUninit,
+    os::raw,
     pin::Pin,
+    ptr::NonNull,
 };
 
-use crate::wren_sys;
+use crate::wren_sys::{
+    self, wrenCall, wrenFreeVM, wrenGetUserData, wrenGetVariable, wrenInitConfiguration,
+    wrenInterpret, wrenMakeCallHandle, wrenNewVM, WrenConfiguration, WrenErrorType, WrenHandle,
+    WrenInterpretResult, WrenVM,
+};
 
-unsafe fn get_user_data<'s, V>(vm: *mut wren_sys::WrenVM) -> Option<&'s mut V> {
-    let user_data = wren_sys::wrenGetUserData(vm);
+unsafe fn get_user_data<'s, V>(vm: *mut WrenVM) -> Option<&'s mut V> {
+    let user_data = wrenGetUserData(vm);
     if user_data.is_null() {
         None
     } else {
@@ -19,7 +25,7 @@ unsafe fn get_user_data<'s, V>(vm: *mut wren_sys::WrenVM) -> Option<&'s mut V> {
     }
 }
 
-unsafe extern "C" fn write_fn<V: VmUserData>(vm: *mut wren_sys::WrenVM, text: *const i8) {
+unsafe extern "C" fn write_fn<V: VmUserData>(vm: *mut WrenVM, text: *const i8) {
     let user_data = get_user_data::<V>(vm);
 
     if let Some(user_data) = user_data {
@@ -29,8 +35,8 @@ unsafe extern "C" fn write_fn<V: VmUserData>(vm: *mut wren_sys::WrenVM, text: *c
 }
 
 unsafe extern "C" fn error_fn<V: VmUserData>(
-    vm: *mut wren_sys::WrenVM,
-    error_type: wren_sys::WrenErrorType,
+    vm: *mut WrenVM,
+    error_type: WrenErrorType,
     module: *const i8,
     line: i32,
     msg: *const i8,
@@ -63,6 +69,74 @@ unsafe extern "C" fn error_fn<V: VmUserData>(
     }
 }
 
+#[repr(transparent)]
+#[derive(Debug, Clone, Copy)]
+pub struct VMPtr(NonNull<WrenVM>);
+
+type Slot = std::os::raw::c_int;
+
+impl VMPtr {
+    /// SAFETY: Will segfault if an invalid slot
+    /// is asked for
+    pub unsafe fn set_slot_bool_unchecked(self, slot: Slot, value: bool) {
+        wren_sys::wrenSetSlotBool(self.0.as_ptr(), slot, value);
+    }
+
+    /// SAFETY: Calling this on a slot that isn't a bool or a valid slot is undefined behavior
+    pub unsafe fn get_slot_bool_unchecked(self, slot: Slot) -> bool {
+        wren_sys::wrenGetSlotBool(self.0.as_ptr(), slot)
+    }
+
+    /// SAFETY: this is always non null but will segfault if an invalid slot
+    /// is asked for
+    /// And is not guarenteed to be a valid object
+    pub unsafe fn get_slot_handle_unchecked(self, slot: Slot) -> NonNull<WrenHandle> {
+        NonNull::new_unchecked(wren_sys::wrenGetSlotHandle(self.0.as_ptr(), slot))
+    }
+
+    /// SAFETY: this is always non null but will segfault if an invalid slot
+    /// is asked for
+    /// MAYBE: Will seg fault if the variable does not exist?
+    /// Still need to set up module resolution
+    pub unsafe fn get_variable_unchecked<Module, Name>(self, module: Module, name: Name, slot: Slot)
+    where
+        Module: AsRef<str>,
+        Name: AsRef<str>,
+    {
+        let vm = self.0;
+        let module = CString::new(module.as_ref()).unwrap();
+        let name = CString::new(name.as_ref()).unwrap();
+
+        wrenGetVariable(vm.as_ptr(), module.as_ptr(), name.as_ptr(), slot);
+    }
+
+    pub fn make_call_handle<Signature>(self, signature: Signature) -> NonNull<WrenHandle>
+    where
+        Signature: AsRef<str>,
+    {
+        let vm = self.0;
+        let signature = CString::new(signature.as_ref()).unwrap();
+        // SAFETY: this function is always safe to call but may be unsafe to use the handle it returns
+        // as that handle might not be valid
+        unsafe { NonNull::new_unchecked(wrenMakeCallHandle(vm.as_ptr(), signature.as_ptr())) }
+    }
+
+    /// Safety: Will segfault if used with an invalid method
+    pub unsafe fn call(self, method: NonNull<WrenHandle>) -> Result<(), InterpretResultErrorKind> {
+        let vm = self.0;
+        let result = wrenCall(vm.as_ptr(), method.as_ptr());
+
+        InterpretResultErrorKind::new_from_result(result)
+    }
+
+    pub fn ensure_slots(self, num_slots: Slot) {
+        // SAFETY: this one is always safe to call even if the value is negative
+        unsafe {
+            wren_sys::wrenEnsureSlots(self.0.as_ptr(), num_slots);
+        }
+    }
+}
+
 pub struct ErrorContext<'s> {
     pub module: &'s str,
     pub line: i32,
@@ -73,13 +147,24 @@ pub enum ErrorKind<'s> {
     Compile(ErrorContext<'s>),
     Runtime(&'s str),
     Stacktrace(ErrorContext<'s>),
-    Unknown(wren_sys::WrenErrorType, ErrorContext<'s>),
+    Unknown(WrenErrorType, ErrorContext<'s>),
 }
 
 pub enum InterpretResultErrorKind {
     Compile,
     Runtime,
-    Unknown(wren_sys::WrenInterpretResult),
+    Unknown(WrenInterpretResult),
+}
+
+impl InterpretResultErrorKind {
+    const fn new_from_result(result: u32) -> Result<(), Self> {
+        match result {
+            wren_sys::WrenInterpretResult_WREN_RESULT_COMPILE_ERROR => Err(Self::Compile),
+            wren_sys::WrenInterpretResult_WREN_RESULT_RUNTIME_ERROR => Err(Self::Runtime),
+            wren_sys::WrenInterpretResult_WREN_RESULT_SUCCESS => Ok(()),
+            kind => Err(Self::Unknown(kind)),
+        }
+    }
 }
 
 #[allow(unused_variables)]
@@ -90,7 +175,7 @@ pub trait VmUserData {
 }
 
 pub struct Vm<V> {
-    vm: *mut wren_sys::WrenVM,
+    vm: VMPtr,
     // This value is held here so that it is
     // disposed of properly when execution is finished
     // but it isn't actually used in the struct
@@ -99,7 +184,7 @@ pub struct Vm<V> {
 
 impl<V> Drop for Vm<V> {
     fn drop(&mut self) {
-        unsafe { wren_sys::wrenFreeVM(self.vm) }
+        unsafe { wrenFreeVM(self.vm.0.as_ptr()) }
     }
 }
 
@@ -107,10 +192,10 @@ impl<V> Vm<V>
 where
     V: VmUserData,
 {
-    pub fn new(user_data: V) -> Self {
+    pub fn new(user_data: V) -> Option<Self> {
         unsafe {
-            let mut config: wren_sys::WrenConfiguration = MaybeUninit::zeroed().assume_init();
-            wren_sys::wrenInitConfiguration(&mut config);
+            let mut config: WrenConfiguration = MaybeUninit::zeroed().assume_init();
+            wrenInitConfiguration(&mut config);
 
             let user_data = Box::pin(RefCell::new(user_data));
 
@@ -118,12 +203,12 @@ where
             config.errorFn = Some(error_fn::<V>);
             config.userData = user_data.as_ptr().cast::<c_void>();
 
-            let vm = wren_sys::wrenNewVM(&mut config);
+            let vm = VMPtr(NonNull::new(wrenNewVM(&mut config))?);
 
-            Self {
+            Some(Self {
                 vm,
                 _user_data: user_data,
-            }
+            })
         }
     }
 
@@ -135,18 +220,9 @@ where
         unsafe {
             let module = CString::new(module.as_ref()).unwrap();
             let source = CString::new(source.as_ref()).unwrap();
-            let result = wren_sys::wrenInterpret(self.vm, module.as_ptr(), source.as_ptr());
+            let result = wrenInterpret(self.vm.0.as_ptr(), module.as_ptr(), source.as_ptr());
 
-            match result {
-                wren_sys::WrenInterpretResult_WREN_RESULT_COMPILE_ERROR => {
-                    Err(InterpretResultErrorKind::Compile)
-                }
-                wren_sys::WrenInterpretResult_WREN_RESULT_RUNTIME_ERROR => {
-                    Err(InterpretResultErrorKind::Runtime)
-                }
-                wren_sys::WrenInterpretResult_WREN_RESULT_SUCCESS => Ok(()),
-                kind => Err(InterpretResultErrorKind::Unknown(kind)),
-            }
+            InterpretResultErrorKind::new_from_result(result)
         }
     }
 }

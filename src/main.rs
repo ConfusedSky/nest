@@ -3,6 +3,7 @@
 
 use std::{env, fs, path::PathBuf};
 
+mod modules;
 mod wren;
 mod wren_sys;
 
@@ -50,7 +51,7 @@ fn main() {
         .unwrap_or_else(|_| panic!("Ensure {} is a valid module name to continue", &module));
 
     let user_data = MyUserData;
-    let vm = wren::Vm::new(user_data);
+    let vm = wren::Vm::new(user_data).unwrap();
 
     let result = vm.interpret(module, source);
 
