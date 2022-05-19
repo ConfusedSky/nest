@@ -184,6 +184,11 @@ impl VMPtr {
         NonNull::new_unchecked(wren_sys::wrenGetSlotHandle(self.0.as_ptr(), slot))
     }
 
+    /// SAFETY: Calling this on a slot that isn't a bool or a valid slot is undefined behavior
+    pub unsafe fn get_slot_double_unchecked(self, slot: Slot) -> f64 {
+        wren_sys::wrenGetSlotDouble(self.0.as_ptr(), slot)
+    }
+
     /// SAFETY: this is always non null but will segfault if an invalid slot
     /// is asked for
     /// MAYBE: Will seg fault if the variable does not exist?

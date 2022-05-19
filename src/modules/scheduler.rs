@@ -41,7 +41,7 @@ impl Drop for Scheduler {
 }
 
 impl Scheduler {
-    unsafe fn resume(&self, fiber: NonNull<wren_sys::WrenHandle>, has_argument: bool) {
+    pub unsafe fn resume(&self, fiber: NonNull<wren_sys::WrenHandle>, has_argument: bool) {
         self.vm.ensure_slots(2 + if has_argument { 1 } else { 0 });
         self.vm.set_slot_handle_unchecked(0, self.class);
         self.vm.set_slot_handle_unchecked(1, fiber);
@@ -51,10 +51,10 @@ impl Scheduler {
             _resume(self.vm, self.resume1);
         }
     }
-    unsafe fn finish_resume(&self) {
+    pub unsafe fn finish_resume(&self) {
         _resume(self.vm, self.resume2);
     }
-    unsafe fn resume_error<S>(&self, fiber: NonNull<wren_sys::WrenHandle>, error: S)
+    pub unsafe fn resume_error<S>(&self, fiber: NonNull<wren_sys::WrenHandle>, error: S)
     where
         S: AsRef<str>,
     {

@@ -78,13 +78,6 @@ impl wren::VmUserData for MyUserData {
     }
 }
 
-use tokio::time;
-async fn my_bg_task() {
-    println!("Task start");
-    time::sleep(time::Duration::from_millis(1000)).await;
-    println!("Task end");
-}
-
 fn main() {
     // There is always the executables name which we can skip
     let module: Option<String> = env::args().nth(1);
@@ -103,17 +96,16 @@ fn main() {
     let source = fs::read_to_string(&module_path)
         .unwrap_or_else(|_| panic!("Ensure {} is a valid module name to continue", &module));
 
-    let mut user_data = MyUserData::new();
-    user_data.enqueue_future(my_bg_task());
+    let user_data = MyUserData::new();
     let vm = wren::Vm::new(user_data).unwrap();
 
     let result = vm.interpret(module, source);
 
     match result {
-        Ok(()) => println!("SUCCESS"),
-        Err(wren::InterpretResultErrorKind::Compile) => println!("COMPILE_ERROR"),
-        Err(wren::InterpretResultErrorKind::Runtime) => println!("RUNTIME_ERROR"),
-        Err(wren::InterpretResultErrorKind::Unknown(kind)) => println!("UNKNOWN ERROR: {}", kind),
+        Ok(()) => (),
+        Err(wren::InterpretResultErrorKind::Compile) => panic!("COMPILE_ERROR"),
+        Err(wren::InterpretResultErrorKind::Runtime) => panic!("RUNTIME_ERROR"),
+        Err(wren::InterpretResultErrorKind::Unknown(kind)) => panic!("UNKNOWN ERROR: {}", kind),
     }
 
     let runtime = Builder::new_current_thread().enable_all().build().unwrap();
@@ -124,10 +116,15 @@ fn main() {
     let user_data = unsafe { vm.get_ptr().get_user_data::<MyUserData>() };
     if let Some(user_data) = user_data {
         runtime.block_on(local_set.run_until(async {
+            let mut handles = vec![];
             let mut next = user_data.next_item();
             while let Some(future) = next {
-                future.await;
+                handles.push(tokio::task::spawn_local(future));
                 next = user_data.next_item();
+            }
+
+            for handle in handles {
+                handle.await.unwrap();
             }
         }));
     }

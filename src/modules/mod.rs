@@ -1,6 +1,7 @@
 #!allow(unsafe_code);
 
 mod scheduler;
+mod timer;
 
 use crate::wren;
 use std::collections::HashMap;
@@ -49,6 +50,19 @@ fn modules_init() -> HashMap<&'static str, Module> {
         .insert("Scheduler".to_string(), scheduler_class);
 
     m.insert("scheduler", scheduler_module);
+
+    let timer_source = include_str!("timer.wren");
+
+    let mut timer_class = Class::new();
+    timer_class
+        .static_methods
+        .insert("startTimer_(_,_)".to_string(), timer::start_timer);
+
+    let mut timer_module = Module::new(CString::new(timer_source).unwrap());
+    timer_module
+        .classes
+        .insert("Timer".to_string(), timer_class);
+    m.insert("timer", timer_module);
 
     m
 }
