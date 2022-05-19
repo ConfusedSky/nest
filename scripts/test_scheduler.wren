@@ -16,12 +16,20 @@ Scheduler.add {
     System.print("In Task 2")
     Timer.sleep(50)
     System.print("End Task 2")
+
+    Scheduler.add {
+        System.print("This should happen almost immediately")
+    }
 }
 
 Scheduler.add {
     System.print("In Task 3")
     Timer.sleep(1000)
     System.print("End Task 3")
+
+    Scheduler.add {
+        System.print("Will this one be scheduled?")
+    }
 }
 
 System.print(x)
