@@ -2,21 +2,65 @@
 
 mod scheduler;
 
+use crate::wren;
 use std::collections::HashMap;
 use std::ffi::CString;
 
+pub struct Class {
+    pub methods: HashMap<String, wren::ForeignMethod>,
+    pub static_methods: HashMap<String, wren::ForeignMethod>,
+}
+
+impl Class {
+    fn new() -> Self {
+        Self {
+            methods: HashMap::new(),
+            static_methods: HashMap::new(),
+        }
+    }
+}
+
+pub struct Module {
+    pub source: CString,
+    pub classes: HashMap<String, Class>,
+}
+
+impl Module {
+    fn new(source: CString) -> Self {
+        Self {
+            source,
+            classes: HashMap::new(),
+        }
+    }
+}
+
+fn modules_init() -> HashMap<&'static str, Module> {
+    let mut m = HashMap::new();
+    let scheduler_source = include_str!("scheduler.wren");
+
+    let mut scheduler_class = Class::new();
+    scheduler_class
+        .static_methods
+        .insert("captureMethods_()".to_string(), scheduler::capture_methods);
+
+    let mut scheduler_module = Module::new(CString::new(scheduler_source).unwrap());
+    scheduler_module
+        .classes
+        .insert("Scheduler".to_string(), scheduler_class);
+
+    m.insert("scheduler", scheduler_module);
+
+    m
+}
+
 lazy_static! {
     // TODO: Refactor to make this not require modules to stay in memory indefinitely
-    static ref MODULES: HashMap<&'static str, CString> = {
-        let mut m = HashMap::new();
-        let scheduler = include_str!("scheduler.wren");
-        m.insert("scheduler", CString::new(scheduler).unwrap());
-
-        m
+    static ref MODULES: HashMap<&'static str, Module> = {
+        modules_init()
     };
 }
 
-pub fn get_module<S>(name: S) -> Option<&'static CString>
+pub fn get_module<S>(name: S) -> Option<&'static Module>
 where
     S: AsRef<str>,
 {

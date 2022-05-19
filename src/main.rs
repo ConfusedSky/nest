@@ -36,8 +36,22 @@ impl wren::VmUserData for MyUserData {
         print!("{}", text);
     }
     fn load_module(&mut self, name: &str) -> Option<&'static CString> {
-        println!("IMPORT name: {}", name);
-        crate::modules::get_module(name)
+        crate::modules::get_module(name).map(|module| &module.source)
+    }
+    fn bind_foreign_method(
+        &mut self,
+        module: &str,
+        class_name: &str,
+        is_static: bool,
+        signature: &str,
+    ) -> Option<wren::ForeignMethod> {
+        let module = crate::modules::get_module(module)?;
+        let class = module.classes.get(class_name)?;
+        if is_static {
+            class.static_methods.get(signature).copied()
+        } else {
+            class.methods.get(signature).copied()
+        }
     }
 }
 

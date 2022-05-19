@@ -27,6 +27,19 @@ pub struct Scheduler {
     resume_error: NonNull<wren_sys::WrenHandle>,
 }
 
+impl Drop for Scheduler {
+    fn drop(&mut self) {
+        let scheduler = self;
+        let vm = scheduler.vm;
+        unsafe {
+            vm.release_handle_unchecked(scheduler.class);
+            vm.release_handle_unchecked(scheduler.resume1);
+            vm.release_handle_unchecked(scheduler.resume2);
+            vm.release_handle_unchecked(scheduler.resume_error);
+        }
+    }
+}
+
 impl Scheduler {
     unsafe fn resume(&self, fiber: NonNull<wren_sys::WrenHandle>, has_argument: bool) {
         self.vm.ensure_slots(2 + if has_argument { 1 } else { 0 });
@@ -72,20 +85,6 @@ pub unsafe fn capture_methods(vm: wren::VMPtr) {
         resume2,
         resume_error,
     });
-}
-
-pub unsafe fn shutdown(vm: wren::VMPtr) {
-    let scheduler = SCHEDULER.get_mut();
-
-    if scheduler.is_none() {
-        return;
-    }
-
-    let scheduler = scheduler.take().unwrap();
-    vm.release_handle_unchecked(scheduler.class);
-    vm.release_handle_unchecked(scheduler.resume1);
-    vm.release_handle_unchecked(scheduler.resume2);
-    vm.release_handle_unchecked(scheduler.resume_error);
 }
 
 pub unsafe fn get<'s>() -> Option<&'s Scheduler> {

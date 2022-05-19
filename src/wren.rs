@@ -15,6 +15,8 @@ use crate::wren_sys::{
     WrenErrorType, WrenHandle, WrenInterpretResult, WrenVM,
 };
 
+pub type ForeignMethod = unsafe fn(vm: VMPtr);
+
 unsafe fn get_user_data<'s, V>(vm: *mut WrenVM) -> Option<&'s mut V> {
     let user_data = wrenGetUserData(vm);
     if user_data.is_null() {
@@ -27,7 +29,7 @@ unsafe fn get_user_data<'s, V>(vm: *mut WrenVM) -> Option<&'s mut V> {
 // Allow custom logic later this is just for testing for now
 unsafe extern "C" fn resolve_module<V: VmUserData>(
     _vm: *mut WrenVM,
-    resolver: *const i8,
+    _resolver: *const i8,
     name: *const i8,
 ) -> *const i8 {
     name
@@ -53,6 +55,41 @@ unsafe extern "C" fn load_module<V: VmUserData>(
             }
 
             result
+        },
+    )
+}
+
+unsafe extern "C" fn foreign_method<F>(vm: *mut WrenVM)
+where
+    F: Fn(VMPtr) + Default,
+{
+    let function = F::default();
+    let vm = NonNull::new_unchecked(vm);
+    function(VMPtr(vm));
+}
+
+unsafe extern "C" fn bind_foreign_method<V: VmUserData>(
+    vm: *mut WrenVM,
+    module: *const i8,
+    class_name: *const i8,
+    is_static: bool,
+    signature: *const i8,
+) -> wren_sys::WrenForeignMethodFn {
+    let user_data = get_user_data::<V>(vm);
+
+    user_data.map_or_else(
+        || std::mem::zeroed(),
+        |user_data| {
+            let module = CStr::from_ptr(module).to_string_lossy();
+            let class_name = CStr::from_ptr(class_name).to_string_lossy();
+            let signature = CStr::from_ptr(signature).to_string_lossy();
+
+            let method = user_data.bind_foreign_method(
+                module.as_ref(),
+                class_name.as_ref(),
+                is_static,
+                signature.as_ref(),
+            )?;
         },
     )
 }
@@ -241,7 +278,7 @@ pub trait VmUserData {
         classname: &str,
         is_static: bool,
         signature: &str,
-    ) -> wren_sys::WrenForeignMethodFn {
+    ) -> Option<ForeignMethod> {
         unsafe { std::mem::zeroed() }
     }
     // Default behavior is to return a struct with fields nulled out
@@ -286,6 +323,7 @@ where
             config.errorFn = Some(error_fn::<V>);
             config.loadModuleFn = Some(load_module::<V>);
             config.resolveModuleFn = Some(resolve_module::<V>);
+            config.bindForeignMethodFn = Some(bind_foreign_method::<V>);
             config.userData = user_data.as_ptr().cast::<c_void>();
 
             let vm = VMPtr(NonNull::new(wrenNewVM(&mut config))?);
