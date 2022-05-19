@@ -4,7 +4,7 @@ use std::{
     borrow::Cow,
     cell::RefCell,
     ffi::{c_void, CStr, CString},
-    mem::MaybeUninit,
+    mem::{transmute_copy, MaybeUninit},
     pin::Pin,
     ptr::NonNull,
 };
@@ -59,15 +59,6 @@ unsafe extern "C" fn load_module<V: VmUserData>(
     )
 }
 
-unsafe extern "C" fn foreign_method<F>(vm: *mut WrenVM)
-where
-    F: Fn(VMPtr) + Default,
-{
-    let function = F::default();
-    let vm = NonNull::new_unchecked(vm);
-    function(VMPtr(vm));
-}
-
 unsafe extern "C" fn bind_foreign_method<V: VmUserData>(
     vm: *mut WrenVM,
     module: *const i8,
@@ -90,6 +81,9 @@ unsafe extern "C" fn bind_foreign_method<V: VmUserData>(
                 is_static,
                 signature.as_ref(),
             )?;
+
+            // Safety: VMPtr is a transparent wrapper over a VM pointer
+            transmute_copy(&method)
         },
     )
 }
