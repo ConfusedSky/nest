@@ -144,6 +144,12 @@ impl VMPtr {
         Self(NonNull::new_unchecked(vm))
     }
 
+    /// SAFETY: This is not guarenteed to be safe the user needs to know to input
+    /// the correct type
+    pub unsafe fn get_user_data<'s, V: VmUserData>(self) -> Option<&'s mut V> {
+        get_user_data(self.0.as_ptr())
+    }
+
     /// SAFETY: Will segfault if an invalid slot
     /// is asked for
     pub unsafe fn set_slot_handle_unchecked(self, slot: Slot, handle: Handle) {
@@ -327,6 +333,10 @@ where
                 _user_data: user_data,
             })
         }
+    }
+
+    pub fn get_ptr(&self) -> VMPtr {
+        self.vm
     }
 
     pub fn interpret<M, S>(&self, module: M, source: S) -> Result<(), InterpretResultErrorKind>
