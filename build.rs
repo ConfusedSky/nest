@@ -6,6 +6,7 @@ use std::path::PathBuf;
 fn main() {
     const WREN_H: &str = "lib/wren/src/include/wren.h";
     println!("cargo:rerun-if-changed={}", WREN_H);
+    println!("cargo:rerun-if-changed=lib/wren/lib/libwren.a");
 
     // TODO: Actaully build this in this build script
     println!("cargo:rustc-link-search=lib/wren/lib");

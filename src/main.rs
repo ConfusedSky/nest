@@ -1,7 +1,10 @@
 #![deny(clippy::all)]
 #![warn(clippy::pedantic, clippy::nursery, unsafe_code)]
 
-use std::{env, fs, path::PathBuf};
+#[macro_use]
+extern crate lazy_static;
+
+use std::{env, ffi::CString, fs, path::PathBuf};
 
 use wren::VMPtr;
 
@@ -31,6 +34,10 @@ impl wren::VmUserData for MyUserData {
     }
     fn on_write(&mut self, _: VMPtr, text: &str) {
         print!("{}", text);
+    }
+    fn load_module(&mut self, name: &str) -> Option<&'static CString> {
+        println!("IMPORT name: {}", name);
+        crate::modules::get_module(name)
     }
 }
 

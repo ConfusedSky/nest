@@ -24,6 +24,39 @@ unsafe fn get_user_data<'s, V>(vm: *mut WrenVM) -> Option<&'s mut V> {
     }
 }
 
+// Allow custom logic later this is just for testing for now
+unsafe extern "C" fn resolve_module<V: VmUserData>(
+    _vm: *mut WrenVM,
+    resolver: *const i8,
+    name: *const i8,
+) -> *const i8 {
+    name
+}
+
+unsafe extern "C" fn load_module<V: VmUserData>(
+    vm: *mut WrenVM,
+    name: *const i8,
+) -> wren_sys::WrenLoadModuleResult {
+    let user_data = get_user_data::<V>(vm);
+
+    user_data.map_or_else(
+        || std::mem::zeroed(),
+        |user_data| {
+            let name = CStr::from_ptr(name).to_string_lossy();
+
+            let source = user_data.load_module(name.as_ref());
+
+            let mut result: wren_sys::WrenLoadModuleResult = std::mem::zeroed();
+
+            if let Some(source) = source {
+                result.source = source.as_ptr();
+            }
+
+            result
+        },
+    )
+}
+
 unsafe extern "C" fn write_fn<V: VmUserData>(vm: *mut WrenVM, text: *const i8) {
     let user_data = get_user_data::<V>(vm);
 
@@ -191,23 +224,33 @@ impl InterpretResultErrorKind {
     }
 }
 
+lazy_static! {
+    static ref EMPTY_CSTRING: CString =
+        unsafe { CString::from_vec_with_nul_unchecked(b"\0".to_vec()) };
+}
+
 #[allow(unused_variables)]
 // We define empty defaults here so that the user can define what they want
 pub trait VmUserData {
-    fn load_module(name: &str) -> wren_sys::WrenLoadModuleResult {
-        unsafe { std::mem::zeroed() }
+    fn load_module(&mut self, name: &str) -> Option<&'static CString> {
+        Some(&EMPTY_CSTRING)
     }
     fn bind_foreign_method(
+        &mut self,
         module: &str,
         classname: &str,
         is_static: bool,
         signature: &str,
-    ) -> *mut wren_sys::WrenForeignMethodFn {
+    ) -> wren_sys::WrenForeignMethodFn {
         unsafe { std::mem::zeroed() }
     }
     // Default behavior is to return a struct with fields nulled out
     // so this is fine
-    fn bind_foreign_class(module: &str, classname: &str) -> wren_sys::WrenForeignClassMethods {
+    fn bind_foreign_class(
+        &mut self,
+        module: &str,
+        classname: &str,
+    ) -> wren_sys::WrenForeignClassMethods {
         unsafe { std::mem::zeroed() }
     }
     fn on_write(&mut self, vm: VMPtr, text: &str) {}
@@ -241,6 +284,8 @@ where
 
             config.writeFn = Some(write_fn::<V>);
             config.errorFn = Some(error_fn::<V>);
+            config.loadModuleFn = Some(load_module::<V>);
+            config.resolveModuleFn = Some(resolve_module::<V>);
             config.userData = user_data.as_ptr().cast::<c_void>();
 
             let vm = VMPtr(NonNull::new(wrenNewVM(&mut config))?);
