@@ -322,6 +322,7 @@ where
             let mut config: WrenConfiguration = MaybeUninit::zeroed().assume_init();
             wrenInitConfiguration(&mut config);
 
+            // TODO: Check if this is a zst and don't allocate space if not
             let user_data = Box::pin(RefCell::new(user_data));
 
             config.writeFn = Some(write_fn::<V>);
