@@ -7,6 +7,9 @@
 #[macro_use]
 extern crate lazy_static;
 
+#[macro_use]
+extern crate static_assertions;
+
 use std::{env, ffi::CString, fs, future::Future, path::PathBuf, pin::Pin};
 use tokio::runtime::Builder;
 

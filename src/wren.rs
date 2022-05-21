@@ -27,6 +27,8 @@ unsafe fn get_user_data<'s, V>(vm: *mut WrenVM) -> Option<&'s mut V> {
 }
 
 // Allow custom logic later this is just for testing for now
+// const extern functions aren't stable so this should be ignored
+#[allow(clippy::missing_const_for_fn)]
 unsafe extern "C" fn resolve_module<V: VmUserData>(
     _vm: *mut WrenVM,
     _resolver: *const i8,
@@ -135,6 +137,13 @@ unsafe extern "C" fn error_fn<V: VmUserData>(
 #[repr(transparent)]
 #[derive(Debug, Clone, Copy)]
 pub struct VMPtr(NonNull<WrenVM>);
+
+// Ensure that VMPtr is the same Size as `*mut WrenVM`
+// the whole purpose of it is to make it easier to access
+// the wren api, without having to sacrifice size, performance or ergonomics
+// So they should be directly castable
+static_assertions::assert_eq_align!(VMPtr, *mut WrenVM);
+static_assertions::assert_eq_size!(VMPtr, *mut WrenVM);
 
 type Slot = std::os::raw::c_int;
 type Handle = NonNull<WrenHandle>;
