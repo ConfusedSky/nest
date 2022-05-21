@@ -2,7 +2,8 @@
 
 use std::{cell::RefCell, ptr::NonNull};
 
-use crate::{wren, wren_sys, MyUserData};
+use crate::{wren, MyUserData};
+use wren_sys;
 
 static mut SCHEDULER: RefCell<Option<Scheduler>> = RefCell::new(None);
 

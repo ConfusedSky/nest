@@ -9,7 +9,7 @@ use std::{
     ptr::NonNull,
 };
 
-use crate::wren_sys::{
+use wren_sys::{
     self, wrenCall, wrenFreeVM, wrenGetUserData, wrenGetVariable, wrenInitConfiguration,
     wrenInterpret, wrenMakeCallHandle, wrenNewVM, wrenReleaseHandle, WrenConfiguration,
     WrenErrorType, WrenHandle, WrenInterpretResult, WrenVM,

@@ -7,14 +7,13 @@
 #[macro_use]
 extern crate lazy_static;
 
-use std::{env, ffi::CString, fs, future::Future, path::PathBuf, pin::Pin, ptr::NonNull};
+use std::{env, ffi::CString, fs, future::Future, path::PathBuf, pin::Pin};
 use tokio::runtime::Builder;
 
 use wren::VMPtr;
 
 mod modules;
 mod wren;
-mod wren_sys;
 
 struct MyUserData {
     queue: Vec<Pin<Box<dyn Future<Output = ()>>>>,
