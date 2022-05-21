@@ -8,12 +8,11 @@ class Scheduler {
     })
   }
 
-  static hasWaitingFibers {
-    if (__waiting == null) {
-      return false
-    } else {
-      return !__waiting.isEmpty
-    }
+  // Hands control from this Fiber to the scheduler and lets it run
+  // Effectively does the same thing as `Timer.sleep(0)`
+  // TODO: Implement this without requiring a timer to be built
+  static runScheduled() {
+    return Timer.sleep(0)
   }
 
   // Wait for all scheduled async tasks to complete before rescheduling this fiber to
@@ -61,5 +60,9 @@ class Scheduler {
   foreign static captureMethods_()
   foreign static awaitAll_()
 }
+
+// Timer must be imported after scheduler is defined because of the way imports work
+import "timer" for Timer
+
 
 Scheduler.captureMethods_()
