@@ -24,7 +24,7 @@ impl MyUserData {
         }
     }
 
-    pub fn enqueue_future<F>(&mut self, future: F)
+    pub fn schedule_task<F>(&mut self, future: F)
     where
         F: 'static + Future<Output = ()>,
     {
@@ -118,13 +118,61 @@ fn main() {
         runtime.block_on(local_set.run_until(async {
             let mut handles = vec![];
             let mut next = user_data.next_item();
-            while let Some(future) = next {
-                handles.push(tokio::task::spawn_local(future));
-                next = user_data.next_item();
-            }
 
-            for handle in handles {
-                handle.await.unwrap();
+            // Loop as long as new tasks are still being created
+            // Loop is structured this way so that mutiple items can be
+            // added to the queue from a single Fiber and multiple asynchronous calls
+            // can be made from a single fiber as well.
+            // If each call awaited imidiately this would still work but all tasks would complete in
+            // order they were enqueued, which would cause faster processes to wait for slower
+            // processes if they were scheduled after the slower process.
+            //
+            // For example if you had two Fibers with timers
+            // Scheduler.add {
+            //   Timer.sleep(1000)
+            //   System.print("Task 1 complete")
+            // }
+            // Scheduler.add {
+            //   Timer.sleep(500)
+            //   System.print("Task 2 complete")
+            // }
+            // Timer.sleep(0)
+            // Would result in "Task 1 complete" printing before "Task 2 complete" printing
+            //
+            // And if we only spawned the handles that exist at the time of calling without
+            // looping then each Fiber could only have one async call in it with any other
+            // call in that fiber not being awaited on. This is because new async calls
+            // are never spawned on the async runtime
+            //
+            // So
+            // Scheduler.add {
+            //   Timer.sleep(100)
+            //   System.print("Do 1")
+            //   Timer.sleep(100)
+            //   System.print("Do 2")
+            // }
+            // Timer.sleep(0)
+            // Would only print "Do 1"
+            loop {
+                // Let each existing handle run locally
+                while let Some(future) = next {
+                    handles.push(tokio::task::spawn_local(future));
+                    next = user_data.next_item();
+                }
+
+                // If there are no new handles then break out of the loop
+                if handles.is_empty() {
+                    break;
+                }
+
+                // Wait for existing handles then clear the handles
+                for handle in &mut handles {
+                    handle.await.unwrap();
+                }
+                handles.clear();
+
+                // Check the queue for another handle
+                next = user_data.next_item();
             }
         }));
     }

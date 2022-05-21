@@ -56,7 +56,7 @@ fn modules_init() -> HashMap<&'static str, Module> {
     let mut timer_class = Class::new();
     timer_class
         .static_methods
-        .insert("startTimer_(_,_)".to_string(), timer::start_timer);
+        .insert("startTimer_(_,_)".to_string(), timer::start);
 
     let mut timer_module = Module::new(CString::new(timer_source).unwrap());
     timer_module

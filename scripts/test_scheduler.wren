@@ -7,6 +7,7 @@ Scheduler.add {
 }
 
 Scheduler.add {
+    Timer.sleep(1000)
     System.print("In Task 1")
     Timer.sleep(500)
     System.print("End Task 1")

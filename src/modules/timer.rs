@@ -7,17 +7,16 @@ use crate::MyUserData;
 
 use super::scheduler::get;
 
-pub unsafe fn start_timer(vm: wren::VMPtr) {
+pub unsafe fn start(vm: wren::VMPtr) {
     let scheduler = get().unwrap();
     let user_data = vm.get_user_data::<MyUserData>().unwrap();
 
-    let ms = vm.get_slot_double_unchecked(1) as u64;
+    // We are guarenteed ms is positive based on usage
+    let ms = vm.get_slot_double_unchecked(1) as u32;
     let fiber = vm.get_slot_handle_unchecked(2);
 
-    let future = async move {
-        sleep(Duration::from_millis(ms)).await;
+    user_data.schedule_task(async move {
+        sleep(Duration::from_millis(ms.into())).await;
         scheduler.resume(fiber, false);
-    };
-
-    user_data.enqueue_future(future);
+    });
 }
