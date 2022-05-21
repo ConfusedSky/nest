@@ -20,8 +20,8 @@ class Scheduler {
   static awaitAll() {
     if (__waiting == null) __waiting = []
     __waiting.add(Fiber.current)
-    Scheduler.awaitAll_()
-    return Scheduler.runNextScheduled_()
+    awaitAll_()
+    return runNextScheduled_()
   }
 
   // Called by native code.
@@ -32,7 +32,7 @@ class Scheduler {
     if (__waiting != null) {
       // Reschedule all waiting fibers
       for (fiber in __waiting) {
-        Scheduler.add {
+        add {
           fiber.transfer()
         }
       }
@@ -40,20 +40,24 @@ class Scheduler {
       __waiting.clear()
     }
     // Run the next scheduled fiber
-    return Scheduler.runNextScheduled_()
+    return runNextScheduled_()
   }
 
   // wait for a method to finish that has a callback on the C side
   static await_(fn) {
     fn.call()
-    return Scheduler.runNextScheduled_()
+    return runNextScheduled_()
+  }
+
+  static hasNext_ {
+    return __scheduled != null && !__scheduled.isEmpty
   }
 
   static runNextScheduled_() {
-    if (__scheduled == null || __scheduled.isEmpty) {
-      return Fiber.suspend()
-    } else {
+    if (hasNext_) {
       return __scheduled.removeAt(0).transfer()
+    } else {
+      return Fiber.suspend()
     }
   }
 

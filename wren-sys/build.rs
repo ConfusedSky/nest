@@ -23,8 +23,8 @@ fn main() {
             .current_dir(wren_dir)
             .arg(script)
             .output()
-            .expect("Amalgamation script failed to build");
-        std::fs::write(wren_c_path, &result.stdout).expect("Failed writing WREN_C");
+            .expect("Amalgamation script failed to run");
+        std::fs::write(wren_c_path, &result.stdout).expect("Failed writing wren.c");
     }
 
     cc::Build::new()

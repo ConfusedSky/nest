@@ -11,7 +11,7 @@ unsafe fn _resume(vm: wren::VMPtr, method: NonNull<wren_sys::WrenHandle>) {
     let result = vm.call(method);
 
     if let Err(wren::InterpretResultErrorKind::Runtime) = result {
-        panic!("AHHHHHHHHH")
+        panic!("Fiber panicked after resuming.");
     }
 }
 #[derive(Debug)]
@@ -27,6 +27,8 @@ pub struct Scheduler {
     resume2: NonNull<wren_sys::WrenHandle>,
     resume_error: NonNull<wren_sys::WrenHandle>,
     resume_waiting: NonNull<wren_sys::WrenHandle>,
+    has_next: NonNull<wren_sys::WrenHandle>,
+    run_next_scheduled: NonNull<wren_sys::WrenHandle>,
 }
 
 impl Drop for Scheduler {
@@ -39,6 +41,8 @@ impl Drop for Scheduler {
             vm.release_handle_unchecked(scheduler.resume2);
             vm.release_handle_unchecked(scheduler.resume_error);
             vm.release_handle_unchecked(scheduler.resume_waiting);
+            vm.release_handle_unchecked(scheduler.has_next);
+            vm.release_handle_unchecked(scheduler.run_next_scheduled);
         }
     }
 }
@@ -72,6 +76,17 @@ impl Scheduler {
         self.vm.set_slot_handle_unchecked(0, self.class);
         _resume(self.vm, self.resume_waiting);
     }
+    pub unsafe fn has_next(&self) -> bool {
+        self.vm.ensure_slots(1);
+        self.vm.set_slot_handle_unchecked(0, self.class);
+        _resume(self.vm, self.has_next);
+        self.vm.get_slot_bool_unchecked(0)
+    }
+    pub unsafe fn run_next_scheduled(&self) {
+        self.vm.ensure_slots(1);
+        self.vm.set_slot_handle_unchecked(0, self.class);
+        _resume(self.vm, self.run_next_scheduled);
+    }
 }
 
 unsafe impl Send for Scheduler {}
@@ -87,6 +102,8 @@ pub unsafe fn capture_methods(vm: wren::VMPtr) {
     let resume2 = vm.make_call_handle("resume_(_,_)");
     let resume_error = vm.make_call_handle("resumeError_(_,_)");
     let resume_waiting = vm.make_call_handle("resumeWaitingFibers_()");
+    let has_next = vm.make_call_handle("hasNext_");
+    let run_next_scheduled = vm.make_call_handle("runNextScheduled_()");
 
     let scheduler = SCHEDULER.get_mut();
     *scheduler = Some(Scheduler {
@@ -96,6 +113,8 @@ pub unsafe fn capture_methods(vm: wren::VMPtr) {
         resume2,
         resume_error,
         resume_waiting,
+        has_next,
+        run_next_scheduled,
     });
 }
 

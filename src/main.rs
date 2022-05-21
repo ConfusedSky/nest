@@ -7,9 +7,6 @@
 #[macro_use]
 extern crate lazy_static;
 
-#[macro_use]
-extern crate static_assertions;
-
 use std::{env, ffi::CString, fs, future::Future, path::PathBuf, pin::Pin};
 use tokio::runtime::Builder;
 
@@ -192,12 +189,18 @@ fn main() {
     #[allow(unsafe_code)]
     let user_data = unsafe { vm.get_ptr().get_user_data::<MyUserData>() };
     if let Some(user_data) = user_data {
+        let scheduler = unsafe { modules::scheduler::get().unwrap() };
         loop {
             user_data.run_async_loop(&runtime);
+
+            // If there are waiting fibers or fibers that have been scheduled
+            // but never had control handed over to them make sure they get a chance to run
             if user_data.has_waiting_fibers {
                 unsafe {
-                    modules::scheduler::get().unwrap().resume_waiting();
+                    scheduler.resume_waiting();
                 }
+            } else if unsafe { scheduler.has_next() } {
+                unsafe { scheduler.run_next_scheduled() }
             } else {
                 break;
             }
