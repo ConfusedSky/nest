@@ -236,12 +236,14 @@ impl VMPtr {
     }
 }
 
+#[derive(Debug)]
 pub struct ErrorContext<'s> {
     pub module: &'s str,
     pub line: i32,
     pub msg: &'s str,
 }
 
+#[derive(Debug)]
 pub enum ErrorKind<'s> {
     Compile(ErrorContext<'s>),
     Runtime(&'s str),
@@ -249,6 +251,7 @@ pub enum ErrorKind<'s> {
     Unknown(WrenErrorType, ErrorContext<'s>),
 }
 
+#[derive(Debug)]
 pub enum InterpretResultErrorKind {
     Compile,
     Runtime,

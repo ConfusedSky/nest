@@ -2,7 +2,7 @@
 
 use std::{cell::RefCell, ptr::NonNull};
 
-use crate::{wren, wren_sys};
+use crate::{wren, wren_sys, MyUserData};
 
 static mut SCHEDULER: RefCell<Option<Scheduler>> = RefCell::new(None);
 
@@ -25,6 +25,7 @@ pub struct Scheduler {
     resume1: NonNull<wren_sys::WrenHandle>,
     resume2: NonNull<wren_sys::WrenHandle>,
     resume_error: NonNull<wren_sys::WrenHandle>,
+    resume_waiting: NonNull<wren_sys::WrenHandle>,
 }
 
 impl Drop for Scheduler {
@@ -36,6 +37,7 @@ impl Drop for Scheduler {
             vm.release_handle_unchecked(scheduler.resume1);
             vm.release_handle_unchecked(scheduler.resume2);
             vm.release_handle_unchecked(scheduler.resume_error);
+            vm.release_handle_unchecked(scheduler.resume_waiting);
         }
     }
 }
@@ -62,6 +64,13 @@ impl Scheduler {
         self.vm.set_slot_string_unchecked(2, error);
         _resume(self.vm, self.resume_error);
     }
+    pub unsafe fn resume_waiting(&self) {
+        let mut user_data = self.vm.get_user_data::<MyUserData>().unwrap();
+        user_data.has_waiting_fibers = false;
+        self.vm.ensure_slots(1);
+        self.vm.set_slot_handle_unchecked(0, self.class);
+        _resume(self.vm, self.resume_waiting);
+    }
 }
 
 unsafe impl Send for Scheduler {}
@@ -76,6 +85,7 @@ pub unsafe fn capture_methods(vm: wren::VMPtr) {
     let resume1 = vm.make_call_handle("resume_(_)");
     let resume2 = vm.make_call_handle("resume_(_,_)");
     let resume_error = vm.make_call_handle("resumeError_(_,_)");
+    let resume_waiting = vm.make_call_handle("resumeWaitingFibers_()");
 
     let scheduler = SCHEDULER.get_mut();
     *scheduler = Some(Scheduler {
@@ -84,7 +94,13 @@ pub unsafe fn capture_methods(vm: wren::VMPtr) {
         resume1,
         resume2,
         resume_error,
+        resume_waiting,
     });
+}
+
+pub unsafe fn await_all(vm: wren::VMPtr) {
+    let mut user_data = vm.get_user_data::<MyUserData>().unwrap();
+    user_data.has_waiting_fibers = true;
 }
 
 pub unsafe fn get<'s>() -> Option<&'s Scheduler> {

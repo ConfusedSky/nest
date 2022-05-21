@@ -36,3 +36,5 @@ Scheduler.add {
 System.print(x)
 Timer.sleep(100)
 System.print(x)
+Scheduler.awaitAll()
+System.print("Finished")

@@ -5,10 +5,10 @@ use tokio::time::{sleep, Duration};
 use crate::wren;
 use crate::MyUserData;
 
-use super::scheduler::get;
+use super::scheduler;
 
 pub unsafe fn start(vm: wren::VMPtr) {
-    let scheduler = get().unwrap();
+    let scheduler = scheduler::get().unwrap();
     let user_data = vm.get_user_data::<MyUserData>().unwrap();
 
     // We are guarenteed ms is positive based on usage

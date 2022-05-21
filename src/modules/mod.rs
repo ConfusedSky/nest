@@ -1,7 +1,7 @@
 #!allow(unsafe_code);
 
-mod scheduler;
-mod timer;
+pub mod scheduler;
+pub mod timer;
 
 use crate::wren;
 use std::collections::HashMap;
@@ -43,6 +43,9 @@ fn modules_init() -> HashMap<&'static str, Module> {
     scheduler_class
         .static_methods
         .insert("captureMethods_()".to_string(), scheduler::capture_methods);
+    scheduler_class
+        .static_methods
+        .insert("awaitAll_()".to_string(), scheduler::await_all);
 
     let mut scheduler_module = Module::new(CString::new(scheduler_source).unwrap());
     scheduler_module
