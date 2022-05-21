@@ -1,20 +1,36 @@
 extern crate bindgen;
 
 use std::env;
-use std::path::PathBuf;
+use std::path::Path;
+use std::process::Command;
+use which::which;
 
 fn main() {
     let manifest_dir = env::var("CARGO_MANIFEST_DIR").unwrap();
-    const WREN_H: &str = "lib/wren/src/include/wren.h";
-    println!("cargo:rerun-if-changed={}", WREN_H);
-    println!(
-        "cargo:rerun-if-changed={}/lib/wren/lib/libwren.a",
-        manifest_dir
-    );
+    let wren_dir = format!("{}/lib/wren", manifest_dir);
+    let wren_h = format!("{}/src/include/wren.h", wren_dir);
+    let wren_c = format!("{}/lib/wren.c", wren_dir);
 
-    // TODO: Actaully build this in this build script
-    println!("cargo:rustc-link-search={}/lib/wren/lib", manifest_dir);
-    println!("cargo:rustc-link-lib=static=wren");
+    println!("cargo:rerun-if-changed={}", wren_h);
+    println!("cargo:rerun-if-changed={}", wren_c);
+
+    let wren_c_path = Path::new(wren_c.as_str());
+
+    if !wren_c_path.exists() {
+        let script = format!("{}/util/generate_amalgamation.py", wren_dir);
+        let python = which("python3").expect("wren_sys requires python to generate almalgamation!");
+        let result = Command::new(python)
+            .current_dir(wren_dir)
+            .arg(script)
+            .output()
+            .expect("Amalgamation script failed to build");
+        std::fs::write(wren_c_path, &result.stdout).expect("Failed writing WREN_C");
+    }
+
+    cc::Build::new()
+        .file(wren_c_path)
+        .warnings(false)
+        .compile("wren");
 
     // The bindgen::Builder is the main entry point
     // to bindgen, and lets you build up options for
@@ -22,14 +38,15 @@ fn main() {
     let bindings = bindgen::Builder::default()
         // The input header we would like to generate
         // bindings for.
-        .header(WREN_H)
+        .header(wren_h)
         // Finish the builder and generate the bindings.
         .generate()
         // Unwrap the Result and panic on failure.
         .expect("Unable to generate bindings");
 
     // Write the bindings to the $OUT_DIR/bindings.rs file.
-    let out_path = PathBuf::from(env::var("OUT_DIR").unwrap());
+    let dir = env::var("OUT_DIR").unwrap();
+    let out_path = Path::new(dir.as_str());
     bindings
         .write_to_file(out_path.join("bindings.rs"))
         .expect("Couldn't write bindings!");
