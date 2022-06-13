@@ -1,11 +1,9 @@
 #![allow(unsafe_code)]
 
-use std::{cell::RefCell, ptr::NonNull};
+use std::{future::Future, pin::Pin, ptr::NonNull};
 
 use crate::{wren, MyUserData};
 use wren_sys;
-
-static mut SCHEDULER: RefCell<Option<Scheduler>> = RefCell::new(None);
 
 unsafe fn _resume(vm: wren::VMPtr, method: NonNull<wren_sys::WrenHandle>) {
     let result = vm.call(method);
@@ -14,7 +12,7 @@ unsafe fn _resume(vm: wren::VMPtr, method: NonNull<wren_sys::WrenHandle>) {
         panic!("Fiber panicked after resuming.");
     }
 }
-#[derive(Debug)]
+// #[derive(Debug)]
 pub struct Scheduler {
     vm: wren::VMPtr,
     // A handle to the "Scheduler" class object. Used to call static methods on it.
@@ -29,6 +27,9 @@ pub struct Scheduler {
     resume_waiting: NonNull<wren_sys::WrenHandle>,
     has_next: NonNull<wren_sys::WrenHandle>,
     run_next_scheduled: NonNull<wren_sys::WrenHandle>,
+
+    pub has_waiting_fibers: bool,
+    queue: Vec<Pin<Box<dyn Future<Output = ()>>>>,
 }
 
 impl Drop for Scheduler {
@@ -48,6 +49,93 @@ impl Drop for Scheduler {
 }
 
 impl Scheduler {
+    pub fn schedule_task<F>(&mut self, future: F)
+    where
+        F: 'static + Future<Output = ()>,
+    {
+        let future = Box::pin(future);
+        self.queue.insert(0, future);
+    }
+
+    pub fn next_item(&mut self) -> Option<Pin<Box<dyn Future<Output = ()>>>> {
+        self.queue.pop()
+    }
+
+    pub fn await_all(&mut self) {
+        self.has_waiting_fibers = true;
+    }
+
+    /// Loop as long as new tasks are still being created
+    /// Loop is structured this way so that mutiple items can be
+    /// added to the queue from a single Fiber and multiple asynchronous calls
+    /// can be made from a single fiber as well.
+    /// If each call awaited imidiately this would still work but all tasks would complete in
+    /// order they were enqueued, which would cause faster processes to wait for slower
+    /// processes if they were scheduled after the slower process.
+    ///
+    /// For example if you had two Fibers with timers
+    /// ```
+    /// Scheduler.add {
+    ///   Timer.sleep(1000)
+    ///   System.print("Task 1 complete")
+    /// }
+    /// Scheduler.add {
+    ///   Timer.sleep(500)
+    ///   System.print("Task 2 complete")
+    /// }
+    /// Scheduler.awaitAll()
+    /// ```
+    ///
+    /// Would result in "Task 1 complete" printing before "Task 2 complete" printing
+    ///
+    /// And if we only spawned the handles that exist at the time of calling without
+    /// looping then each Fiber could only have one async call in it with any other
+    /// call in that fiber not being awaited on. This is because new async calls
+    /// are never spawned on the async runtime
+    ///
+    /// So
+    /// ```
+    /// Scheduler.add {
+    ///   Timer.sleep(100)
+    ///   System.print("Do 1")
+    ///   Timer.sleep(100)
+    ///   System.print("Do 2")
+    /// }
+    /// Scheduler.awaitAll()
+    /// ```
+    /// Would only print "Do 1"
+    pub fn run_async_loop(&mut self, runtime: &tokio::runtime::Runtime) {
+        let local_set = tokio::task::LocalSet::new();
+
+        let mut handles = vec![];
+        let mut next = self.next_item();
+
+        runtime.block_on(local_set.run_until(async move {
+            loop {
+                // Create a new task on the local set for each of the scheduled tasks
+                // So that they can be run concurrently
+                while let Some(future) = next {
+                    handles.push(tokio::task::spawn_local(future));
+                    next = self.next_item();
+                }
+
+                // If there are no new handles then break out of the loop
+                if handles.is_empty() {
+                    break;
+                }
+
+                // Wait for existing handles then clear the handles
+                for handle in &mut handles {
+                    handle.await.unwrap();
+                }
+                handles.clear();
+
+                // Check the queue for another handle
+                next = self.next_item();
+            }
+        }));
+    }
+
     pub unsafe fn resume(&self, fiber: NonNull<wren_sys::WrenHandle>, has_argument: bool) {
         self.vm.ensure_slots(2 + if has_argument { 1 } else { 0 });
         self.vm.set_slot_handle_unchecked(0, self.class);
@@ -69,9 +157,8 @@ impl Scheduler {
         self.vm.set_slot_string_unchecked(2, error);
         _resume(self.vm, self.resume_error);
     }
-    pub unsafe fn resume_waiting(&self) {
-        let mut user_data = self.vm.get_user_data::<MyUserData>().unwrap();
-        user_data.has_waiting_fibers = false;
+    pub unsafe fn resume_waiting(&mut self) {
+        self.has_waiting_fibers = false;
         self.vm.ensure_slots(1);
         self.vm.set_slot_handle_unchecked(0, self.class);
         _resume(self.vm, self.resume_waiting);
@@ -89,10 +176,8 @@ impl Scheduler {
     }
 }
 
-unsafe impl Send for Scheduler {}
-unsafe impl Sync for Scheduler {}
-
 pub unsafe fn capture_methods(vm: wren::VMPtr) {
+    let mut user_data = vm.get_user_data::<MyUserData>().unwrap();
     vm.ensure_slots(1);
     vm.get_variable_unchecked("scheduler", "Scheduler", 0);
     // TODO: Figure out if we actually should check this
@@ -105,8 +190,9 @@ pub unsafe fn capture_methods(vm: wren::VMPtr) {
     let has_next = vm.make_call_handle("hasNext_");
     let run_next_scheduled = vm.make_call_handle("runNextScheduled_()");
 
-    let scheduler = SCHEDULER.get_mut();
-    *scheduler = Some(Scheduler {
+    user_data.scheduler = Some(Scheduler {
+        queue: Vec::default(),
+        has_waiting_fibers: false,
         vm,
         class,
         resume1,
@@ -119,10 +205,10 @@ pub unsafe fn capture_methods(vm: wren::VMPtr) {
 }
 
 pub unsafe fn await_all(vm: wren::VMPtr) {
-    let mut user_data = vm.get_user_data::<MyUserData>().unwrap();
-    user_data.has_waiting_fibers = true;
-}
-
-pub unsafe fn get<'s>() -> Option<&'s Scheduler> {
-    SCHEDULER.get_mut().as_ref()
+    vm.get_user_data::<MyUserData>()
+        .unwrap()
+        .scheduler
+        .as_mut()
+        .unwrap()
+        .await_all();
 }

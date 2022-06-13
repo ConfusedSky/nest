@@ -7,7 +7,8 @@
 #[macro_use]
 extern crate lazy_static;
 
-use std::{env, ffi::CString, fs, future::Future, path::PathBuf, pin::Pin};
+use modules::scheduler::Scheduler;
+use std::{env, ffi::CString, fs, path::PathBuf};
 use tokio::runtime::Builder;
 
 use wren::VMPtr;
@@ -16,99 +17,12 @@ mod modules;
 mod wren;
 
 struct MyUserData {
-    queue: Vec<Pin<Box<dyn Future<Output = ()>>>>,
-    pub has_waiting_fibers: bool,
+    scheduler: Option<Scheduler>,
 }
 
 impl MyUserData {
-    pub fn new() -> Self {
-        Self {
-            queue: Vec::default(),
-            has_waiting_fibers: false,
-        }
-    }
-
-    pub fn schedule_task<F>(&mut self, future: F)
-    where
-        F: 'static + Future<Output = ()>,
-    {
-        let future = Box::pin(future);
-        self.queue.insert(0, future);
-    }
-
-    pub fn next_item(&mut self) -> Option<Pin<Box<dyn Future<Output = ()>>>> {
-        self.queue.pop()
-    }
-
-    /// Loop as long as new tasks are still being created
-    /// Loop is structured this way so that mutiple items can be
-    /// added to the queue from a single Fiber and multiple asynchronous calls
-    /// can be made from a single fiber as well.
-    /// If each call awaited imidiately this would still work but all tasks would complete in
-    /// order they were enqueued, which would cause faster processes to wait for slower
-    /// processes if they were scheduled after the slower process.
-    ///
-    /// For example if you had two Fibers with timers
-    /// ```
-    /// Scheduler.add {
-    ///   Timer.sleep(1000)
-    ///   System.print("Task 1 complete")
-    /// }
-    /// Scheduler.add {
-    ///   Timer.sleep(500)
-    ///   System.print("Task 2 complete")
-    /// }
-    /// Scheduler.awaitAll()
-    /// ```
-    ///
-    /// Would result in "Task 1 complete" printing before "Task 2 complete" printing
-    ///
-    /// And if we only spawned the handles that exist at the time of calling without
-    /// looping then each Fiber could only have one async call in it with any other
-    /// call in that fiber not being awaited on. This is because new async calls
-    /// are never spawned on the async runtime
-    ///
-    /// So
-    /// ```
-    /// Scheduler.add {
-    ///   Timer.sleep(100)
-    ///   System.print("Do 1")
-    ///   Timer.sleep(100)
-    ///   System.print("Do 2")
-    /// }
-    /// Scheduler.awaitAll()
-    /// ```
-    /// Would only print "Do 1"
-    pub fn run_async_loop(&mut self, runtime: &tokio::runtime::Runtime) {
-        let local_set = tokio::task::LocalSet::new();
-
-        let mut handles = vec![];
-        let mut next = self.next_item();
-
-        runtime.block_on(local_set.run_until(async move {
-            loop {
-                // Create a new task on the local set for each of the scheduled tasks
-                // So that they can be run concurrently
-                while let Some(future) = next {
-                    handles.push(tokio::task::spawn_local(future));
-                    next = self.next_item();
-                }
-
-                // If there are no new handles then break out of the loop
-                if handles.is_empty() {
-                    break;
-                }
-
-                // Wait for existing handles then clear the handles
-                for handle in &mut handles {
-                    handle.await.unwrap();
-                }
-                handles.clear();
-
-                // Check the queue for another handle
-                next = self.next_item();
-            }
-        }));
+    pub const fn new() -> Self {
+        Self { scheduler: None }
     }
 }
 
@@ -189,20 +103,23 @@ fn main() {
     #[allow(unsafe_code)]
     let user_data = unsafe { vm.get_ptr().get_user_data::<MyUserData>() };
     if let Some(user_data) = user_data {
-        let scheduler = unsafe { modules::scheduler::get().unwrap() };
-        loop {
-            user_data.run_async_loop(&runtime);
+        // We only should run the async loop if there is a loop to run
+        if let Some(ref mut scheduler) = user_data.scheduler {
+            println!("Run the scheduler");
+            loop {
+                scheduler.run_async_loop(&runtime);
 
-            // If there are waiting fibers or fibers that have been scheduled
-            // but never had control handed over to them make sure they get a chance to run
-            if user_data.has_waiting_fibers {
-                unsafe {
-                    scheduler.resume_waiting();
+                // If there are waiting fibers or fibers that have been scheduled
+                // but never had control handed over to them make sure they get a chance to run
+                if scheduler.has_waiting_fibers {
+                    unsafe {
+                        scheduler.resume_waiting();
+                    }
+                } else if unsafe { scheduler.has_next() } {
+                    unsafe { scheduler.run_next_scheduled() }
+                } else {
+                    break;
                 }
-            } else if unsafe { scheduler.has_next() } {
-                unsafe { scheduler.run_next_scheduled() }
-            } else {
-                break;
             }
         }
     }

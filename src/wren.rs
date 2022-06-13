@@ -353,7 +353,7 @@ where
         }
     }
 
-    pub fn get_ptr(&self) -> VMPtr {
+    pub const fn get_ptr(&self) -> VMPtr {
         self.vm
     }
 
