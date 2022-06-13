@@ -5,6 +5,9 @@ use std::{future::Future, pin::Pin, ptr::NonNull};
 use crate::{wren, MyUserData};
 use wren_sys;
 
+use super::{Class, Module};
+use std::ffi::CString;
+
 unsafe fn _resume(vm: wren::VMPtr, method: NonNull<wren_sys::WrenHandle>) {
     let result = vm.call(method);
 
@@ -12,6 +15,26 @@ unsafe fn _resume(vm: wren::VMPtr, method: NonNull<wren_sys::WrenHandle>) {
         panic!("Fiber panicked after resuming.");
     }
 }
+
+pub fn init_module() -> Module {
+    let scheduler_source = include_str!("scheduler.wren");
+
+    let mut scheduler_class = Class::new();
+    scheduler_class
+        .static_methods
+        .insert("captureMethods_()".to_string(), capture_methods);
+    scheduler_class
+        .static_methods
+        .insert("awaitAll_()".to_string(), await_all);
+
+    let mut scheduler_module = Module::new(CString::new(scheduler_source).unwrap());
+    scheduler_module
+        .classes
+        .insert("Scheduler".to_string(), scheduler_class);
+
+    scheduler_module
+}
+
 // #[derive(Debug)]
 pub struct Scheduler {
     vm: wren::VMPtr,
@@ -176,7 +199,7 @@ impl Scheduler {
     }
 }
 
-pub unsafe fn capture_methods(vm: wren::VMPtr) {
+unsafe fn capture_methods(vm: wren::VMPtr) {
     let mut user_data = vm.get_user_data::<MyUserData>().unwrap();
     vm.ensure_slots(1);
     vm.get_variable_unchecked("scheduler", "Scheduler", 0);
@@ -204,7 +227,7 @@ pub unsafe fn capture_methods(vm: wren::VMPtr) {
     });
 }
 
-pub unsafe fn await_all(vm: wren::VMPtr) {
+unsafe fn await_all(vm: wren::VMPtr) {
     vm.get_user_data::<MyUserData>()
         .unwrap()
         .scheduler

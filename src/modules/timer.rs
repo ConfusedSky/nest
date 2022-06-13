@@ -5,7 +5,26 @@ use tokio::time::{sleep, Duration};
 use crate::wren;
 use crate::MyUserData;
 
-pub unsafe fn start(vm: wren::VMPtr) {
+use super::{Class, Module};
+use std::ffi::CString;
+
+pub fn init_module() -> Module {
+    let timer_source = include_str!("timer.wren");
+
+    let mut timer_class = Class::new();
+    timer_class
+        .static_methods
+        .insert("startTimer_(_,_)".to_string(), start);
+
+    let mut timer_module = Module::new(CString::new(timer_source).unwrap());
+    timer_module
+        .classes
+        .insert("Timer".to_string(), timer_class);
+
+    timer_module
+}
+
+unsafe fn start(vm: wren::VMPtr) {
     let user_data = vm.get_user_data::<MyUserData>().unwrap();
     let scheduler = user_data.scheduler.as_mut().unwrap();
 

@@ -37,35 +37,8 @@ impl Module {
 
 fn modules_init() -> HashMap<&'static str, Module> {
     let mut m = HashMap::new();
-    let scheduler_source = include_str!("scheduler.wren");
-
-    let mut scheduler_class = Class::new();
-    scheduler_class
-        .static_methods
-        .insert("captureMethods_()".to_string(), scheduler::capture_methods);
-    scheduler_class
-        .static_methods
-        .insert("awaitAll_()".to_string(), scheduler::await_all);
-
-    let mut scheduler_module = Module::new(CString::new(scheduler_source).unwrap());
-    scheduler_module
-        .classes
-        .insert("Scheduler".to_string(), scheduler_class);
-
-    m.insert("scheduler", scheduler_module);
-
-    let timer_source = include_str!("timer.wren");
-
-    let mut timer_class = Class::new();
-    timer_class
-        .static_methods
-        .insert("startTimer_(_,_)".to_string(), timer::start);
-
-    let mut timer_module = Module::new(CString::new(timer_source).unwrap());
-    timer_module
-        .classes
-        .insert("Timer".to_string(), timer_class);
-    m.insert("timer", timer_module);
+    m.insert("scheduler", scheduler::init_module());
+    m.insert("timer", timer::init_module());
 
     m
 }
