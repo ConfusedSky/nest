@@ -29,11 +29,11 @@ unsafe fn start(vm: wren::VMPtr) {
     let scheduler = user_data.scheduler.as_mut().unwrap();
 
     // We are guarenteed ms is positive based on usage
-    let ms = vm.get_slot_double_unchecked(1) as u32;
+    let ms = vm.get_slot_double_unchecked(1);
     let fiber = vm.get_slot_handle_unchecked(2);
 
     let task = async move {
-        sleep(Duration::from_millis(ms.into())).await;
+        sleep(Duration::from_secs_f64(ms / 1000.0)).await;
         let user_data = vm.get_user_data::<MyUserData>().unwrap();
         let scheduler = user_data.scheduler.as_ref().unwrap();
         scheduler.resume(fiber, false);
