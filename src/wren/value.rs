@@ -121,48 +121,91 @@ impl<T: Value> Args for T {
     }
 }
 
+macro_rules! count {
+    () => (0usize);
+    ( $x:tt $($xs:tt)* ) => (1usize + count!($($xs)*));
+}
 // TODO: Convert this implementation to a macro
-impl<T: Value, U: Value> Args for (&T, &U) {
-    const REQUIRED_SLOTS: Slot = const_max!(
-        T::ADDITIONAL_SLOTS_NEEDED + 1,
-        U::ADDITIONAL_SLOTS_NEEDED + 2,
-    );
+// impl<T: Value, U: Value> Args for (&T, &U) {
+// const REQUIRED_SLOTS: Slot = const_max!(
+// T::ADDITIONAL_SLOTS_NEEDED + 1,
+// U::ADDITIONAL_SLOTS_NEEDED + 2,
+// );
 
-    unsafe fn set_slots(&self, vm: VMPtr) {
-        self.0.send_to_vm(vm, 0);
-        self.1.send_to_vm(vm, 1);
-    }
+// unsafe fn set_slots(&self, vm: VMPtr) {
+// self.0.send_to_vm(vm, 0);
+// self.1.send_to_vm(vm, 1);
+// }
+// }
+
+// impl<T: Value, U: Value, V: Value> Args for (&T, &U, &V) {
+// const REQUIRED_SLOTS: Slot = const_max!(
+// T::ADDITIONAL_SLOTS_NEEDED + 1,
+// U::ADDITIONAL_SLOTS_NEEDED + 2,
+// V::ADDITIONAL_SLOTS_NEEDED + 3,
+// );
+
+// unsafe fn set_slots(&self, vm: VMPtr) {
+// self.0.send_to_vm(vm, 0);
+// self.1.send_to_vm(vm, 1);
+// self.2.send_to_vm(vm, 2);
+// }
+// }
+
+// impl<T: Value, U: Value, V: Value, W: Value> Args for (&T, &U, &V, &W) {
+// const REQUIRED_SLOTS: Slot = const_max!(
+// T::ADDITIONAL_SLOTS_NEEDED + 1,
+// U::ADDITIONAL_SLOTS_NEEDED + 2,
+// V::ADDITIONAL_SLOTS_NEEDED + 3,
+// W::ADDITIONAL_SLOTS_NEEDED + 4,
+// );
+
+// unsafe fn set_slots(&self, vm: VMPtr) {
+// self.0.send_to_vm(vm, 0);
+// self.1.send_to_vm(vm, 1);
+// self.2.send_to_vm(vm, 2);
+// self.3.send_to_vm(vm, 3);
+// }
+// }
+
+// macro_rules! expand_required_slots {
+
+// (@step $_idx:expr) => {
+// };
+
+// (@step $idx:expr, $head:tt, $($tail:tt,)*) => {
+// <$head>::ADDITIONAL_SLOTS_NEEDED + 1 + $idx,
+// expand_required_slots!(@step $idx + 1usize, $($tail,)*)
+// };
+
+// ($($n:tt),*) => {
+// &[expand_required_slots!(@step 0i32, $($n,)*)]
+// };
+// }
+
+// const SLOTS: &[Slot] = expand_required_slots!(String, f64);
+
+macro_rules! impl_args {
+    ($( $xs:ident ), *) => {
+        impl<$( $xs: Value, )*> Args for ($( &$xs, )*) {
+            const REQUIRED_SLOTS: Slot =
+                const_max!($( $xs::ADDITIONAL_SLOTS_NEEDED + 1 ), *);
+
+
+            unsafe fn set_slots(&self, vm: VMPtr) {
+                self.0.send_to_vm(vm, 0);
+                self.1.send_to_vm(vm, 1);
+            }
+        }
+    };
 }
 
-impl<T: Value, U: Value, V: Value> Args for (&T, &U, &V) {
-    const REQUIRED_SLOTS: Slot = const_max!(
-        T::ADDITIONAL_SLOTS_NEEDED + 1,
-        U::ADDITIONAL_SLOTS_NEEDED + 2,
-        V::ADDITIONAL_SLOTS_NEEDED + 3,
-    );
-
-    unsafe fn set_slots(&self, vm: VMPtr) {
-        self.0.send_to_vm(vm, 0);
-        self.1.send_to_vm(vm, 1);
-        self.2.send_to_vm(vm, 2);
-    }
-}
-
-impl<T: Value, U: Value, V: Value, W: Value> Args for (&T, &U, &V, &W) {
-    const REQUIRED_SLOTS: Slot = const_max!(
-        T::ADDITIONAL_SLOTS_NEEDED + 1,
-        U::ADDITIONAL_SLOTS_NEEDED + 2,
-        V::ADDITIONAL_SLOTS_NEEDED + 3,
-        W::ADDITIONAL_SLOTS_NEEDED + 4,
-    );
-
-    unsafe fn set_slots(&self, vm: VMPtr) {
-        self.0.send_to_vm(vm, 0);
-        self.1.send_to_vm(vm, 1);
-        self.2.send_to_vm(vm, 2);
-        self.3.send_to_vm(vm, 3);
-    }
-}
+impl_args!(T, U);
+impl_args!(T, U, V);
+impl_args!(T, U, V, W);
+impl_args!(T, U, V, W, W2);
+impl_args!(T, U, V, W, W2, W3);
+impl_args!(T, U, V, W, W2, W3, W4);
 
 #[cfg(test)]
 mod test {
