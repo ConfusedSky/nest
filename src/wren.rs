@@ -6,7 +6,7 @@ use std::{
     ffi::{c_void, CStr, CString},
     mem::{transmute_copy, MaybeUninit},
     pin::Pin,
-    ptr::NonNull,
+    ptr::{null, NonNull},
 };
 
 use wren_sys::{
@@ -30,11 +30,26 @@ unsafe fn get_user_data<'s, V>(vm: *mut WrenVM) -> Option<&'s mut V> {
 // const extern functions aren't stable so this should be ignored
 #[allow(clippy::missing_const_for_fn)]
 unsafe extern "C" fn resolve_module<V: VmUserData>(
-    _vm: *mut WrenVM,
-    _resolver: *const i8,
+    vm: *mut WrenVM,
+    resolver: *const i8,
     name: *const i8,
 ) -> *const i8 {
-    name
+    let user_data = get_user_data::<V>(vm);
+
+    user_data.map_or_else(
+        || std::mem::zeroed(),
+        |user_data| {
+            let name = CStr::from_ptr(name).to_string_lossy();
+            let resolver = CStr::from_ptr(resolver).to_string_lossy();
+
+            let name = user_data.resolve_module(resolver.as_ref(), name.as_ref());
+
+            match name {
+                Some(name) => name.into_raw(),
+                None => null(),
+            }
+        },
+    )
 }
 
 unsafe extern "C" fn load_module<V: VmUserData>(
@@ -286,6 +301,9 @@ lazy_static! {
 #[allow(unused_variables)]
 // We define empty defaults here so that the user can define what they want
 pub trait VmUserData {
+    fn resolve_module(&mut self, resolver: &str, name: &str) -> Option<CString> {
+        CString::new(name.to_string()).ok()
+    }
     fn load_module(&mut self, name: &str) -> Option<&'static CString> {
         Some(&EMPTY_CSTRING)
     }
