@@ -293,11 +293,6 @@ impl InterpretResultErrorKind {
     }
 }
 
-lazy_static! {
-    static ref EMPTY_CSTRING: CString =
-        unsafe { CString::from_vec_with_nul_unchecked(b"\0".to_vec()) };
-}
-
 #[allow(unused_variables)]
 // We define empty defaults here so that the user can define what they want
 pub trait VmUserData {
@@ -305,7 +300,7 @@ pub trait VmUserData {
         CString::new(name.to_string()).ok()
     }
     fn load_module(&mut self, name: &str) -> Option<&'static CString> {
-        Some(&EMPTY_CSTRING)
+        None
     }
     fn bind_foreign_method(
         &mut self,
