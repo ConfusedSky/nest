@@ -91,7 +91,7 @@ const fn _const_max_helper(a: Slot, b: Slot) -> Slot {
 
 macro_rules! const_max {
     ($x:expr) => ($x);
-    ($x:expr, $($y:expr),+) => (
+    ($x:expr, $($y:expr),+ $(,)?) => (
         _const_max_helper($x, const_max!($($y),+))
     )
 }
@@ -125,7 +125,7 @@ impl<T: Value> Args for T {
 impl<T: Value, U: Value> Args for (&T, &U) {
     const REQUIRED_SLOTS: Slot = const_max!(
         T::ADDITIONAL_SLOTS_NEEDED + 1,
-        U::ADDITIONAL_SLOTS_NEEDED + 2
+        U::ADDITIONAL_SLOTS_NEEDED + 2,
     );
 
     unsafe fn set_slots(&self, vm: VMPtr) {
@@ -138,7 +138,7 @@ impl<T: Value, U: Value, V: Value> Args for (&T, &U, &V) {
     const REQUIRED_SLOTS: Slot = const_max!(
         T::ADDITIONAL_SLOTS_NEEDED + 1,
         U::ADDITIONAL_SLOTS_NEEDED + 2,
-        V::ADDITIONAL_SLOTS_NEEDED + 3
+        V::ADDITIONAL_SLOTS_NEEDED + 3,
     );
 
     unsafe fn set_slots(&self, vm: VMPtr) {
@@ -153,7 +153,7 @@ impl<T: Value, U: Value, V: Value, W: Value> Args for (&T, &U, &V, &W) {
         T::ADDITIONAL_SLOTS_NEEDED + 1,
         U::ADDITIONAL_SLOTS_NEEDED + 2,
         V::ADDITIONAL_SLOTS_NEEDED + 3,
-        W::ADDITIONAL_SLOTS_NEEDED + 4
+        W::ADDITIONAL_SLOTS_NEEDED + 4,
     );
 
     unsafe fn set_slots(&self, vm: VMPtr) {
