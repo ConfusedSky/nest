@@ -112,7 +112,7 @@ unsafe extern "C" fn bind_foreign_method<V: VmUserData>(
                 signature.as_ref(),
             )?;
 
-            // Safety: VMPtr is a transparent wrapper over a VM pointer
+            // Safety: VMPtr is a transparent wrapper over a *mut WrenVM
             transmute_copy(&method)
         },
     )
