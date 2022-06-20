@@ -86,27 +86,33 @@ impl Value for bool {
 }
 
 pub trait Args {
-    fn get_required_slots(self) -> Slot;
-    fn set_wren_stack(self, vm: VMPtr);
+    fn get_required_slots(&self) -> Slot;
+    unsafe fn set_slots(&self, vm: VMPtr);
+    unsafe fn set_wren_stack_unchecked(&self, vm: VMPtr, num_slots: Slot) {
+        vm.ensure_slots(num_slots);
+        self.set_slots(vm);
+    }
+    fn set_wren_stack(&self, vm: VMPtr) {
+        // This is guarenteed to be safe because we ensured that we had enough
+        // slots for T using get_required_slots
+        unsafe {
+            self.set_wren_stack_unchecked(vm, self.get_required_slots());
+        }
+    }
 }
 
-impl<T: Value> Args for &T {
-    fn get_required_slots(self) -> Slot {
+impl<T: Value> Args for T {
+    fn get_required_slots(&self) -> Slot {
         1 + T::ADDITIONAL_SLOTS_NEEDED
     }
-    fn set_wren_stack(self, vm: VMPtr) {
-        vm.ensure_slots(self.get_required_slots());
-        // This is guarenteed to be safe because we ensured that we had enough
-        // slots for T above
-        unsafe {
-            self.send_to_vm(vm, 0);
-        }
+    unsafe fn set_slots(&self, vm: VMPtr) {
+        self.send_to_vm(vm, 0);
     }
 }
 
 // TODO: Convert this implementation to a macro
 impl<T: Value, U: Value> Args for (&T, &U) {
-    fn get_required_slots(self) -> Slot {
+    fn get_required_slots(&self) -> Slot {
         [
             T::ADDITIONAL_SLOTS_NEEDED + 1,
             U::ADDITIONAL_SLOTS_NEEDED + 2,
@@ -116,19 +122,14 @@ impl<T: Value, U: Value> Args for (&T, &U) {
         .unwrap_or(1)
     }
 
-    fn set_wren_stack(self, vm: VMPtr) {
-        vm.ensure_slots(self.get_required_slots());
-        // This is guarenteed to be safe because we ensured that we had enough
-        // slots for T above
-        unsafe {
-            self.0.send_to_vm(vm, 0);
-            self.1.send_to_vm(vm, 1);
-        }
+    unsafe fn set_slots(&self, vm: VMPtr) {
+        self.0.send_to_vm(vm, 0);
+        self.1.send_to_vm(vm, 1);
     }
 }
 
 impl<T: Value, U: Value, V: Value> Args for (&T, &U, &V) {
-    fn get_required_slots(self) -> Slot {
+    fn get_required_slots(&self) -> Slot {
         [
             T::ADDITIONAL_SLOTS_NEEDED + 1,
             U::ADDITIONAL_SLOTS_NEEDED + 2,
@@ -139,20 +140,15 @@ impl<T: Value, U: Value, V: Value> Args for (&T, &U, &V) {
         .unwrap_or(1)
     }
 
-    fn set_wren_stack(self, vm: VMPtr) {
-        vm.ensure_slots(self.get_required_slots());
-        // This is guarenteed to be safe because we ensured that we had enough
-        // slots for T above
-        unsafe {
-            self.0.send_to_vm(vm, 0);
-            self.1.send_to_vm(vm, 1);
-            self.2.send_to_vm(vm, 2);
-        }
+    unsafe fn set_slots(&self, vm: VMPtr) {
+        self.0.send_to_vm(vm, 0);
+        self.1.send_to_vm(vm, 1);
+        self.2.send_to_vm(vm, 2);
     }
 }
 
 impl<T: Value, U: Value, V: Value, W: Value> Args for (&T, &U, &V, &W) {
-    fn get_required_slots(self) -> Slot {
+    fn get_required_slots(&self) -> Slot {
         [
             T::ADDITIONAL_SLOTS_NEEDED + 1,
             U::ADDITIONAL_SLOTS_NEEDED + 2,
@@ -164,16 +160,11 @@ impl<T: Value, U: Value, V: Value, W: Value> Args for (&T, &U, &V, &W) {
         .unwrap_or(1)
     }
 
-    fn set_wren_stack(self, vm: VMPtr) {
-        vm.ensure_slots(self.get_required_slots());
-        // This is guarenteed to be safe because we ensured that we had enough
-        // slots for T above
-        unsafe {
-            self.0.send_to_vm(vm, 0);
-            self.1.send_to_vm(vm, 1);
-            self.2.send_to_vm(vm, 2);
-            self.3.send_to_vm(vm, 3);
-        }
+    unsafe fn set_slots(&self, vm: VMPtr) {
+        self.0.send_to_vm(vm, 0);
+        self.1.send_to_vm(vm, 1);
+        self.2.send_to_vm(vm, 2);
+        self.3.send_to_vm(vm, 3);
     }
 }
 

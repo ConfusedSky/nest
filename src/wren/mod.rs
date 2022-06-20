@@ -31,9 +31,6 @@ unsafe fn get_user_data<'s, V>(vm: *mut WrenVM) -> Option<&'s mut V> {
     }
 }
 
-// Allow custom logic later this is just for testing for now
-// const extern functions aren't stable so this should be ignored
-#[allow(clippy::missing_const_for_fn)]
 unsafe extern "C" fn resolve_module<V: VmUserData>(
     vm: *mut WrenVM,
     resolver: *const i8,
