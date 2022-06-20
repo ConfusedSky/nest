@@ -85,17 +85,6 @@ impl Value for bool {
     }
 }
 
-const fn _const_max_helper(a: Slot, b: Slot) -> Slot {
-    [a, b][(a < b) as usize]
-}
-
-macro_rules! const_max {
-    ($x:expr) => ($x);
-    ($x:expr, $($y:expr),+ $(,)?) => (
-        _const_max_helper($x, const_max!($($y),+))
-    )
-}
-
 pub trait Args {
     const REQUIRED_SLOTS: Slot;
     unsafe fn set_slots(&self, vm: VMPtr);
@@ -121,10 +110,6 @@ impl<T: Value> Args for T {
     }
 }
 
-macro_rules! count {
-    () => (0usize);
-    ( $x:tt $($xs:tt)* ) => (1usize + count!($($xs)*));
-}
 // TODO: Convert this implementation to a macro
 // impl<T: Value, U: Value> Args for (&T, &U) {
 // const REQUIRED_SLOTS: Slot = const_max!(
@@ -168,28 +153,28 @@ macro_rules! count {
 // }
 // }
 
-// macro_rules! expand_required_slots {
+const fn _const_max_helper(a: Slot, b: Slot) -> Slot {
+    [a, b][(a < b) as usize]
+}
 
-// (@step $_idx:expr) => {
-// };
-
-// (@step $idx:expr, $head:tt, $($tail:tt,)*) => {
-// <$head>::ADDITIONAL_SLOTS_NEEDED + 1 + $idx,
-// expand_required_slots!(@step $idx + 1usize, $($tail,)*)
-// };
-
-// ($($n:tt),*) => {
-// &[expand_required_slots!(@step 0i32, $($n,)*)]
-// };
-// }
-
-// const SLOTS: &[Slot] = expand_required_slots!(String, f64);
+macro_rules! expand_required_slots {
+    (@step $i:expr, $x:ty) => (<$x>::ADDITIONAL_SLOTS_NEEDED+ $i);
+    (@step $i:expr, $x:ty, $($y:ty),+ $(,)?) => (
+        _const_max_helper(
+            <$x>::ADDITIONAL_SLOTS_NEEDED+ $i,
+            expand_required_slots!(@step $i + 1, $($y),+),
+        )
+    );
+    ($x:ty, $($y:ty),+ $(,)?) => (
+        expand_required_slots!(@step 1i32, $x, $($y),+)
+    )
+}
 
 macro_rules! impl_args {
     ($( $xs:ident ), *) => {
         impl<$( $xs: Value, )*> Args for ($( &$xs, )*) {
             const REQUIRED_SLOTS: Slot =
-                const_max!($( $xs::ADDITIONAL_SLOTS_NEEDED + 1 ), *);
+                expand_required_slots!($( $xs ), *);
 
 
             unsafe fn set_slots(&self, vm: VMPtr) {
