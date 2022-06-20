@@ -12,8 +12,9 @@ use std::{
 
 use wren_sys::{
     self, wrenCall, wrenFreeVM, wrenGetUserData, wrenGetVariable, wrenInitConfiguration,
-    wrenInterpret, wrenMakeCallHandle, wrenNewVM, wrenReleaseHandle, WrenConfiguration,
-    WrenErrorType, WrenHandle, WrenInterpretResult, WrenLoadModuleResult, WrenVM,
+    wrenInsertInList, wrenInterpret, wrenMakeCallHandle, wrenNewVM, wrenReleaseHandle,
+    WrenConfiguration, WrenErrorType, WrenHandle, WrenInterpretResult, WrenLoadModuleResult,
+    WrenVM,
 };
 
 pub type ForeignMethod = unsafe fn(vm: VMPtr);
@@ -191,6 +192,16 @@ impl VMPtr {
     /// is asked for
     pub unsafe fn set_slot_handle_unchecked(self, slot: Slot, handle: Handle) {
         wren_sys::wrenSetSlotHandle(self.0.as_ptr(), slot, handle.as_ptr());
+    }
+
+    /// SAFETY: Will segfault if an invalid slot
+    /// is asked for
+    pub unsafe fn set_slot_new_list_unchecked(self, slot: Slot) {
+        wren_sys::wrenSetSlotNewList(self.0.as_ptr(), slot);
+    }
+
+    pub unsafe fn insert_in_list(self, list_slot: Slot, index: i32, element_slot: Slot) {
+        wrenInsertInList(self.0.as_ptr(), list_slot, index, element_slot);
     }
 
     /// SAFETY: Will segfault if an invalid slot

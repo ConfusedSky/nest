@@ -22,15 +22,15 @@ pub fn init_module() -> Module {
     let mut scheduler_class = Class::new();
     scheduler_class
         .static_methods
-        .insert("captureMethods_()".to_string(), capture_methods);
+        .insert("captureMethods_()", capture_methods);
     scheduler_class
         .static_methods
-        .insert("awaitAll_()".to_string(), await_all);
+        .insert("awaitAll_()", await_all);
 
     let mut scheduler_module = Module::new(CString::new(scheduler_source).unwrap());
     scheduler_module
         .classes
-        .insert("Scheduler".to_string(), scheduler_class);
+        .insert("Scheduler", scheduler_class);
 
     scheduler_module
 }

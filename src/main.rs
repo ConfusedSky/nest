@@ -88,7 +88,7 @@ fn main() {
         .unwrap_or_else(|_| panic!("Ensure {} is a valid module name to continue", &module));
 
     let user_data = MyUserData::new();
-    let vm = wren::Vm::new(user_data).unwrap();
+    let vm = wren::Vm::new(user_data).expect("VM failed to initialize");
 
     let result = vm.interpret(module, source);
 
@@ -107,7 +107,6 @@ fn main() {
     if let Some(user_data) = user_data {
         // We only should run the async loop if there is a loop to run
         if let Some(ref mut scheduler) = user_data.scheduler {
-            println!("Run the scheduler");
             loop {
                 scheduler.run_async_loop(&runtime);
 

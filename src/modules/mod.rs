@@ -1,5 +1,6 @@
 #!allow(unsafe_code);
 
+pub mod os;
 pub mod scheduler;
 pub mod timer;
 
@@ -8,8 +9,8 @@ use std::collections::HashMap;
 use std::ffi::CString;
 
 pub struct Class {
-    pub methods: HashMap<String, wren::ForeignMethod>,
-    pub static_methods: HashMap<String, wren::ForeignMethod>,
+    pub methods: HashMap<&'static str, wren::ForeignMethod>,
+    pub static_methods: HashMap<&'static str, wren::ForeignMethod>,
 }
 
 impl Class {
@@ -23,7 +24,7 @@ impl Class {
 
 pub struct Module {
     pub source: CString,
-    pub classes: HashMap<String, Class>,
+    pub classes: HashMap<&'static str, Class>,
 }
 
 impl Module {
@@ -39,6 +40,7 @@ fn modules_init() -> HashMap<&'static str, Module> {
     let mut m = HashMap::new();
     m.insert("scheduler", scheduler::init_module());
     m.insert("timer", timer::init_module());
+    m.insert("os", os::init_module());
 
     m
 }

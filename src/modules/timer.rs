@@ -12,14 +12,10 @@ pub fn init_module() -> Module {
     let timer_source = include_str!("timer.wren");
 
     let mut timer_class = Class::new();
-    timer_class
-        .static_methods
-        .insert("startTimer_(_,_)".to_string(), start);
+    timer_class.static_methods.insert("startTimer_(_,_)", start);
 
     let mut timer_module = Module::new(CString::new(timer_source).unwrap());
-    timer_module
-        .classes
-        .insert("Timer".to_string(), timer_class);
+    timer_module.classes.insert("Timer", timer_class);
 
     timer_module
 }
