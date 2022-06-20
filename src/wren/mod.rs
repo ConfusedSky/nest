@@ -1,5 +1,7 @@
 #![allow(unsafe_code)]
 
+mod wren_value;
+
 use std::{
     alloc::Layout,
     borrow::Cow,
