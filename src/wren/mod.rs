@@ -1,6 +1,7 @@
 #![allow(unsafe_code)]
 
-pub mod wren_value;
+mod value;
+pub use value::{Args, Value};
 
 use std::{
     alloc::Layout,

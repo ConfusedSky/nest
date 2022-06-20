@@ -7,7 +7,7 @@ use crate::wren;
 use crate::MyUserData;
 
 use super::{Class, Module};
-use crate::wren::wren_value::WrenValue;
+use crate::wren::Value as WrenValue;
 use std::ffi::CString;
 use std::ptr::NonNull;
 
@@ -35,7 +35,7 @@ unsafe fn start(vm: wren::VMPtr) {
         sleep(Duration::from_secs_f64(ms / 1000.0)).await;
         let user_data = vm.get_user_data::<MyUserData>().unwrap();
         let scheduler = user_data.scheduler.as_ref().unwrap();
-        scheduler.resume(fiber, false);
+        scheduler.resume(fiber);
     };
 
     scheduler.schedule_task(task);

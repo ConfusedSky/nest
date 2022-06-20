@@ -2,7 +2,7 @@
 
 use std::{future::Future, pin::Pin, ptr::NonNull};
 
-use crate::wren::wren_value::{WrenArgs, WrenValue};
+use crate::wren::{Args as WrenArgs, Value as WrenValue};
 use crate::{wren, MyUserData};
 use wren_sys::{self, WrenHandle};
 
@@ -160,28 +160,36 @@ impl Scheduler {
         }));
     }
 
-    pub fn resume(&self, fiber: NonNull<wren_sys::WrenHandle>, has_argument: bool) {
-        // We still need to ensure here since it's possible we underestimate
-        self.vm.ensure_slots(2 + if has_argument { 1 } else { 0 });
-        (&self.class, &fiber).set_wren_stack(self.vm);
-        unsafe {
-            self.vm.release_handle_unchecked(fiber);
-
-            if !has_argument {
-                _resume(self.vm, self.resume1);
-            }
-        }
+    pub unsafe fn resume(&self, fiber: NonNull<wren_sys::WrenHandle>) {
+        // resume_wit_arg needs a valid WrenValue type so just set it to
+        // a random one
+        self.resume_with_arg::<f64>(fiber, None);
     }
-    pub unsafe fn finish_resume(&self) {
-        _resume(self.vm, self.resume2);
+
+    pub unsafe fn resume_with_arg<T: WrenValue>(
+        &self,
+        fiber: NonNull<wren_sys::WrenHandle>,
+        additional_argument: Option<T>,
+    ) {
+        let method = additional_argument.map_or_else(
+            || {
+                (&self.class, &fiber).set_wren_stack(self.vm);
+                self.resume1
+            },
+            |arg| {
+                (&self.class, &fiber, &arg).set_wren_stack(self.vm);
+                self.resume2
+            },
+        );
+
+        self.vm.release_handle_unchecked(fiber);
+        _resume(self.vm, method);
     }
     pub unsafe fn resume_error<S>(&self, fiber: NonNull<wren_sys::WrenHandle>, error: S)
     where
         S: AsRef<str>,
     {
-        self.resume(fiber, true);
-        error.as_ref().to_string().send_to_vm(self.vm, 2);
-        _resume(self.vm, self.resume_error);
+        self.resume_with_arg(fiber, Some(error.as_ref().to_string()));
     }
     pub unsafe fn resume_waiting(&mut self) {
         self.has_waiting_fibers = false;

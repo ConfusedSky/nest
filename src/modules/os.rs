@@ -1,7 +1,7 @@
-use crate::wren::{wren_value::WrenValue, VMPtr};
+use crate::wren::VMPtr;
 
 use super::{Class, Module};
-use crate::wren::wren_value::WrenArgs;
+use crate::wren::Args as WrenArgs;
 use std::{env::args, ffi::CString};
 
 pub fn init_module() -> Module {

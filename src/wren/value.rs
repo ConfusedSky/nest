@@ -10,14 +10,14 @@ use super::{Handle, Slot, VMPtr};
 /// Methods have 3 arguments
 /// VM: The vm pointer
 /// slot: The slot being saved to
-pub trait WrenValue {
+pub trait Value {
     /// Number of additional slots that need to be allocated to use this
     const ADDITIONAL_SLOTS_NEEDED: Slot;
     unsafe fn send_to_vm(&self, vm: VMPtr, slot: Slot);
     unsafe fn get_from_vm(vm: VMPtr, slot: Slot) -> Self;
 }
 
-impl WrenValue for Handle {
+impl Value for Handle {
     const ADDITIONAL_SLOTS_NEEDED: Slot = 0;
     unsafe fn send_to_vm(&self, vm: VMPtr, slot: Slot) {
         vm.set_slot_handle_unchecked(slot, *self);
@@ -27,7 +27,7 @@ impl WrenValue for Handle {
     }
 }
 
-impl<T: WrenValue> WrenValue for Vec<T> {
+impl<T: Value> Value for Vec<T> {
     // This needs at least one for moving values into the wren list as well as
     // any additional slots for T's initialization
     const ADDITIONAL_SLOTS_NEEDED: Slot = 1 + T::ADDITIONAL_SLOTS_NEEDED;
@@ -53,7 +53,7 @@ impl<T: WrenValue> WrenValue for Vec<T> {
     }
 }
 
-impl WrenValue for String {
+impl Value for String {
     const ADDITIONAL_SLOTS_NEEDED: Slot = 0;
     unsafe fn send_to_vm(&self, vm: VMPtr, slot: Slot) {
         vm.set_slot_string_unchecked(slot, self);
@@ -65,7 +65,7 @@ impl WrenValue for String {
     }
 }
 
-impl WrenValue for f64 {
+impl Value for f64 {
     const ADDITIONAL_SLOTS_NEEDED: Slot = 0;
     unsafe fn send_to_vm(&self, vm: VMPtr, slot: Slot) {
         wrenSetSlotDouble(vm.0.as_ptr(), slot, *self);
@@ -75,7 +75,7 @@ impl WrenValue for f64 {
     }
 }
 
-impl WrenValue for bool {
+impl Value for bool {
     const ADDITIONAL_SLOTS_NEEDED: Slot = 0;
     unsafe fn send_to_vm(&self, vm: VMPtr, slot: Slot) {
         vm.set_slot_bool_unchecked(slot, *self);
@@ -85,12 +85,12 @@ impl WrenValue for bool {
     }
 }
 
-pub trait WrenArgs {
+pub trait Args {
     fn get_required_slots(self) -> Slot;
     fn set_wren_stack(self, vm: VMPtr);
 }
 
-impl<T: WrenValue> WrenArgs for &T {
+impl<T: Value> Args for &T {
     fn get_required_slots(self) -> Slot {
         1 + T::ADDITIONAL_SLOTS_NEEDED
     }
@@ -105,7 +105,7 @@ impl<T: WrenValue> WrenArgs for &T {
 }
 
 // TODO: Convert this implementation to a macro
-impl<T: WrenValue, U: WrenValue> WrenArgs for (&T, &U) {
+impl<T: Value, U: Value> Args for (&T, &U) {
     fn get_required_slots(self) -> Slot {
         [
             T::ADDITIONAL_SLOTS_NEEDED + 1,
@@ -127,7 +127,7 @@ impl<T: WrenValue, U: WrenValue> WrenArgs for (&T, &U) {
     }
 }
 
-impl<T: WrenValue, U: WrenValue, V: WrenValue> WrenArgs for (&T, &U, &V) {
+impl<T: Value, U: Value, V: Value> Args for (&T, &U, &V) {
     fn get_required_slots(self) -> Slot {
         [
             T::ADDITIONAL_SLOTS_NEEDED + 1,
@@ -151,7 +151,7 @@ impl<T: WrenValue, U: WrenValue, V: WrenValue> WrenArgs for (&T, &U, &V) {
     }
 }
 
-impl<T: WrenValue, U: WrenValue, V: WrenValue, W: WrenValue> WrenArgs for (&T, &U, &V, &W) {
+impl<T: Value, U: Value, V: Value, W: Value> Args for (&T, &U, &V, &W) {
     fn get_required_slots(self) -> Slot {
         [
             T::ADDITIONAL_SLOTS_NEEDED + 1,
@@ -179,7 +179,7 @@ impl<T: WrenValue, U: WrenValue, V: WrenValue, W: WrenValue> WrenArgs for (&T, &
 
 #[cfg(test)]
 mod test {
-    use super::WrenArgs;
+    use super::Args;
 
     // TODO: Figure out how to test set_wren_stack
 

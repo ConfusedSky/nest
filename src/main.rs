@@ -8,8 +8,10 @@
 extern crate lazy_static;
 
 use modules::scheduler::Scheduler;
-use std::{env, ffi::CString, fs, io::stdin, path::PathBuf};
+use std::{env, ffi::CString, fs, path::PathBuf};
 use tokio::runtime::Builder;
+
+// use std::io::stdin;
 
 use wren::VMPtr;
 
