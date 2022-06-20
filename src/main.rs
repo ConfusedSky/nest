@@ -8,7 +8,7 @@
 extern crate lazy_static;
 
 use modules::scheduler::Scheduler;
-use std::{env, ffi::CString, fs, path::PathBuf};
+use std::{env, ffi::CString, fs, io::stdin, path::PathBuf};
 use tokio::runtime::Builder;
 
 use wren::VMPtr;
@@ -47,8 +47,10 @@ impl wren::VmUserData for MyUserData {
     fn on_write(&mut self, _: VMPtr, text: &str) {
         print!("{}", text);
     }
-    fn load_module(&mut self, name: &str) -> Option<&'static CString> {
-        crate::modules::get_module(name).map(|module| &module.source)
+    fn load_module(&mut self, name: &str) -> Option<CString> {
+        crate::modules::get_module(name)
+            .map(|module| &module.source)
+            .cloned()
     }
     fn bind_foreign_method(
         &mut self,
@@ -123,4 +125,9 @@ fn main() {
             }
         }
     }
+
+    // This code is for testing with leaks
+    // drop(vm);
+    // let mut buf = String::new();
+    // stdin().read_line(&mut buf).unwrap();
 }
