@@ -85,9 +85,22 @@ impl Value for bool {
     }
 }
 
+const fn _const_max_helper(a: Slot, b: Slot) -> Slot {
+    [a, b][(a < b) as usize]
+}
+
+macro_rules! const_max {
+    ($x:expr) => ($x);
+    ($x:expr, $($y:expr),+) => (
+        _const_max_helper($x, const_max!($($y),+))
+    )
+}
+
 pub trait Args {
-    fn get_required_slots(&self) -> Slot;
+    const REQUIRED_SLOTS: Slot;
     unsafe fn set_slots(&self, vm: VMPtr);
+    /// This fn should probably never be used directly since it only existed
+    /// before required slots was a constant
     unsafe fn set_wren_stack_unchecked(&self, vm: VMPtr, num_slots: Slot) {
         vm.ensure_slots(num_slots);
         self.set_slots(vm);
@@ -96,15 +109,13 @@ pub trait Args {
         // This is guarenteed to be safe because we ensured that we had enough
         // slots for T using get_required_slots
         unsafe {
-            self.set_wren_stack_unchecked(vm, self.get_required_slots());
+            self.set_wren_stack_unchecked(vm, Self::REQUIRED_SLOTS);
         }
     }
 }
 
 impl<T: Value> Args for T {
-    fn get_required_slots(&self) -> Slot {
-        1 + T::ADDITIONAL_SLOTS_NEEDED
-    }
+    const REQUIRED_SLOTS: Slot = 1 + T::ADDITIONAL_SLOTS_NEEDED;
     unsafe fn set_slots(&self, vm: VMPtr) {
         self.send_to_vm(vm, 0);
     }
@@ -112,15 +123,10 @@ impl<T: Value> Args for T {
 
 // TODO: Convert this implementation to a macro
 impl<T: Value, U: Value> Args for (&T, &U) {
-    fn get_required_slots(&self) -> Slot {
-        [
-            T::ADDITIONAL_SLOTS_NEEDED + 1,
-            U::ADDITIONAL_SLOTS_NEEDED + 2,
-        ]
-        .into_iter()
-        .max()
-        .unwrap_or(1)
-    }
+    const REQUIRED_SLOTS: Slot = const_max!(
+        T::ADDITIONAL_SLOTS_NEEDED + 1,
+        U::ADDITIONAL_SLOTS_NEEDED + 2
+    );
 
     unsafe fn set_slots(&self, vm: VMPtr) {
         self.0.send_to_vm(vm, 0);
@@ -129,16 +135,11 @@ impl<T: Value, U: Value> Args for (&T, &U) {
 }
 
 impl<T: Value, U: Value, V: Value> Args for (&T, &U, &V) {
-    fn get_required_slots(&self) -> Slot {
-        [
-            T::ADDITIONAL_SLOTS_NEEDED + 1,
-            U::ADDITIONAL_SLOTS_NEEDED + 2,
-            V::ADDITIONAL_SLOTS_NEEDED + 3,
-        ]
-        .into_iter()
-        .max()
-        .unwrap_or(1)
-    }
+    const REQUIRED_SLOTS: Slot = const_max!(
+        T::ADDITIONAL_SLOTS_NEEDED + 1,
+        U::ADDITIONAL_SLOTS_NEEDED + 2,
+        V::ADDITIONAL_SLOTS_NEEDED + 3
+    );
 
     unsafe fn set_slots(&self, vm: VMPtr) {
         self.0.send_to_vm(vm, 0);
@@ -148,17 +149,12 @@ impl<T: Value, U: Value, V: Value> Args for (&T, &U, &V) {
 }
 
 impl<T: Value, U: Value, V: Value, W: Value> Args for (&T, &U, &V, &W) {
-    fn get_required_slots(&self) -> Slot {
-        [
-            T::ADDITIONAL_SLOTS_NEEDED + 1,
-            U::ADDITIONAL_SLOTS_NEEDED + 2,
-            V::ADDITIONAL_SLOTS_NEEDED + 3,
-            W::ADDITIONAL_SLOTS_NEEDED + 4,
-        ]
-        .into_iter()
-        .max()
-        .unwrap_or(1)
-    }
+    const REQUIRED_SLOTS: Slot = const_max!(
+        T::ADDITIONAL_SLOTS_NEEDED + 1,
+        U::ADDITIONAL_SLOTS_NEEDED + 2,
+        V::ADDITIONAL_SLOTS_NEEDED + 3,
+        W::ADDITIONAL_SLOTS_NEEDED + 4
+    );
 
     unsafe fn set_slots(&self, vm: VMPtr) {
         self.0.send_to_vm(vm, 0);
@@ -176,11 +172,11 @@ mod test {
 
     #[test]
     fn test_slot_size() {
-        assert_eq!(1.0.get_required_slots(), 1);
-        assert_eq!((&1.0, &2.0).get_required_slots(), 2);
-        assert_eq!((&vec![vec![1.0]], &2.0).get_required_slots(), 3);
-        assert_eq!((&2.0, &vec![vec![1.0]]).get_required_slots(), 4);
-        assert_eq!((&1.0, &2.0, &3.0).get_required_slots(), 3);
-        assert_eq!((&1.0, &2.0, &3.0, &4.0).get_required_slots(), 4);
+        assert_eq!(f64::REQUIRED_SLOTS, 1);
+        assert_eq!(<(&f64, &f64)>::REQUIRED_SLOTS, 2);
+        assert_eq!(<(&Vec<Vec<f64>>, &f64)>::REQUIRED_SLOTS, 3);
+        assert_eq!(<(&f64, &Vec<Vec<f64>>)>::REQUIRED_SLOTS, 4);
+        assert_eq!(<(&f64, &f64, &f64)>::REQUIRED_SLOTS, 3);
+        assert_eq!(<(&f64, &f64, &f64, &f64)>::REQUIRED_SLOTS, 4);
     }
 }
