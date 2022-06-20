@@ -1,6 +1,7 @@
-use crate::wren::VMPtr;
+use crate::wren::{wren_value::WrenValue, VMPtr};
 
 use super::{Class, Module};
+use crate::wren::wren_value::WrenArgs;
 use std::{env::args, ffi::CString};
 
 pub fn init_module() -> Module {
@@ -17,12 +18,6 @@ pub fn init_module() -> Module {
     module
 }
 
-unsafe fn all_arguments(vm: VMPtr) {
-    vm.ensure_slots(2);
-    vm.set_slot_new_list_unchecked(0);
-
-    for arg in args() {
-        vm.set_slot_string_unchecked(1, arg);
-        vm.insert_in_list(0, -1, 1);
-    }
+fn all_arguments(vm: VMPtr) {
+    args().collect::<Vec<String>>().set_wren_stack(vm);
 }

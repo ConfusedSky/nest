@@ -2,8 +2,9 @@
 
 use std::{future::Future, pin::Pin, ptr::NonNull};
 
+use crate::wren::wren_value::{WrenArgs, WrenValue};
 use crate::{wren, MyUserData};
-use wren_sys;
+use wren_sys::{self, WrenHandle};
 
 use super::{Class, Module};
 use std::ffi::CString;
@@ -159,14 +160,16 @@ impl Scheduler {
         }));
     }
 
-    pub unsafe fn resume(&self, fiber: NonNull<wren_sys::WrenHandle>, has_argument: bool) {
+    pub fn resume(&self, fiber: NonNull<wren_sys::WrenHandle>, has_argument: bool) {
+        // We still need to ensure here since it's possible we underestimate
         self.vm.ensure_slots(2 + if has_argument { 1 } else { 0 });
-        self.vm.set_slot_handle_unchecked(0, self.class);
-        self.vm.set_slot_handle_unchecked(1, fiber);
-        self.vm.release_handle_unchecked(fiber);
+        (&self.class, &fiber).set_wren_stack(self.vm);
+        unsafe {
+            self.vm.release_handle_unchecked(fiber);
 
-        if !has_argument {
-            _resume(self.vm, self.resume1);
+            if !has_argument {
+                _resume(self.vm, self.resume1);
+            }
         }
     }
     pub unsafe fn finish_resume(&self) {
@@ -177,24 +180,21 @@ impl Scheduler {
         S: AsRef<str>,
     {
         self.resume(fiber, true);
-        self.vm.set_slot_string_unchecked(2, error);
+        error.as_ref().to_string().send_to_vm(self.vm, 2);
         _resume(self.vm, self.resume_error);
     }
     pub unsafe fn resume_waiting(&mut self) {
         self.has_waiting_fibers = false;
-        self.vm.ensure_slots(1);
-        self.vm.set_slot_handle_unchecked(0, self.class);
+        self.class.set_wren_stack(self.vm);
         _resume(self.vm, self.resume_waiting);
     }
     pub unsafe fn has_next(&self) -> bool {
-        self.vm.ensure_slots(1);
-        self.vm.set_slot_handle_unchecked(0, self.class);
+        self.class.set_wren_stack(self.vm);
         _resume(self.vm, self.has_next);
-        self.vm.get_slot_bool_unchecked(0)
+        bool::get_from_vm(self.vm, 0)
     }
     pub unsafe fn run_next_scheduled(&self) {
-        self.vm.ensure_slots(1);
-        self.vm.set_slot_handle_unchecked(0, self.class);
+        self.class.set_wren_stack(self.vm);
         _resume(self.vm, self.run_next_scheduled);
     }
 }
@@ -204,7 +204,7 @@ unsafe fn capture_methods(vm: wren::VMPtr) {
     vm.ensure_slots(1);
     vm.get_variable_unchecked("scheduler", "Scheduler", 0);
     // TODO: Figure out if we actually should check this
-    let class = vm.get_slot_handle_unchecked(0);
+    let class = NonNull::<WrenHandle>::get_from_vm(vm, 0);
 
     let resume1 = vm.make_call_handle("resume_(_)");
     let resume2 = vm.make_call_handle("resume_(_,_)");

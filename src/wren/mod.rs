@@ -1,6 +1,6 @@
 #![allow(unsafe_code)]
 
-mod wren_value;
+pub mod wren_value;
 
 use std::{
     alloc::Layout,
@@ -192,23 +192,23 @@ impl VMPtr {
 
     /// SAFETY: Will segfault if an invalid slot
     /// is asked for
-    pub unsafe fn set_slot_handle_unchecked(self, slot: Slot, handle: Handle) {
+    unsafe fn set_slot_handle_unchecked(self, slot: Slot, handle: Handle) {
         wren_sys::wrenSetSlotHandle(self.0.as_ptr(), slot, handle.as_ptr());
     }
 
     /// SAFETY: Will segfault if an invalid slot
     /// is asked for
-    pub unsafe fn set_slot_new_list_unchecked(self, slot: Slot) {
+    unsafe fn set_slot_new_list_unchecked(self, slot: Slot) {
         wren_sys::wrenSetSlotNewList(self.0.as_ptr(), slot);
     }
 
-    pub unsafe fn insert_in_list(self, list_slot: Slot, index: i32, element_slot: Slot) {
+    unsafe fn insert_in_list(self, list_slot: Slot, index: i32, element_slot: Slot) {
         wrenInsertInList(self.0.as_ptr(), list_slot, index, element_slot);
     }
 
     /// SAFETY: Will segfault if an invalid slot
     /// is set for
-    pub unsafe fn set_slot_string_unchecked<S>(self, slot: Slot, value: S)
+    unsafe fn set_slot_string_unchecked<S>(self, slot: Slot, value: S)
     where
         S: AsRef<str>,
     {
@@ -218,24 +218,24 @@ impl VMPtr {
 
     /// SAFETY: Will segfault if an invalid slot
     /// is set for
-    pub unsafe fn set_slot_bool_unchecked(self, slot: Slot, value: bool) {
+    unsafe fn set_slot_bool_unchecked(self, slot: Slot, value: bool) {
         wren_sys::wrenSetSlotBool(self.0.as_ptr(), slot, value);
     }
 
     /// SAFETY: Calling this on a slot that isn't a bool or a valid slot is undefined behavior
-    pub unsafe fn get_slot_bool_unchecked(self, slot: Slot) -> bool {
+    unsafe fn get_slot_bool_unchecked(self, slot: Slot) -> bool {
         wren_sys::wrenGetSlotBool(self.0.as_ptr(), slot)
     }
 
     /// SAFETY: this is always non null but will segfault if an invalid slot
     /// is asked for
     /// And is not guarenteed to be a valid object
-    pub unsafe fn get_slot_handle_unchecked(self, slot: Slot) -> Handle {
+    unsafe fn get_slot_handle_unchecked(self, slot: Slot) -> Handle {
         NonNull::new_unchecked(wren_sys::wrenGetSlotHandle(self.0.as_ptr(), slot))
     }
 
     /// SAFETY: Calling this on a slot that isn't a bool or a valid slot is undefined behavior
-    pub unsafe fn get_slot_double_unchecked(self, slot: Slot) -> f64 {
+    unsafe fn get_slot_double_unchecked(self, slot: Slot) -> f64 {
         wren_sys::wrenGetSlotDouble(self.0.as_ptr(), slot)
     }
 
