@@ -170,6 +170,19 @@ macro_rules! expand_required_slots {
     )
 }
 
+macro_rules! expand_set_slots {
+    ($self:ident, $vm:ident, @step $i:expr, $x:ty) => (
+        $self.0.send_to_vm($vm, $i);
+    );
+    ($self:ident, $vm:ident, @step $i:expr, $x:ty, $($y:ty),+ $(,)?) => (
+        $self.0.send_to_vm($vm, $i);
+        expand_set_slots!($self, $vm, @step $i + 1, $($y),+);
+    );
+    ($self:ident, $vm:ident, $x:ty, $($y:ty),+ $(,)?) => (
+        expand_set_slots!($self, $vm, @step 0i32, $x, $($y),+);
+    )
+}
+
 macro_rules! impl_args {
     ($( $xs:ident ), *) => {
         impl<$( $xs: Value, )*> Args for ($( &$xs, )*) {
@@ -178,8 +191,7 @@ macro_rules! impl_args {
 
 
             unsafe fn set_slots(&self, vm: VMPtr) {
-                self.0.send_to_vm(vm, 0);
-                self.1.send_to_vm(vm, 1);
+                expand_set_slots!(self, vm, $( $xs ), *);
             }
         }
     };

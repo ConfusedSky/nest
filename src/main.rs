@@ -128,6 +128,7 @@ fn main() {
     }
 
     // This code is for testing with leaks
+    // Create a feature for this
     // drop(vm);
     // let mut buf = String::new();
     // stdin().read_line(&mut buf).unwrap();
