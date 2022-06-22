@@ -171,38 +171,35 @@ macro_rules! expand_required_slots {
 }
 
 macro_rules! expand_set_slots {
-    ($self:ident, $vm:ident, @step $i:expr, $x:ty) => (
-        $self.0.send_to_vm($vm, $i);
-    );
-    ($self:ident, $vm:ident, @step $i:expr, $x:ty, $($y:ty),+ $(,)?) => (
-        $self.0.send_to_vm($vm, $i);
-        expand_set_slots!($self, $vm, @step $i + 1, $($y),+);
-    );
-    ($self:ident, $vm:ident, $x:ty, $($y:ty),+ $(,)?) => (
-        expand_set_slots!($self, $vm, @step 0i32, $x, $($y),+);
-    )
+    ($self:ident, $vm:ident, $i:tt) => {
+        $self.$i.send_to_vm($vm, $i);
+    };
+    ($self:ident, $vm:ident, $i:tt, $($xs:tt),+ $(,)?) => {
+        expand_set_slots!($self, $vm, $i);
+        expand_set_slots!($self, $vm, $( $xs ), *);
+    };
 }
 
 macro_rules! impl_args {
-    ($( $xs:ident ), *) => {
+    ($( $xs:ident = $i:tt ), *) => {
         impl<$( $xs: Value, )*> Args for ($( &$xs, )*) {
             const REQUIRED_SLOTS: Slot =
                 expand_required_slots!($( $xs ), *);
 
 
             unsafe fn set_slots(&self, vm: VMPtr) {
-                expand_set_slots!(self, vm, $( $xs ), *);
+                expand_set_slots!(self, vm, $( $i ), *);
             }
         }
     };
 }
 
-impl_args!(T, U);
-impl_args!(T, U, V);
-impl_args!(T, U, V, W);
-impl_args!(T, U, V, W, W2);
-impl_args!(T, U, V, W, W2, W3);
-impl_args!(T, U, V, W, W2, W3, W4);
+impl_args!(T = 0, U = 1);
+impl_args!(T = 0, U = 1, V = 2);
+impl_args!(T = 0, U = 1, V = 2, W = 3);
+impl_args!(T = 0, U = 1, V = 2, W = 3, W2 = 4);
+impl_args!(T = 0, U = 1, V = 2, W = 3, W2 = 4, W3 = 5);
+impl_args!(T = 0, U = 1, V = 2, W = 3, W2 = 4, W3 = 5, W4 = 6);
 
 #[cfg(test)]
 mod test {
