@@ -27,6 +27,15 @@ impl<T: Value> Value for &T {
     const ADDITIONAL_SLOTS_NEEDED: Slot = T::ADDITIONAL_SLOTS_NEEDED;
 }
 
+// () is implemented to allow skipping slots
+impl Value for () {
+    const ADDITIONAL_SLOTS_NEEDED: Slot = 0;
+}
+
+impl Get for () {
+    unsafe fn get_from_vm(_vm: VMPtr, _slot: Slot) -> Self {}
+}
+
 impl<T: Set> Set for &T {
     unsafe fn send_to_vm(&self, vm: VMPtr, slot: Slot) {
         (*self).send_to_vm(vm, slot);
@@ -38,7 +47,7 @@ impl Value for Handle {
 }
 impl Set for Handle {
     unsafe fn send_to_vm(&self, vm: VMPtr, slot: Slot) {
-        vm.set_slot_handle_unchecked(slot, *self);
+        vm.set_slot_handle_unchecked(slot, self);
     }
 }
 impl Get for Handle {

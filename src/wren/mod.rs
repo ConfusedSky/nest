@@ -1,6 +1,8 @@
 #![allow(unsafe_code)]
 
+mod handle;
 mod value;
+pub use handle::Handle;
 pub use value::{Get, GetArgs, Set, SetArgs, Value};
 
 use std::{
@@ -16,8 +18,7 @@ use std::{
 use wren_sys::{
     self, wrenCall, wrenFreeVM, wrenGetUserData, wrenGetVariable, wrenInitConfiguration,
     wrenInsertInList, wrenInterpret, wrenMakeCallHandle, wrenNewVM, wrenReleaseHandle,
-    WrenConfiguration, WrenErrorType, WrenHandle, WrenInterpretResult, WrenLoadModuleResult,
-    WrenVM,
+    WrenConfiguration, WrenErrorType, WrenInterpretResult, WrenLoadModuleResult, WrenVM,
 };
 
 pub type ForeignMethod = unsafe fn(vm: VMPtr);
@@ -175,7 +176,6 @@ static_assertions::assert_eq_align!(VMPtr, *mut WrenVM);
 static_assertions::assert_eq_size!(VMPtr, *mut WrenVM);
 
 pub type Slot = std::os::raw::c_int;
-pub type Handle = NonNull<WrenHandle>;
 
 impl VMPtr {
     pub const unsafe fn new_unchecked(vm: *mut WrenVM) -> Self {
@@ -190,7 +190,7 @@ impl VMPtr {
 
     /// SAFETY: Will segfault if an invalid slot
     /// is asked for
-    unsafe fn set_slot_handle_unchecked(self, slot: Slot, handle: Handle) {
+    unsafe fn set_slot_handle_unchecked(self, slot: Slot, handle: &Handle) {
         wren_sys::wrenSetSlotHandle(self.0.as_ptr(), slot, handle.as_ptr());
     }
 
@@ -229,7 +229,10 @@ impl VMPtr {
     /// is asked for
     /// And is not guarenteed to be a valid object
     unsafe fn get_slot_handle_unchecked(self, slot: Slot) -> Handle {
-        NonNull::new_unchecked(wren_sys::wrenGetSlotHandle(self.0.as_ptr(), slot))
+        Handle::new(
+            self,
+            NonNull::new_unchecked(wren_sys::wrenGetSlotHandle(self.0.as_ptr(), slot)),
+        )
     }
 
     /// SAFETY: Calling this on a slot that isn't a bool or a valid slot is undefined behavior
@@ -261,11 +264,16 @@ impl VMPtr {
         let signature = CString::new(signature.as_ref()).unwrap();
         // SAFETY: this function is always safe to call but may be unsafe to use the handle it returns
         // as that handle might not be valid
-        unsafe { NonNull::new_unchecked(wrenMakeCallHandle(vm.as_ptr(), signature.as_ptr())) }
+        unsafe {
+            Handle::new(
+                self,
+                NonNull::new_unchecked(wrenMakeCallHandle(vm.as_ptr(), signature.as_ptr())),
+            )
+        }
     }
 
     /// Safety: Will segfault if used with an invalid method
-    pub unsafe fn call(self, method: Handle) -> Result<(), InterpretResultErrorKind> {
+    pub unsafe fn call(self, method: &Handle) -> Result<(), InterpretResultErrorKind> {
         let vm = self.0;
         let result = wrenCall(vm.as_ptr(), method.as_ptr());
 

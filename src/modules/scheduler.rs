@@ -1,15 +1,14 @@
 #![allow(unsafe_code)]
 
-use std::{future::Future, pin::Pin, ptr::NonNull};
+use std::{future::Future, pin::Pin};
 
 use crate::wren::{Handle, Set as WrenSet};
 use crate::{wren, MyUserData};
-use wren_sys::{self};
 
 use super::{Class, Module};
 use std::ffi::CString;
 
-unsafe fn _resume(vm: wren::VMPtr, method: NonNull<wren_sys::WrenHandle>) {
+unsafe fn _resume(vm: wren::VMPtr, method: &Handle) {
     let result = vm.call(method);
 
     if let Err(wren::InterpretResultErrorKind::Runtime) = result {
@@ -40,36 +39,20 @@ pub fn init_module() -> Module {
 pub struct Scheduler {
     vm: wren::VMPtr,
     // A handle to the "Scheduler" class object. Used to call static methods on it.
-    class: NonNull<wren_sys::WrenHandle>,
+    class: Handle,
 
     // This method resumes a fiber that is suspended waiting on an asynchronous
     // operation. The first resumes it with zero arguments, and the second passes
     // one.
-    resume1: NonNull<wren_sys::WrenHandle>,
-    resume2: NonNull<wren_sys::WrenHandle>,
-    resume_error: NonNull<wren_sys::WrenHandle>,
-    resume_waiting: NonNull<wren_sys::WrenHandle>,
-    has_next: NonNull<wren_sys::WrenHandle>,
-    run_next_scheduled: NonNull<wren_sys::WrenHandle>,
+    resume1: Handle,
+    resume2: Handle,
+    resume_error: Handle,
+    resume_waiting: Handle,
+    has_next: Handle,
+    run_next_scheduled: Handle,
 
     pub has_waiting_fibers: bool,
     queue: Vec<Pin<Box<dyn Future<Output = ()>>>>,
-}
-
-impl Drop for Scheduler {
-    fn drop(&mut self) {
-        let scheduler = self;
-        let vm = scheduler.vm;
-        unsafe {
-            vm.release_handle_unchecked(scheduler.class);
-            vm.release_handle_unchecked(scheduler.resume1);
-            vm.release_handle_unchecked(scheduler.resume2);
-            vm.release_handle_unchecked(scheduler.resume_error);
-            vm.release_handle_unchecked(scheduler.resume_waiting);
-            vm.release_handle_unchecked(scheduler.has_next);
-            vm.release_handle_unchecked(scheduler.run_next_scheduled);
-        }
-    }
 }
 
 impl Scheduler {
@@ -160,51 +143,44 @@ impl Scheduler {
         }));
     }
 
-    pub unsafe fn resume(&self, fiber: NonNull<wren_sys::WrenHandle>) {
+    pub unsafe fn resume(&self, fiber: Handle) {
         // resume_wit_arg needs a valid WrenValue type so just set it to
         // a random one
-        self.resume_with_arg::<f64>(fiber, None);
+        self.vm.set_stack(&(&self.class, &fiber));
+        // this is just here to keep clippy from complaining
+        drop(fiber);
+        _resume(self.vm, &self.resume1);
     }
 
-    pub unsafe fn resume_with_arg<T: WrenSet>(
-        &self,
-        fiber: NonNull<wren_sys::WrenHandle>,
-        additional_argument: Option<T>,
-    ) {
-        let method = additional_argument.map_or_else(
-            || {
-                self.vm.set_stack(&(&self.class, &fiber));
-                self.resume1
-            },
-            |arg| {
-                self.vm.set_stack(&(&self.class, &fiber, &arg));
-                self.resume2
-            },
-        );
-
-        self.vm.release_handle_unchecked(fiber);
-        _resume(self.vm, method);
+    pub unsafe fn resume_with_arg<T: WrenSet>(&self, fiber: Handle, additional_argument: T) {
+        self.vm
+            .set_stack(&(&self.class, &fiber, &additional_argument));
+        drop(fiber);
+        _resume(self.vm, &self.resume2);
     }
-    pub unsafe fn resume_error<S>(&self, fiber: NonNull<wren_sys::WrenHandle>, error: S)
+    pub unsafe fn resume_error<S>(&self, fiber: Handle, error: S)
     where
         S: AsRef<str>,
     {
-        self.resume_with_arg(fiber, Some(error.as_ref().to_string()));
+        let error = error.as_ref().to_string();
+        self.vm.set_stack(&(&self.class, &fiber, &error));
+        drop(fiber);
+        _resume(self.vm, &self.resume_error);
     }
     pub unsafe fn resume_waiting(&mut self) {
         self.has_waiting_fibers = false;
         self.vm.set_stack(&self.class);
-        _resume(self.vm, self.resume_waiting);
+        _resume(self.vm, &self.resume_waiting);
     }
     pub unsafe fn has_next(&self) -> bool {
         self.vm.set_stack(&self.class);
-        _resume(self.vm, self.has_next);
+        _resume(self.vm, &self.has_next);
 
         self.vm.get_return_value()
     }
     pub unsafe fn run_next_scheduled(&self) {
         self.vm.set_stack(&self.class);
-        _resume(self.vm, self.run_next_scheduled);
+        _resume(self.vm, &self.run_next_scheduled);
     }
 }
 

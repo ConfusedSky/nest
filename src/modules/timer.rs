@@ -26,7 +26,7 @@ unsafe fn start(vm: wren::VMPtr) {
     let scheduler = user_data.scheduler.as_mut().unwrap();
 
     // We are guarenteed ms is positive based on usage
-    let (ms, fiber) = vm.get_stack::<(f64, Handle)>();
+    let (_, ms, fiber) = vm.get_stack::<((), f64, Handle)>();
 
     let task = async move {
         sleep(Duration::from_secs_f64(ms / 1000.0)).await;
