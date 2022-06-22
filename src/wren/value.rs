@@ -13,15 +13,25 @@ use super::{Handle, Slot, VMPtr};
 pub trait Value {
     /// Number of additional slots that need to be allocated to use this
     const ADDITIONAL_SLOTS_NEEDED: Slot;
+}
+
+pub trait Set: Value {
     unsafe fn send_to_vm(&self, vm: VMPtr, slot: Slot);
+}
+
+pub trait Get: Value {
     unsafe fn get_from_vm(vm: VMPtr, slot: Slot) -> Self;
 }
 
 impl Value for Handle {
     const ADDITIONAL_SLOTS_NEEDED: Slot = 0;
+}
+impl Set for Handle {
     unsafe fn send_to_vm(&self, vm: VMPtr, slot: Slot) {
         vm.set_slot_handle_unchecked(slot, *self);
     }
+}
+impl Get for Handle {
     unsafe fn get_from_vm(vm: VMPtr, slot: Slot) -> Self {
         vm.get_slot_handle_unchecked(slot)
     }
@@ -31,6 +41,9 @@ impl<T: Value> Value for Vec<T> {
     // This needs at least one for moving values into the wren list as well as
     // any additional slots for T's initialization
     const ADDITIONAL_SLOTS_NEEDED: Slot = 1 + T::ADDITIONAL_SLOTS_NEEDED;
+}
+
+impl<T: Set> Set for Vec<T> {
     unsafe fn send_to_vm(&self, vm: VMPtr, slot: Slot) {
         vm.set_slot_new_list_unchecked(slot);
 
@@ -39,6 +52,9 @@ impl<T: Value> Value for Vec<T> {
             vm.insert_in_list(slot, -1, slot + 1);
         }
     }
+}
+
+impl<T: Get> Get for Vec<T> {
     unsafe fn get_from_vm(vm: VMPtr, slot: Slot) -> Self {
         let mut vec = vec![];
 
@@ -55,9 +71,15 @@ impl<T: Value> Value for Vec<T> {
 
 impl Value for String {
     const ADDITIONAL_SLOTS_NEEDED: Slot = 0;
+}
+
+impl Set for String {
     unsafe fn send_to_vm(&self, vm: VMPtr, slot: Slot) {
         vm.set_slot_string_unchecked(slot, self);
     }
+}
+
+impl Get for String {
     unsafe fn get_from_vm(vm: VMPtr, slot: Slot) -> Self {
         let res = wrenGetSlotString(vm.0.as_ptr(), slot);
         let res = CString::from_raw(res as *mut i8);
@@ -67,9 +89,15 @@ impl Value for String {
 
 impl Value for f64 {
     const ADDITIONAL_SLOTS_NEEDED: Slot = 0;
+}
+
+impl Set for f64 {
     unsafe fn send_to_vm(&self, vm: VMPtr, slot: Slot) {
         wrenSetSlotDouble(vm.0.as_ptr(), slot, *self);
     }
+}
+
+impl Get for f64 {
     unsafe fn get_from_vm(vm: VMPtr, slot: Slot) -> Self {
         vm.get_slot_double_unchecked(slot)
     }
@@ -77,15 +105,21 @@ impl Value for f64 {
 
 impl Value for bool {
     const ADDITIONAL_SLOTS_NEEDED: Slot = 0;
+}
+
+impl Set for bool {
     unsafe fn send_to_vm(&self, vm: VMPtr, slot: Slot) {
         vm.set_slot_bool_unchecked(slot, *self);
     }
+}
+
+impl Get for bool {
     unsafe fn get_from_vm(vm: VMPtr, slot: Slot) -> Self {
         vm.get_slot_bool_unchecked(slot)
     }
 }
 
-pub trait Args {
+pub trait SetArgs {
     const REQUIRED_SLOTS: Slot;
     unsafe fn set_slots(&self, vm: VMPtr);
     /// This fn should probably never be used directly since it only existed
@@ -96,62 +130,19 @@ pub trait Args {
     }
     fn set_wren_stack(&self, vm: VMPtr) {
         // This is guarenteed to be safe because we ensured that we had enough
-        // slots for T using get_required_slots
+        // slots for T using REQUIRED_SLOTS
         unsafe {
             self.set_wren_stack_unchecked(vm, Self::REQUIRED_SLOTS);
         }
     }
 }
 
-impl<T: Value> Args for T {
+impl<T: Set> SetArgs for T {
     const REQUIRED_SLOTS: Slot = 1 + T::ADDITIONAL_SLOTS_NEEDED;
     unsafe fn set_slots(&self, vm: VMPtr) {
         self.send_to_vm(vm, 0);
     }
 }
-
-// TODO: Convert this implementation to a macro
-// impl<T: Value, U: Value> Args for (&T, &U) {
-// const REQUIRED_SLOTS: Slot = const_max!(
-// T::ADDITIONAL_SLOTS_NEEDED + 1,
-// U::ADDITIONAL_SLOTS_NEEDED + 2,
-// );
-
-// unsafe fn set_slots(&self, vm: VMPtr) {
-// self.0.send_to_vm(vm, 0);
-// self.1.send_to_vm(vm, 1);
-// }
-// }
-
-// impl<T: Value, U: Value, V: Value> Args for (&T, &U, &V) {
-// const REQUIRED_SLOTS: Slot = const_max!(
-// T::ADDITIONAL_SLOTS_NEEDED + 1,
-// U::ADDITIONAL_SLOTS_NEEDED + 2,
-// V::ADDITIONAL_SLOTS_NEEDED + 3,
-// );
-
-// unsafe fn set_slots(&self, vm: VMPtr) {
-// self.0.send_to_vm(vm, 0);
-// self.1.send_to_vm(vm, 1);
-// self.2.send_to_vm(vm, 2);
-// }
-// }
-
-// impl<T: Value, U: Value, V: Value, W: Value> Args for (&T, &U, &V, &W) {
-// const REQUIRED_SLOTS: Slot = const_max!(
-// T::ADDITIONAL_SLOTS_NEEDED + 1,
-// U::ADDITIONAL_SLOTS_NEEDED + 2,
-// V::ADDITIONAL_SLOTS_NEEDED + 3,
-// W::ADDITIONAL_SLOTS_NEEDED + 4,
-// );
-
-// unsafe fn set_slots(&self, vm: VMPtr) {
-// self.0.send_to_vm(vm, 0);
-// self.1.send_to_vm(vm, 1);
-// self.2.send_to_vm(vm, 2);
-// self.3.send_to_vm(vm, 3);
-// }
-// }
 
 const fn _const_max_helper(a: Slot, b: Slot) -> Slot {
     [a, b][(a < b) as usize]
@@ -171,24 +162,24 @@ macro_rules! expand_required_slots {
 }
 
 macro_rules! expand_set_slots {
-    ($self:ident, $vm:ident, $i:tt) => {
-        $self.$i.send_to_vm($vm, $i);
+    ($self:ident, $vm:ident, $method:ident, $i:tt) => {
+        $self.$i.$method($vm, $i);
     };
-    ($self:ident, $vm:ident, $i:tt, $($xs:tt),+ $(,)?) => {
-        expand_set_slots!($self, $vm, $i);
-        expand_set_slots!($self, $vm, $( $xs ), *);
+    ($self:ident, $vm:ident, $method:ident, $i:tt, $($xs:tt),+ $(,)?) => {
+        expand_set_slots!($self, $vm, $method, $i);
+        expand_set_slots!($self, $vm, $method, $( $xs ), *);
     };
 }
 
 macro_rules! impl_args {
     ($( $xs:ident = $i:tt ), *) => {
-        impl<$( $xs: Value, )*> Args for ($( &$xs, )*) {
+        impl<$( $xs: Set, )*> Args for ($( &$xs, )*) {
             const REQUIRED_SLOTS: Slot =
                 expand_required_slots!($( $xs ), *);
 
 
             unsafe fn set_slots(&self, vm: VMPtr) {
-                expand_set_slots!(self, vm, $( $i ), *);
+                expand_set_slots!(self, vm, send_to_vm, $( $i ), *);
             }
         }
     };
@@ -203,7 +194,7 @@ impl_args!(T = 0, U = 1, V = 2, W = 3, W2 = 4, W3 = 5, W4 = 6);
 
 #[cfg(test)]
 mod test {
-    use super::Args;
+    use super::SetArgs;
 
     // TODO: Figure out how to test set_wren_stack
 

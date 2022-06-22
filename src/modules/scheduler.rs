@@ -2,7 +2,7 @@
 
 use std::{future::Future, pin::Pin, ptr::NonNull};
 
-use crate::wren::{Args as WrenArgs, Value as WrenValue};
+use crate::wren::{Get as WrenGet, Set as WrenSet, SetArgs as WrenArgs};
 use crate::{wren, MyUserData};
 use wren_sys::{self, WrenHandle};
 
@@ -166,7 +166,7 @@ impl Scheduler {
         self.resume_with_arg::<f64>(fiber, None);
     }
 
-    pub unsafe fn resume_with_arg<T: WrenValue>(
+    pub unsafe fn resume_with_arg<T: WrenSet>(
         &self,
         fiber: NonNull<wren_sys::WrenHandle>,
         additional_argument: Option<T>,

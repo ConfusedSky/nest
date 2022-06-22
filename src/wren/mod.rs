@@ -1,7 +1,7 @@
 #![allow(unsafe_code)]
 
 mod value;
-pub use value::{Args, Value};
+pub use value::{Get, Set, SetArgs, Value};
 
 use std::{
     alloc::Layout,

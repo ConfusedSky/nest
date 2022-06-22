@@ -7,7 +7,7 @@ use crate::wren;
 use crate::MyUserData;
 
 use super::{Class, Module};
-use crate::wren::Value as WrenValue;
+use crate::wren::Get as WrenGet;
 use std::ffi::CString;
 use std::ptr::NonNull;
 
