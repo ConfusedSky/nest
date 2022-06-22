@@ -2,9 +2,9 @@
 
 use std::{future::Future, pin::Pin, ptr::NonNull};
 
-use crate::wren::{Get as WrenGet, Set as WrenSet, SetArgs as WrenArgs};
+use crate::wren::{Handle, Set as WrenSet};
 use crate::{wren, MyUserData};
-use wren_sys::{self, WrenHandle};
+use wren_sys::{self};
 
 use super::{Class, Module};
 use std::ffi::CString;
@@ -173,11 +173,11 @@ impl Scheduler {
     ) {
         let method = additional_argument.map_or_else(
             || {
-                (&self.class, &fiber).set_wren_stack(self.vm);
+                self.vm.set_stack(&(&self.class, &fiber));
                 self.resume1
             },
             |arg| {
-                (&self.class, &fiber, &arg).set_wren_stack(self.vm);
+                self.vm.set_stack(&(&self.class, &fiber, &arg));
                 self.resume2
             },
         );
@@ -193,16 +193,17 @@ impl Scheduler {
     }
     pub unsafe fn resume_waiting(&mut self) {
         self.has_waiting_fibers = false;
-        self.class.set_wren_stack(self.vm);
+        self.vm.set_stack(&self.class);
         _resume(self.vm, self.resume_waiting);
     }
     pub unsafe fn has_next(&self) -> bool {
-        self.class.set_wren_stack(self.vm);
+        self.vm.set_stack(&self.class);
         _resume(self.vm, self.has_next);
-        bool::get_from_vm(self.vm, 0)
+
+        self.vm.get_return_value()
     }
     pub unsafe fn run_next_scheduled(&self) {
-        self.class.set_wren_stack(self.vm);
+        self.vm.set_stack(&self.class);
         _resume(self.vm, self.run_next_scheduled);
     }
 }
@@ -212,7 +213,7 @@ unsafe fn capture_methods(vm: wren::VMPtr) {
     vm.ensure_slots(1);
     vm.get_variable_unchecked("scheduler", "Scheduler", 0);
     // TODO: Figure out if we actually should check this
-    let class = NonNull::<WrenHandle>::get_from_vm(vm, 0);
+    let class = vm.get_stack::<Handle>();
 
     let resume1 = vm.make_call_handle("resume_(_)");
     let resume2 = vm.make_call_handle("resume_(_,_)");

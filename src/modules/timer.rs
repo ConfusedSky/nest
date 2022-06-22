@@ -1,15 +1,13 @@
 #![allow(unsafe_code)]
 
 use tokio::time::{sleep, Duration};
-use wren_sys::WrenHandle;
 
 use crate::wren;
 use crate::MyUserData;
 
 use super::{Class, Module};
-use crate::wren::Get as WrenGet;
+use crate::wren::Handle;
 use std::ffi::CString;
-use std::ptr::NonNull;
 
 pub fn init_module() -> Module {
     let timer_source = include_str!("timer.wren");
@@ -28,8 +26,7 @@ unsafe fn start(vm: wren::VMPtr) {
     let scheduler = user_data.scheduler.as_mut().unwrap();
 
     // We are guarenteed ms is positive based on usage
-    let ms = f64::get_from_vm(vm, 1);
-    let fiber = NonNull::<WrenHandle>::get_from_vm(vm, 2);
+    let (ms, fiber) = vm.get_stack::<(f64, Handle)>();
 
     let task = async move {
         sleep(Duration::from_secs_f64(ms / 1000.0)).await;

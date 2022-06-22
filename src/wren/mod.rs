@@ -174,8 +174,8 @@ pub struct VMPtr(NonNull<WrenVM>);
 static_assertions::assert_eq_align!(VMPtr, *mut WrenVM);
 static_assertions::assert_eq_size!(VMPtr, *mut WrenVM);
 
-type Slot = std::os::raw::c_int;
-type Handle = NonNull<WrenHandle>;
+pub type Slot = std::os::raw::c_int;
+pub type Handle = NonNull<WrenHandle>;
 
 impl VMPtr {
     pub const unsafe fn new_unchecked(vm: *mut WrenVM) -> Self {
@@ -283,11 +283,15 @@ impl VMPtr {
         }
     }
 
-    pub fn set_stack<T: SetArgs>(self, args: T) {
+    pub fn set_stack<T: SetArgs>(self, args: &T) {
         args.set_wren_stack(self);
     }
 
     pub unsafe fn get_stack<T: GetArgs>(self) -> T {
+        T::get_slots(self)
+    }
+
+    pub unsafe fn get_return_value<T: Get>(self) -> T {
         T::get_slots(self)
     }
 }

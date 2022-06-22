@@ -1,7 +1,6 @@
 use crate::wren::VMPtr;
 
 use super::{Class, Module};
-use crate::wren::SetArgs as WrenArgs;
 use std::{env::args, ffi::CString};
 
 pub fn init_module() -> Module {
@@ -19,5 +18,6 @@ pub fn init_module() -> Module {
 }
 
 fn all_arguments(vm: VMPtr) {
-    args().collect::<Vec<String>>().set_wren_stack(vm);
+    let arguments = args().collect::<Vec<String>>();
+    vm.set_stack(&arguments);
 }

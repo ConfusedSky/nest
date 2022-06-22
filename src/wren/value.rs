@@ -230,6 +230,12 @@ pub trait GetArgs {
     unsafe fn get_slots(vm: VMPtr) -> Self;
 }
 
+impl<T: Get> GetArgs for T {
+    unsafe fn get_slots(vm: VMPtr) -> Self {
+        T::get_from_vm(vm, 0)
+    }
+}
+
 macro_rules! impl_get_args {
     ($( $xs:ident = $i:tt ), *) => {
         impl<$( $xs: Get, )*> GetArgs for ($( $xs, )*) {
