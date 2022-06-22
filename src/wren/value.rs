@@ -1,8 +1,8 @@
 #![allow(unsafe_code)]
 
-use std::ffi::CString;
+use std::ffi::{CStr, CString};
 
-use wren_sys::{wrenGetSlotString, wrenSetSlotDouble};
+use wren_sys::{wrenGetSlotString, wrenSetSlotDouble, wrenSetSlotString};
 
 use super::{Handle, Slot, VMPtr};
 
@@ -104,6 +104,16 @@ impl<T: Set> Set for [T] {
 // vec
 // }
 // }
+
+impl Value for CString {
+    const ADDITIONAL_SLOTS_NEEDED: Slot = 0;
+}
+
+impl Set for CString {
+    unsafe fn send_to_vm(&self, vm: VMPtr, slot: Slot) {
+        wrenSetSlotString(vm.0.as_ptr(), slot, self.as_ptr());
+    }
+}
 
 macro_rules! str_set_impl {
     ($t:ty) => {

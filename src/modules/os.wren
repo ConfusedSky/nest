@@ -14,5 +14,5 @@ class Process {
   // foreign static cwd
   // foreign static pid
   // foreign static ppid
-  // foreign static version
+  foreign static version
 }

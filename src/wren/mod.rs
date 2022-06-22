@@ -5,6 +5,8 @@ mod value;
 pub use handle::Handle;
 pub use value::{Get, GetArgs, Set, SetArgs, Value};
 
+pub use wren_sys::WREN_VERSION_STRING as VERSION;
+
 use std::{
     alloc::Layout,
     borrow::Cow,
@@ -17,8 +19,8 @@ use std::{
 
 use wren_sys::{
     self, wrenCall, wrenFreeVM, wrenGetUserData, wrenGetVariable, wrenInitConfiguration,
-    wrenInsertInList, wrenInterpret, wrenMakeCallHandle, wrenNewVM, wrenReleaseHandle,
-    WrenConfiguration, WrenErrorType, WrenInterpretResult, WrenLoadModuleResult, WrenVM,
+    wrenInsertInList, wrenInterpret, wrenMakeCallHandle, wrenNewVM, WrenConfiguration,
+    WrenErrorType, WrenInterpretResult, WrenLoadModuleResult, WrenVM,
 };
 
 pub type ForeignMethod = unsafe fn(vm: VMPtr);
@@ -280,10 +282,6 @@ impl VMPtr {
         InterpretResultErrorKind::new_from_result(result)
     }
 
-    pub unsafe fn release_handle_unchecked(self, handle: Handle) {
-        wrenReleaseHandle(self.0.as_ptr(), handle.as_ptr());
-    }
-
     pub fn ensure_slots(self, num_slots: Slot) {
         // SAFETY: this one is always safe to call even if the value is negative
         unsafe {
@@ -293,6 +291,10 @@ impl VMPtr {
 
     pub fn set_stack<T: SetArgs>(self, args: &T) {
         args.set_wren_stack(self);
+    }
+
+    pub fn set_return_value<T: Set>(self, arg: &T) {
+        arg.set_wren_stack(self);
     }
 
     pub unsafe fn get_stack<T: GetArgs>(self) -> T {
