@@ -1,7 +1,7 @@
 #![allow(unsafe_code)]
 
 mod value;
-pub use value::{Get, Set, SetArgs, Value};
+pub use value::{Get, GetArgs, Set, SetArgs, Value};
 
 use std::{
     alloc::Layout,
@@ -281,6 +281,14 @@ impl VMPtr {
         unsafe {
             wren_sys::wrenEnsureSlots(self.0.as_ptr(), num_slots);
         }
+    }
+
+    pub fn set_stack<T: SetArgs>(self, args: T) {
+        args.set_wren_stack(self);
+    }
+
+    pub unsafe fn get_stack<T: GetArgs>(self) -> T {
+        T::get_slots(self)
     }
 }
 

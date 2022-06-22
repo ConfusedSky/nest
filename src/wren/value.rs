@@ -2,7 +2,7 @@
 
 use std::ffi::CString;
 
-use wren_sys::{wrenGetListCount, wrenGetListElement, wrenGetSlotString, wrenSetSlotDouble};
+use wren_sys::{wrenGetSlotString, wrenSetSlotDouble};
 
 use super::{Handle, Slot, VMPtr};
 
@@ -23,6 +23,16 @@ pub trait Get: Value {
     unsafe fn get_from_vm(vm: VMPtr, slot: Slot) -> Self;
 }
 
+impl<T: Value> Value for &T {
+    const ADDITIONAL_SLOTS_NEEDED: Slot = T::ADDITIONAL_SLOTS_NEEDED;
+}
+
+impl<T: Set> Set for &T {
+    unsafe fn send_to_vm(&self, vm: VMPtr, slot: Slot) {
+        (*self).send_to_vm(vm, slot);
+    }
+}
+
 impl Value for Handle {
     const ADDITIONAL_SLOTS_NEEDED: Slot = 0;
 }
@@ -37,44 +47,54 @@ impl Get for Handle {
     }
 }
 
-macro_rules! slice_set_impl {
-    ($t:ty) => {
-        impl<T: Value> Value for $t {
-            // This needs at least one for moving values into the wren list as well as
-            // any additional slots for T's initialization
-            const ADDITIONAL_SLOTS_NEEDED: Slot = 1 + T::ADDITIONAL_SLOTS_NEEDED;
-        }
+unsafe fn send_iterator_to_vm<T: Set, I: Iterator<Item = T>>(iterator: I, vm: VMPtr, slot: Slot) {
+    vm.set_slot_new_list_unchecked(slot);
 
-        impl<T: Set> Set for $t {
-            unsafe fn send_to_vm(&self, vm: VMPtr, slot: Slot) {
-                vm.set_slot_new_list_unchecked(slot);
-
-                for value in self {
-                    value.send_to_vm(vm, slot + 1);
-                    vm.insert_in_list(slot, -1, slot + 1);
-                }
-            }
-        }
-    };
-}
-
-slice_set_impl!(Vec<T>);
-slice_set_impl!([T]);
-
-impl<T: Get> Get for Vec<T> {
-    unsafe fn get_from_vm(vm: VMPtr, slot: Slot) -> Self {
-        let mut vec = vec![];
-
-        let count = wrenGetListCount(vm.0.as_ptr(), slot);
-
-        for i in 0..count {
-            wrenGetListElement(vm.0.as_ptr(), slot, i, slot + 1);
-            vec.push(T::get_from_vm(vm, slot + 1));
-        }
-
-        vec
+    for value in iterator {
+        value.send_to_vm(vm, slot + 1);
+        vm.insert_in_list(slot, -1, slot + 1);
     }
 }
+
+impl<T: Value> Value for Vec<T> {
+    // This needs at least one for moving values into the wren list as well as
+    // any additional slots for T's initialization
+    const ADDITIONAL_SLOTS_NEEDED: Slot = 1 + T::ADDITIONAL_SLOTS_NEEDED;
+}
+
+impl<T: Set> Set for Vec<T> {
+    unsafe fn send_to_vm(&self, vm: VMPtr, slot: Slot) {
+        send_iterator_to_vm(self.iter(), vm, slot);
+    }
+}
+
+impl<T: Value> Value for [T] {
+    // This needs at least one for moving values into the wren list as well as
+    // any additional slots for T's initialization
+    const ADDITIONAL_SLOTS_NEEDED: Slot = 1 + T::ADDITIONAL_SLOTS_NEEDED;
+}
+
+impl<T: Set> Set for [T] {
+    unsafe fn send_to_vm(&self, vm: VMPtr, slot: Slot) {
+        send_iterator_to_vm(self.iter(), vm, slot);
+    }
+}
+
+// This probably doesn't work correctly as it's written
+// impl<T: Get> Get for Vec<T> {
+// unsafe fn get_from_vm(vm: VMPtr, slot: Slot) -> Self {
+// let mut vec = vec![];
+
+// let count = wrenGetListCount(vm.0.as_ptr(), slot);
+
+// for i in 0..count {
+// wrenGetListElement(vm.0.as_ptr(), slot, i, slot + 1);
+// vec.push(T::get_from_vm(vm, slot + 1));
+// }
+
+// vec
+// }
+// }
 
 macro_rules! str_set_impl {
     ($t:ty) => {
@@ -90,7 +110,7 @@ macro_rules! str_set_impl {
     };
 }
 
-str_set_impl!(&str);
+str_set_impl!(str);
 str_set_impl!(String);
 
 impl Get for String {
@@ -133,31 +153,6 @@ impl Get for bool {
     }
 }
 
-pub trait SetArgs {
-    const REQUIRED_SLOTS: Slot;
-    unsafe fn set_slots(&self, vm: VMPtr);
-    /// This fn should probably never be used directly since it only existed
-    /// before required slots was a constant
-    unsafe fn set_wren_stack_unchecked(&self, vm: VMPtr, num_slots: Slot) {
-        vm.ensure_slots(num_slots);
-        self.set_slots(vm);
-    }
-    fn set_wren_stack(&self, vm: VMPtr) {
-        // This is guarenteed to be safe because we ensured that we had enough
-        // slots for T using REQUIRED_SLOTS
-        unsafe {
-            self.set_wren_stack_unchecked(vm, Self::REQUIRED_SLOTS);
-        }
-    }
-}
-
-impl<T: Set> SetArgs for T {
-    const REQUIRED_SLOTS: Slot = 1 + T::ADDITIONAL_SLOTS_NEEDED;
-    unsafe fn set_slots(&self, vm: VMPtr) {
-        self.send_to_vm(vm, 0);
-    }
-}
-
 const fn _const_max_helper(a: Slot, b: Slot) -> Slot {
     [a, b][(a < b) as usize]
 }
@@ -185,7 +180,7 @@ macro_rules! expand_set_slots {
     };
 }
 
-macro_rules! impl_args {
+macro_rules! impl_set_args {
     ($( $xs:ident = $i:tt ), *) => {
         impl<$( $xs: Set, )*> SetArgs for ($( &$xs, )*) {
             const REQUIRED_SLOTS: Slot =
@@ -199,12 +194,60 @@ macro_rules! impl_args {
     };
 }
 
-impl_args!(T = 0, U = 1);
-impl_args!(T = 0, U = 1, V = 2);
-impl_args!(T = 0, U = 1, V = 2, W = 3);
-impl_args!(T = 0, U = 1, V = 2, W = 3, W2 = 4);
-impl_args!(T = 0, U = 1, V = 2, W = 3, W2 = 4, W3 = 5);
-impl_args!(T = 0, U = 1, V = 2, W = 3, W2 = 4, W3 = 5, W4 = 6);
+pub trait SetArgs {
+    const REQUIRED_SLOTS: Slot;
+    unsafe fn set_slots(&self, vm: VMPtr);
+    /// This fn should probably never be used directly since it only existed
+    /// before required slots was a constant
+    unsafe fn set_wren_stack_unchecked(&self, vm: VMPtr, num_slots: Slot) {
+        vm.ensure_slots(num_slots);
+        self.set_slots(vm);
+    }
+    fn set_wren_stack(&self, vm: VMPtr) {
+        // This is guarenteed to be safe because we ensured that we had enough
+        // slots for T using REQUIRED_SLOTS
+        unsafe {
+            self.set_wren_stack_unchecked(vm, Self::REQUIRED_SLOTS);
+        }
+    }
+}
+
+impl<T: Set> SetArgs for T {
+    const REQUIRED_SLOTS: Slot = 1 + T::ADDITIONAL_SLOTS_NEEDED;
+    unsafe fn set_slots(&self, vm: VMPtr) {
+        self.send_to_vm(vm, 0);
+    }
+}
+
+impl_set_args!(T = 0, U = 1);
+impl_set_args!(T = 0, U = 1, V = 2);
+impl_set_args!(T = 0, U = 1, V = 2, W = 3);
+impl_set_args!(T = 0, U = 1, V = 2, W = 3, W2 = 4);
+impl_set_args!(T = 0, U = 1, V = 2, W = 3, W2 = 4, W3 = 5);
+impl_set_args!(T = 0, U = 1, V = 2, W = 3, W2 = 4, W3 = 5, W4 = 6);
+
+pub trait GetArgs {
+    unsafe fn get_slots(vm: VMPtr) -> Self;
+}
+
+macro_rules! impl_get_args {
+    ($( $xs:ident = $i:tt ), *) => {
+        impl<$( $xs: Get, )*> GetArgs for ($( $xs, )*) {
+            unsafe fn get_slots(vm: VMPtr) -> Self{
+                (
+                    $( $xs::get_from_vm(vm, $i) ), *
+                )
+            }
+        }
+    };
+}
+
+impl_get_args!(T = 0, U = 1);
+impl_get_args!(T = 0, U = 1, V = 2);
+impl_get_args!(T = 0, U = 1, V = 2, W = 3);
+impl_get_args!(T = 0, U = 1, V = 2, W = 3, W2 = 4);
+impl_get_args!(T = 0, U = 1, V = 2, W = 3, W2 = 4, W3 = 5);
+impl_get_args!(T = 0, U = 1, V = 2, W = 3, W2 = 4, W3 = 5, W4 = 6);
 
 #[cfg(test)]
 mod test {
