@@ -37,22 +37,29 @@ impl Get for Handle {
     }
 }
 
-impl<T: Value> Value for Vec<T> {
-    // This needs at least one for moving values into the wren list as well as
-    // any additional slots for T's initialization
-    const ADDITIONAL_SLOTS_NEEDED: Slot = 1 + T::ADDITIONAL_SLOTS_NEEDED;
-}
-
-impl<T: Set> Set for Vec<T> {
-    unsafe fn send_to_vm(&self, vm: VMPtr, slot: Slot) {
-        vm.set_slot_new_list_unchecked(slot);
-
-        for value in self {
-            value.send_to_vm(vm, slot + 1);
-            vm.insert_in_list(slot, -1, slot + 1);
+macro_rules! slice_set_impl {
+    ($t:ty) => {
+        impl<T: Value> Value for $t {
+            // This needs at least one for moving values into the wren list as well as
+            // any additional slots for T's initialization
+            const ADDITIONAL_SLOTS_NEEDED: Slot = 1 + T::ADDITIONAL_SLOTS_NEEDED;
         }
-    }
+
+        impl<T: Set> Set for $t {
+            unsafe fn send_to_vm(&self, vm: VMPtr, slot: Slot) {
+                vm.set_slot_new_list_unchecked(slot);
+
+                for value in self {
+                    value.send_to_vm(vm, slot + 1);
+                    vm.insert_in_list(slot, -1, slot + 1);
+                }
+            }
+        }
+    };
 }
+
+slice_set_impl!(Vec<T>);
+slice_set_impl!([T]);
 
 impl<T: Get> Get for Vec<T> {
     unsafe fn get_from_vm(vm: VMPtr, slot: Slot) -> Self {
@@ -69,15 +76,22 @@ impl<T: Get> Get for Vec<T> {
     }
 }
 
-impl Value for String {
-    const ADDITIONAL_SLOTS_NEEDED: Slot = 0;
+macro_rules! str_set_impl {
+    ($t:ty) => {
+        impl Value for $t {
+            const ADDITIONAL_SLOTS_NEEDED: Slot = 0;
+        }
+
+        impl Set for $t {
+            unsafe fn send_to_vm(&self, vm: VMPtr, slot: Slot) {
+                vm.set_slot_string_unchecked(slot, self);
+            }
+        }
+    };
 }
 
-impl Set for String {
-    unsafe fn send_to_vm(&self, vm: VMPtr, slot: Slot) {
-        vm.set_slot_string_unchecked(slot, self);
-    }
-}
+str_set_impl!(&str);
+str_set_impl!(String);
 
 impl Get for String {
     unsafe fn get_from_vm(vm: VMPtr, slot: Slot) -> Self {
@@ -173,7 +187,7 @@ macro_rules! expand_set_slots {
 
 macro_rules! impl_args {
     ($( $xs:ident = $i:tt ), *) => {
-        impl<$( $xs: Set, )*> Args for ($( &$xs, )*) {
+        impl<$( $xs: Set, )*> SetArgs for ($( &$xs, )*) {
             const REQUIRED_SLOTS: Slot =
                 expand_required_slots!($( $xs ), *);
 
