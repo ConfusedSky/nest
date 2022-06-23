@@ -1,6 +1,6 @@
 #![allow(unsafe_code)]
 
-use crate::wren::{Null, VMPtr};
+use crate::wren::VMPtr;
 
 use super::{Class, Module};
 use std::{
@@ -26,7 +26,7 @@ fn flush(vm: VMPtr) {
             vm.abort_fiber("Stdout failed to flush");
         },
         |_| {
-            vm.set_return_value(&Null);
+            vm.set_return_value(&());
         },
     );
 }

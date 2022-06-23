@@ -6,8 +6,6 @@ use wren_sys::{wrenGetSlotString, wrenSetSlotDouble, wrenSetSlotNull, wrenSetSlo
 
 use super::{Handle, Slot, VMPtr};
 
-pub struct Null;
-
 /// `WrenValue` is a value that is marshallable from the vm to rust and vice-versa
 /// Methods have 3 arguments
 /// VM: The vm pointer
@@ -25,11 +23,8 @@ pub trait Get: Value {
     unsafe fn get_from_vm(vm: VMPtr, slot: Slot) -> Self;
 }
 
-impl<T: Value> Value for &T {
-    const ADDITIONAL_SLOTS_NEEDED: Slot = T::ADDITIONAL_SLOTS_NEEDED;
-}
-
 // () is implemented to allow skipping slots
+// and to set send null to the vm
 impl Value for () {
     const ADDITIONAL_SLOTS_NEEDED: Slot = 0;
 }
@@ -38,14 +33,14 @@ impl Get for () {
     unsafe fn get_from_vm(_vm: VMPtr, _slot: Slot) -> Self {}
 }
 
-impl Value for Null {
-    const ADDITIONAL_SLOTS_NEEDED: Slot = 0;
-}
-
-impl Set for Null {
+impl Set for () {
     unsafe fn send_to_vm(&self, vm: VMPtr, slot: Slot) {
         wrenSetSlotNull(vm.0.as_ptr(), slot);
     }
+}
+
+impl<T: Value> Value for &T {
+    const ADDITIONAL_SLOTS_NEEDED: Slot = T::ADDITIONAL_SLOTS_NEEDED;
 }
 
 impl<T: Set> Set for &T {
