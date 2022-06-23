@@ -293,7 +293,7 @@ impl VMPtr {
         args.set_wren_stack(self);
     }
 
-    pub fn set_return_value<T: Set>(self, arg: &T) {
+    pub fn set_return_value<T: Set + ?Sized>(self, arg: &T) {
         arg.set_wren_stack(self);
     }
 

@@ -1,6 +1,6 @@
 #![allow(unsafe_code)]
 
-use std::ffi::{CStr, CString};
+use std::ffi::CString;
 
 use wren_sys::{wrenGetSlotString, wrenSetSlotDouble, wrenSetSlotString};
 
@@ -231,7 +231,7 @@ pub trait SetArgs {
     }
 }
 
-impl<T: Set> SetArgs for T {
+impl<T: Set + ?Sized> SetArgs for T {
     const REQUIRED_SLOTS: Slot = 1 + T::ADDITIONAL_SLOTS_NEEDED;
     unsafe fn set_slots(&self, vm: VMPtr) {
         self.send_to_vm(vm, 0);

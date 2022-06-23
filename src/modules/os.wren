@@ -11,7 +11,7 @@ class Process {
   static arguments { allArguments.count >= 2 ? allArguments[2..-1] : [] }
 
   foreign static allArguments
-  // foreign static cwd
+  foreign static cwd
   // foreign static pid
   // foreign static ppid
   foreign static version
