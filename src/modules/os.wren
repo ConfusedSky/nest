@@ -12,7 +12,7 @@ class Process {
 
   foreign static allArguments
   foreign static cwd
-  // foreign static pid
+  foreign static pid
   // foreign static ppid
   foreign static version
 }

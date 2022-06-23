@@ -18,9 +18,9 @@ use std::{
 };
 
 use wren_sys::{
-    self, wrenCall, wrenFreeVM, wrenGetUserData, wrenGetVariable, wrenInitConfiguration,
-    wrenInsertInList, wrenInterpret, wrenMakeCallHandle, wrenNewVM, WrenConfiguration,
-    WrenErrorType, WrenInterpretResult, WrenLoadModuleResult, WrenVM,
+    self, wrenAbortFiber, wrenCall, wrenFreeVM, wrenGetUserData, wrenGetVariable,
+    wrenInitConfiguration, wrenInsertInList, wrenInterpret, wrenMakeCallHandle, wrenNewVM,
+    WrenConfiguration, WrenErrorType, WrenInterpretResult, WrenLoadModuleResult, WrenVM,
 };
 
 pub type ForeignMethod = unsafe fn(vm: VMPtr);
@@ -303,6 +303,17 @@ impl VMPtr {
 
     pub unsafe fn get_return_value<T: Get>(self) -> T {
         T::get_slots(self)
+    }
+
+    pub fn abort_fiber<S>(self, value: S)
+    where
+        S: AsRef<str>,
+    {
+        self.ensure_slots(1);
+        unsafe {
+            self.set_slot_string_unchecked(0, value);
+            wrenAbortFiber(self.0.as_ptr(), 0);
+        }
     }
 }
 
