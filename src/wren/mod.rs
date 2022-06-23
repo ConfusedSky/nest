@@ -3,7 +3,7 @@
 mod handle;
 mod value;
 pub use handle::Handle;
-pub use value::{Get, GetArgs, Set, SetArgs, Value};
+pub use value::{Get, GetArgs, Null, Set, SetArgs, Value};
 
 pub use wren_sys::WREN_VERSION_STRING as VERSION;
 

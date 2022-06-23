@@ -1,5 +1,6 @@
 #!allow(unsafe_code);
 
+pub mod io;
 pub mod os;
 pub mod scheduler;
 pub mod timer;
@@ -41,6 +42,7 @@ fn modules_init() -> HashMap<&'static str, Module> {
     m.insert("scheduler", scheduler::init_module());
     m.insert("timer", timer::init_module());
     m.insert("os", os::init_module());
+    m.insert("io", io::init_module());
 
     m
 }

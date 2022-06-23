@@ -2,9 +2,11 @@
 
 use std::ffi::CString;
 
-use wren_sys::{wrenGetSlotString, wrenSetSlotDouble, wrenSetSlotString};
+use wren_sys::{wrenGetSlotString, wrenSetSlotDouble, wrenSetSlotNull, wrenSetSlotString};
 
 use super::{Handle, Slot, VMPtr};
+
+pub struct Null;
 
 /// `WrenValue` is a value that is marshallable from the vm to rust and vice-versa
 /// Methods have 3 arguments
@@ -34,6 +36,16 @@ impl Value for () {
 
 impl Get for () {
     unsafe fn get_from_vm(_vm: VMPtr, _slot: Slot) -> Self {}
+}
+
+impl Value for Null {
+    const ADDITIONAL_SLOTS_NEEDED: Slot = 0;
+}
+
+impl Set for Null {
+    unsafe fn send_to_vm(&self, vm: VMPtr, slot: Slot) {
+        wrenSetSlotNull(vm.0.as_ptr(), slot);
+    }
 }
 
 impl<T: Set> Set for &T {
