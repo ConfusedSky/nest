@@ -3,11 +3,15 @@ use crate::wren::VERSION;
 
 use super::{Class, Module};
 use std::env::current_dir;
-use std::process;
 use std::{env::args, ffi::CString};
 
 pub fn init_module() -> Module {
     let module_source = include_str!("os.wren");
+
+    let mut platform_class = Class::new();
+    platform_class.static_methods.insert("isPosix", is_posix);
+    platform_class.static_methods.insert("name", name);
+    platform_class.static_methods.insert("homePath", home_path);
 
     let mut process_class = Class::new();
     process_class
@@ -20,8 +24,31 @@ pub fn init_module() -> Module {
 
     let mut module = Module::new(CString::new(module_source).unwrap());
     module.classes.insert("Process", process_class);
+    module.classes.insert("Platform", platform_class);
 
     module
+}
+
+fn is_posix(vm: VMPtr) {
+    vm.set_return_value(std::env::consts::OS);
+}
+
+fn name(vm: VMPtr) {
+    let value = std::env::consts::FAMILY == "unix";
+    vm.set_return_value(&(value));
+}
+
+fn home_path(vm: VMPtr) {
+    let dir = dirs::home_dir();
+
+    dir.map_or_else(
+        || {
+            vm.abort_fiber("Cannot get the user's home directory");
+        },
+        |dir| {
+            vm.set_return_value(dir.to_string_lossy().as_ref());
+        },
+    );
 }
 
 fn all_arguments(vm: VMPtr) {
