@@ -16,6 +16,7 @@ pub fn init_module() -> Module {
     process_class.static_methods.insert("version", version);
     process_class.static_methods.insert("cwd", cwd);
     process_class.static_methods.insert("pid", pid);
+    process_class.static_methods.insert("ppid", ppid);
 
     let mut module = Module::new(CString::new(module_source).unwrap());
     module.classes.insert("Process", process_class);
@@ -45,4 +46,8 @@ fn cwd(vm: VMPtr) {
 
 fn pid(vm: VMPtr) {
     vm.set_return_value(&(f64::from(std::process::id())));
+}
+
+fn ppid(vm: VMPtr) {
+    vm.abort_fiber("Unimplemented!");
 }
