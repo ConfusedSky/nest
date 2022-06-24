@@ -208,16 +208,6 @@ impl VMPtr {
 
     /// SAFETY: Will segfault if an invalid slot
     /// is set for
-    unsafe fn set_slot_string_unchecked<S>(self, slot: Slot, value: S)
-    where
-        S: AsRef<str>,
-    {
-        let text = CString::new(value.as_ref()).unwrap();
-        wren_sys::wrenSetSlotString(self.0.as_ptr(), slot, text.as_ptr());
-    }
-
-    /// SAFETY: Will segfault if an invalid slot
-    /// is set for
     unsafe fn set_slot_bool_unchecked(self, slot: Slot, value: bool) {
         wren_sys::wrenSetSlotBool(self.0.as_ptr(), slot, value);
     }
@@ -309,9 +299,8 @@ impl VMPtr {
     where
         S: AsRef<str>,
     {
-        self.ensure_slots(1);
+        self.set_return_value(value.as_ref());
         unsafe {
-            self.set_slot_string_unchecked(0, value);
             wrenAbortFiber(self.0.as_ptr(), 0);
         }
     }
