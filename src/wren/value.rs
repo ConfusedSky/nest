@@ -3,12 +3,29 @@
 use std::{ffi::CString, ptr::NonNull};
 
 use wren_sys::{
-    wrenGetSlotBool, wrenGetSlotBytes, wrenGetSlotDouble, wrenGetSlotHandle, wrenInsertInList,
-    wrenSetSlotBool, wrenSetSlotDouble, wrenSetSlotHandle, wrenSetSlotNewList, wrenSetSlotNull,
-    wrenSetSlotString,
+    self, wrenGetListCount, wrenGetListElement, wrenGetSlotBool, wrenGetSlotBytes,
+    wrenGetSlotDouble, wrenGetSlotHandle, wrenGetSlotType, wrenInsertInList, wrenSetSlotBool,
+    wrenSetSlotDouble, wrenSetSlotHandle, wrenSetSlotNewList, wrenSetSlotNull, wrenSetSlotString,
 };
 
 use super::{Handle, Slot, VMPtr};
+
+struct SlotStorage {
+    vm: VMPtr,
+    slot: Slot,
+    handle: Handle,
+}
+
+impl Drop for SlotStorage {
+    fn drop(&mut self) {
+        unsafe { self.handle.send_to_vm(self.vm, self.slot) }
+    }
+}
+
+unsafe fn store_slot(vm: VMPtr, slot: Slot) -> SlotStorage {
+    let handle = Handle::get_from_vm(vm, slot);
+    SlotStorage { vm, slot, handle }
+}
 
 /// `WrenValue` is a value that is marshallable from the vm to rust and vice-versa
 /// Methods have 3 arguments
@@ -62,6 +79,7 @@ impl Set for Handle {
     }
 }
 impl Get for Handle {
+    // We are always able to get a handle from wren
     unsafe fn get_from_vm(vm: VMPtr, slot: Slot) -> Self {
         let handle = wrenGetSlotHandle(vm.as_ptr(), slot);
         Self::new(vm, NonNull::new_unchecked(handle))
@@ -101,21 +119,30 @@ impl<T: Set> Set for [T] {
     }
 }
 
-// This probably doesn't work correctly as it's written
-// impl<T: Get> Get for Vec<T> {
-// unsafe fn get_from_vm(vm: VMPtr, slot: Slot) -> Self {
-// let mut vec = vec![];
+impl<T: Get> Get for Vec<T> {
+    unsafe fn get_from_vm(vm: VMPtr, slot: Slot) -> Self {
+        // Store the next slot so we don't overwrite it's value
+        // Or use the previous slot instead of juggling slots
+        let (store, item_slot) = if slot == 0 {
+            (Some(store_slot(vm, slot + 1)), slot + 1)
+        } else {
+            (None, slot - 1)
+        };
 
-// let count = wrenGetListCount(vm.as_ptr(), slot);
+        let mut vec = vec![];
 
-// for i in 0..count {
-// wrenGetListElement(vm.as_ptr(), slot, i, slot + 1);
-// vec.push(T::get_from_vm(vm, slot + 1));
-// }
+        let count = wrenGetListCount(vm.as_ptr(), slot);
 
-// vec
-// }
-// }
+        for i in 0..count {
+            wrenGetListElement(vm.as_ptr(), slot, i, item_slot);
+            vec.push(T::get_from_vm(vm, item_slot));
+        }
+
+        drop(store);
+
+        vec
+    }
+}
 
 impl Value for CString {
     const ADDITIONAL_SLOTS_NEEDED: Slot = 0;
@@ -196,7 +223,24 @@ impl Set for bool {
 
 impl Get for bool {
     unsafe fn get_from_vm(vm: VMPtr, slot: Slot) -> Self {
-        wrenGetSlotBool(vm.as_ptr(), slot)
+        let t = wrenGetSlotType(vm.as_ptr(), slot);
+        match t {
+            wren_sys::WrenType_WREN_TYPE_BOOL => wrenGetSlotBool(vm.as_ptr(), slot),
+            wren_sys::WrenType_WREN_TYPE_NULL => false,
+            _ => {
+                let system_methods = vm.get_system_methods();
+                let handle = Handle::get_from_vm(vm, slot);
+                handle.send_to_vm(vm, 0);
+
+                vm.call(&system_methods.object_not)
+                    .expect("Not should never fail on a valid wren type");
+                // Note this shouldn't recurse because the second call
+                // will be a bool and follow the top path
+                let result = vm.get_return_value::<Self>();
+
+                !result
+            }
+        }
     }
 }
 
@@ -304,6 +348,8 @@ impl_get_args!(T = 0, U = 1, V = 2, W = 3, W2 = 4, W3 = 5, W4 = 6);
 
 #[cfg(test)]
 mod test {
+    use crate::wren::{Vm, VmUserData};
+
     use super::SetArgs;
 
     // TODO: Figure out how to test set_wren_stack
@@ -316,5 +362,19 @@ mod test {
         assert_eq!(<(&f64, &Vec<Vec<f64>>)>::REQUIRED_SLOTS, 4);
         assert_eq!(<(&f64, &f64, &f64)>::REQUIRED_SLOTS, 3);
         assert_eq!(<(&f64, &f64, &f64, &f64)>::REQUIRED_SLOTS, 4);
+    }
+
+    // TODO: Test to make sure we can send a bool to the vm
+    #[test]
+    fn test_bool() {
+        struct Test;
+        impl VmUserData for Test {}
+
+        let vm = Vm::new(Test).expect("VM shouldn't fail to initialize");
+
+        vm.interpret("<test>", "Fiber.yield(true)")
+            .expect("Code should run successfully");
+        // let result = unsafe { vm.get_ptr().get_return_value::<bool>() };
+        // assert!(result);
     }
 }

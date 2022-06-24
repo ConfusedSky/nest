@@ -25,13 +25,17 @@ use wren_sys::{
 
 pub type ForeignMethod = unsafe fn(vm: VMPtr);
 
-unsafe fn get_user_data<'s, V>(vm: *mut WrenVM) -> Option<&'s mut V> {
+unsafe fn get_system_user_data<'s, V>(vm: *mut WrenVM) -> Option<&'s mut SystemUserData<V>> {
     let user_data = wrenGetUserData(vm);
     if user_data.is_null() {
         None
     } else {
-        Some(user_data.cast::<V>().as_mut().unwrap())
+        Some(user_data.cast::<SystemUserData<V>>().as_mut().unwrap())
     }
+}
+
+unsafe fn get_user_data<'s, V>(vm: *mut WrenVM) -> Option<&'s mut V> {
+    get_system_user_data(vm).map(|s| &mut s.user_data)
 }
 
 unsafe extern "C" fn resolve_module<V: VmUserData>(
@@ -189,6 +193,16 @@ impl VMPtr {
 
     /// SAFETY: This is not guarenteed to be safe the user needs to know to input
     /// the correct type
+    unsafe fn get_system_methods<'s>(self) -> &'s SystemMethods {
+        get_system_user_data::<()>(self.as_ptr())
+            .expect("user_data should have been initialized at this point")
+            .system_methods
+            .as_ref()
+            .expect("SystemMethods should be initialized at this point")
+    }
+
+    /// SAFETY: This is not guarenteed to be safe the user needs to know to input
+    /// the correct type
     pub unsafe fn get_user_data<'s, V: VmUserData>(self) -> Option<&'s mut V> {
         get_user_data(self.as_ptr())
     }
@@ -331,12 +345,40 @@ pub trait VmUserData {
     fn on_error(&mut self, vm: VMPtr, kind: ErrorKind) {}
 }
 
+struct SystemMethods {
+    object_to_string: Handle,
+    object_not: Handle,
+}
+
+impl SystemMethods {
+    fn new(vm: VMPtr) -> Self {
+        Self {
+            object_not: vm.make_call_handle("!"),
+            object_to_string: vm.make_call_handle("toString"),
+        }
+    }
+}
+
+struct SystemUserData<V> {
+    user_data: V,
+    system_methods: Option<SystemMethods>,
+}
+
+impl<V> SystemUserData<V> {
+    const fn new(user_data: V) -> Self {
+        Self {
+            user_data,
+            system_methods: None,
+        }
+    }
+}
+
 pub struct Vm<V> {
     vm: VMPtr,
     // This value is held here so that it is
     // disposed of properly when execution is finished
     // but it isn't actually used in the struct
-    _user_data: Pin<Box<RefCell<V>>>,
+    _user_data: Pin<Box<RefCell<SystemUserData<V>>>>,
 }
 
 impl<V> Vm<V> {
@@ -361,6 +403,7 @@ where
             wrenInitConfiguration(&mut config);
 
             // TODO: Check if this is a zst and don't allocate space if not
+            let user_data = SystemUserData::new(user_data);
             let user_data = Box::pin(RefCell::new(user_data));
 
             config.writeFn = Some(write_fn::<V>);
@@ -371,6 +414,7 @@ where
             config.userData = user_data.as_ptr().cast::<c_void>();
 
             let vm = VMPtr(NonNull::new(wrenNewVM(&mut config))?);
+            (*user_data.as_ptr()).system_methods = Some(SystemMethods::new(vm));
 
             Some(Self {
                 vm,
