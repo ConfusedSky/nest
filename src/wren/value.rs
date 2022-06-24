@@ -10,24 +10,6 @@ use wren_sys::{
 
 use super::{Handle, Slot, VMPtr};
 
-// enum WrenValue<'s> {
-// Null,
-// Bool(bool),
-// Number(f64),
-// String(&'s [u8]),
-// List(Vec<WrenValue<'s>>),
-// Handle(Handle),
-// }
-
-// impl<'s> WrenValue<'s> {
-// const fn get_required_slots(&self) -> Slot {
-// match *self {
-// Self::Null | Self::Bool(_) | Self::Number(_) | Self::String(_) | Self::Handle(_) => 0,
-// Self::List(_) => 1,
-// }
-// }
-// }
-
 /// `WrenValue` is a value that is marshallable from the vm to rust and vice-versa
 /// Methods have 3 arguments
 /// VM: The vm pointer
@@ -145,27 +127,36 @@ impl Set for CString {
     }
 }
 
-macro_rules! str_set_impl {
-    ($t:ty) => {
-        impl Value for $t {
-            const ADDITIONAL_SLOTS_NEEDED: Slot = 0;
-        }
-
-        impl Set for $t {
-            unsafe fn send_to_vm(&self, vm: VMPtr, slot: Slot) {
-                wren_sys::wrenSetSlotBytes(
-                    vm.as_ptr(),
-                    slot,
-                    self.as_ptr().cast(),
-                    self.len().try_into().unwrap(),
-                );
-            }
-        }
-    };
+unsafe fn send_string_to_vm<S: AsRef<str>>(vm: VMPtr, value: S, slot: Slot) {
+    let str = value.as_ref();
+    wren_sys::wrenSetSlotBytes(
+        vm.as_ptr(),
+        slot,
+        str.as_ptr().cast(),
+        // The len should always be valid
+        str.len().try_into().expect("Invalid length for str"),
+    );
 }
 
-str_set_impl!(str);
-str_set_impl!(String);
+impl Value for str {
+    const ADDITIONAL_SLOTS_NEEDED: Slot = 0;
+}
+
+impl Set for str {
+    unsafe fn send_to_vm(&self, vm: VMPtr, slot: Slot) {
+        send_string_to_vm(vm, self, slot);
+    }
+}
+
+impl Value for String {
+    const ADDITIONAL_SLOTS_NEEDED: Slot = 0;
+}
+
+impl Set for String {
+    unsafe fn send_to_vm(&self, vm: VMPtr, slot: Slot) {
+        send_string_to_vm(vm, self, slot);
+    }
+}
 
 impl Get for String {
     unsafe fn get_from_vm(vm: VMPtr, slot: Slot) -> Self {
