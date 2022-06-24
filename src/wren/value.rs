@@ -10,23 +10,23 @@ use wren_sys::{
 
 use super::{Handle, Slot, VMPtr};
 
-enum WrenValue<'s> {
-    Null,
-    Bool(bool),
-    Number(f64),
-    String(&'s str),
-    List(Vec<WrenValue<'s>>),
-    Handle(Handle),
-}
+// enum WrenValue<'s> {
+// Null,
+// Bool(bool),
+// Number(f64),
+// String(&'s [u8]),
+// List(Vec<WrenValue<'s>>),
+// Handle(Handle),
+// }
 
-impl<'s> WrenValue<'s> {
-    const fn get_required_slots(&self) -> Slot {
-        match *self {
-            Self::Null | Self::Bool(_) | Self::Number(_) | Self::String(_) | Self::Handle(_) => 0,
-            Self::List(_) => 1,
-        }
-    }
-}
+// impl<'s> WrenValue<'s> {
+// const fn get_required_slots(&self) -> Slot {
+// match *self {
+// Self::Null | Self::Bool(_) | Self::Number(_) | Self::String(_) | Self::Handle(_) => 0,
+// Self::List(_) => 1,
+// }
+// }
+// }
 
 /// `WrenValue` is a value that is marshallable from the vm to rust and vice-versa
 /// Methods have 3 arguments
