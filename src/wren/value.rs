@@ -334,9 +334,7 @@ impl_get_args!(T = 0, U = 1, V = 2, W = 3, W2 = 4, W3 = 5, W4 = 6);
 
 #[cfg(test)]
 mod test {
-    use wren_sys::wrenGetSlotType;
-
-    use crate::wren::{Get, Handle, Vm, VmUserData};
+    use crate::wren::{Get, Handle, VMPtr, Vm, VmUserData};
 
     use super::SetArgs;
 
@@ -372,43 +370,25 @@ mod test {
 
         let vm = vm.get_ptr();
         unsafe {
-            vm.ensure_slots(2);
+            unsafe fn make_call(vm: VMPtr, signature: &str, args: &impl SetArgs) -> bool {
+                vm.ensure_slots(1);
+                let handle = vm.make_call_handle(signature);
+                vm.set_stack(args);
+
+                vm.call(&handle).unwrap();
+                vm.get_return_value::<bool>()
+            }
+
+            vm.ensure_slots(1);
             vm.get_variable_unchecked("<test>", "Test", 0);
             let class = Handle::get_from_vm(vm, 0);
-            let return_true = vm.make_call_handle("returnTrue()");
 
-            vm.set_stack(&(&class));
-            vm.call(&return_true).unwrap();
-
-            let result = vm.get_return_value::<bool>();
-            assert!(result);
-
-            let return_null = vm.make_call_handle("returnNull()");
-
-            vm.set_stack(&(&class));
-            vm.call(&return_null).unwrap();
-
-            let result = vm.get_return_value::<bool>();
-            assert!(!result);
-
-            let return_value = vm.make_call_handle("returnValue(_)");
-            vm.set_stack(&(&class, &false));
-            vm.call(&return_value).unwrap();
-
-            let result = vm.get_return_value::<bool>();
-            assert!(!result);
-
-            vm.set_stack(&(&class, &"".to_string()));
-            vm.call(&return_value).unwrap();
-
-            let result = vm.get_return_value::<bool>();
-            assert!(result);
-
-            vm.set_stack(&(&class, &class));
-            vm.call(&return_value).unwrap();
-
-            let result = vm.get_return_value::<bool>();
-            assert!(result);
+            assert!(make_call(vm, "returnTrue()", &(&class)));
+            assert!(!make_call(vm, "returnNull()", &(&class)));
+            assert!(!make_call(vm, "returnValue(_)", &(&class, &false)));
+            assert!(make_call(vm, "returnValue(_)", &(&class, &"".to_string())));
+            assert!(make_call(vm, "returnValue(_)", &(&class, &class)));
+            assert!(make_call(vm, "returnValue(_)", &(&class, &vec![1.0])));
         }
     }
 }
