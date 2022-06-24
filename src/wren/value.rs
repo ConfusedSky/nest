@@ -123,7 +123,7 @@ impl<T: Get> Get for Vec<T> {
     unsafe fn get_from_vm(vm: VMPtr, slot: Slot) -> Self {
         // Store the next slot so we don't overwrite it's value
         // Or use the previous slot instead of juggling slots
-        let (store, item_slot) = if slot == 0 {
+        let (_store, item_slot) = if slot == 0 {
             (Some(store_slot(vm, slot + 1)), slot + 1)
         } else {
             (None, slot - 1)
@@ -137,8 +137,6 @@ impl<T: Get> Get for Vec<T> {
             wrenGetListElement(vm.as_ptr(), slot, i, item_slot);
             vec.push(T::get_from_vm(vm, item_slot));
         }
-
-        drop(store);
 
         vec
     }
@@ -227,19 +225,7 @@ impl Get for bool {
         match t {
             wren_sys::WrenType_WREN_TYPE_BOOL => wrenGetSlotBool(vm.as_ptr(), slot),
             wren_sys::WrenType_WREN_TYPE_NULL => false,
-            _ => {
-                let system_methods = vm.get_system_methods();
-                let handle = Handle::get_from_vm(vm, slot);
-                handle.send_to_vm(vm, 0);
-
-                vm.call(&system_methods.object_not)
-                    .expect("Not should never fail on a valid wren type");
-                // Note this shouldn't recurse because the second call
-                // will be a bool and follow the top path
-                let result = vm.get_return_value::<Self>();
-
-                !result
-            }
+            _ => true,
         }
     }
 }
@@ -348,7 +334,9 @@ impl_get_args!(T = 0, U = 1, V = 2, W = 3, W2 = 4, W3 = 5, W4 = 6);
 
 #[cfg(test)]
 mod test {
-    use crate::wren::{Vm, VmUserData};
+    use wren_sys::wrenGetSlotType;
+
+    use crate::wren::{Get, Handle, Vm, VmUserData};
 
     use super::SetArgs;
 
@@ -364,7 +352,7 @@ mod test {
         assert_eq!(<(&f64, &f64, &f64, &f64)>::REQUIRED_SLOTS, 4);
     }
 
-    // TODO: Test to make sure we can send a bool to the vm
+    // Test that all values other than null and false are falsy
     #[test]
     fn test_bool() {
         struct Test;
@@ -372,9 +360,55 @@ mod test {
 
         let vm = Vm::new(Test).expect("VM shouldn't fail to initialize");
 
-        vm.interpret("<test>", "Fiber.yield(true)")
-            .expect("Code should run successfully");
-        // let result = unsafe { vm.get_ptr().get_return_value::<bool>() };
-        // assert!(result);
+        vm.interpret(
+            "<test>",
+            "class Test {
+                static returnTrue() { true }
+                static returnNull() { null }
+                static returnValue(value) { value }
+            }",
+        )
+        .expect("Code should run successfully");
+
+        let vm = vm.get_ptr();
+        unsafe {
+            vm.ensure_slots(2);
+            vm.get_variable_unchecked("<test>", "Test", 0);
+            let class = Handle::get_from_vm(vm, 0);
+            let return_true = vm.make_call_handle("returnTrue()");
+
+            vm.set_stack(&(&class));
+            vm.call(&return_true).unwrap();
+
+            let result = vm.get_return_value::<bool>();
+            assert!(result);
+
+            let return_null = vm.make_call_handle("returnNull()");
+
+            vm.set_stack(&(&class));
+            vm.call(&return_null).unwrap();
+
+            let result = vm.get_return_value::<bool>();
+            assert!(!result);
+
+            let return_value = vm.make_call_handle("returnValue(_)");
+            vm.set_stack(&(&class, &false));
+            vm.call(&return_value).unwrap();
+
+            let result = vm.get_return_value::<bool>();
+            assert!(!result);
+
+            vm.set_stack(&(&class, &"".to_string()));
+            vm.call(&return_value).unwrap();
+
+            let result = vm.get_return_value::<bool>();
+            assert!(result);
+
+            vm.set_stack(&(&class, &class));
+            vm.call(&return_value).unwrap();
+
+            let result = vm.get_return_value::<bool>();
+            assert!(result);
+        }
     }
 }

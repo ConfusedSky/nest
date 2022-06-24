@@ -347,13 +347,11 @@ pub trait VmUserData {
 
 struct SystemMethods {
     object_to_string: Handle,
-    object_not: Handle,
 }
 
 impl SystemMethods {
     fn new(vm: VMPtr) -> Self {
         Self {
-            object_not: vm.make_call_handle("!"),
             object_to_string: vm.make_call_handle("toString"),
         }
     }
