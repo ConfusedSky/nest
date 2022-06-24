@@ -6,7 +6,6 @@ use crate::wren::{Handle, Set as WrenSet};
 use crate::{wren, MyUserData};
 
 use super::{Class, Module};
-use std::ffi::CString;
 
 unsafe fn _resume(vm: wren::VMPtr, method: &Handle) {
     let result = vm.call(method);

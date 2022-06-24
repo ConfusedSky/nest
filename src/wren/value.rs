@@ -1,8 +1,12 @@
 #![allow(unsafe_code)]
 
-use std::ffi::CString;
+use std::{ffi::CString, ptr::NonNull};
 
-use wren_sys::{wrenGetSlotBytes, wrenSetSlotDouble, wrenSetSlotNull, wrenSetSlotString};
+use wren_sys::{
+    wrenGetSlotBool, wrenGetSlotBytes, wrenGetSlotDouble, wrenGetSlotHandle, wrenInsertInList,
+    wrenSetSlotBool, wrenSetSlotDouble, wrenSetSlotHandle, wrenSetSlotNewList, wrenSetSlotNull,
+    wrenSetSlotString,
+};
 
 use super::{Handle, Slot, VMPtr};
 
@@ -72,21 +76,22 @@ impl Value for Handle {
 }
 impl Set for Handle {
     unsafe fn send_to_vm(&self, vm: VMPtr, slot: Slot) {
-        vm.set_slot_handle_unchecked(slot, self);
+        wrenSetSlotHandle(vm.as_ptr(), slot, self.as_ptr());
     }
 }
 impl Get for Handle {
     unsafe fn get_from_vm(vm: VMPtr, slot: Slot) -> Self {
-        vm.get_slot_handle_unchecked(slot)
+        let handle = wrenGetSlotHandle(vm.as_ptr(), slot);
+        Self::new(vm, NonNull::new_unchecked(handle))
     }
 }
 
 unsafe fn send_iterator_to_vm<T: Set, I: Iterator<Item = T>>(iterator: I, vm: VMPtr, slot: Slot) {
-    vm.set_slot_new_list_unchecked(slot);
+    wrenSetSlotNewList(vm.as_ptr(), slot);
 
     for value in iterator {
         value.send_to_vm(vm, slot + 1);
-        vm.insert_in_list(slot, -1, slot + 1);
+        wrenInsertInList(vm.as_ptr(), slot, -1, slot + 1);
     }
 }
 
@@ -184,7 +189,7 @@ impl Set for f64 {
 
 impl Get for f64 {
     unsafe fn get_from_vm(vm: VMPtr, slot: Slot) -> Self {
-        vm.get_slot_double_unchecked(slot)
+        wrenGetSlotDouble(vm.as_ptr(), slot)
     }
 }
 
@@ -194,13 +199,13 @@ impl Value for bool {
 
 impl Set for bool {
     unsafe fn send_to_vm(&self, vm: VMPtr, slot: Slot) {
-        vm.set_slot_bool_unchecked(slot, *self);
+        wrenSetSlotBool(vm.as_ptr(), slot, *self);
     }
 }
 
 impl Get for bool {
     unsafe fn get_from_vm(vm: VMPtr, slot: Slot) -> Self {
-        vm.get_slot_bool_unchecked(slot)
+        wrenGetSlotBool(vm.as_ptr(), slot)
     }
 }
 

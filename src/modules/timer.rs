@@ -7,7 +7,6 @@ use crate::MyUserData;
 
 use super::{Class, Module};
 use crate::wren::Handle;
-use std::ffi::CString;
 
 pub fn init_module() -> Module {
     let mut timer_class = Class::new();
