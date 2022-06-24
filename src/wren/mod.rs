@@ -253,9 +253,7 @@ impl VMPtr {
 
     pub unsafe fn make_call_handle(self, signature: *const i8) -> Handle {
         let vm = self.0;
-        println!("BEFORE MAKE HANDLE");
         let ptr = wrenMakeCallHandle(vm.as_ptr(), signature);
-        println!("AFTER MAKE HANDLE");
 
         // SAFETY: this function is always safe to call but may be unsafe to use the handle it returns
         // as that handle might not be valid

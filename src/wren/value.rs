@@ -408,15 +408,19 @@ mod test {
         let return_value = make_call_handle!(vm, "returnValue(_)");
 
         unsafe {
-            assert!(make_call!(vm, class, return_true));
+            // False cases
             assert!(!make_call!(vm, class, return_null));
             assert!(!make_call!(vm, class, return_value, false));
+
+            // True cases
+            assert!(make_call!(vm, class, return_true));
             assert!(make_call!(vm, class, return_value, "".to_string()));
             assert!(make_call!(vm, class, return_value, class));
             assert!(make_call!(vm, class, return_value, vec![1.0]));
         }
 
         // Make sure vm lives long enough
+        // TODO: Make sure the ptr always outlives the vm
         drop(x);
     }
 }
