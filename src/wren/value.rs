@@ -411,17 +411,18 @@ mod test {
 
         unsafe {
             // False cases
-            assert!(!make_call!(Test.returnNull(context) -> bool));
-            assert!(!make_call!(Test.returnFalse(context) -> bool));
-            assert!(!make_call!(Test.returnValue(context, false) -> bool));
+            assert!(!make_call!( Test.returnNull(context) -> bool            ));
+            assert!(!make_call!( Test.returnFalse(context) -> bool           ));
+            assert!(!make_call!( Test.returnValue(context, false) -> bool    ));
 
             // True cases
-            assert!(make_call!(Test.returnTrue(context) -> bool));
-            assert!(make_call!(Test.returnValue(context, "") -> bool));
-            assert!(make_call!(Test.returnValue(context, "Test") -> bool));
-            assert!(make_call!(Test.returnValue(context, Test) -> bool));
-            assert!(make_call!(Test.returnValue(context, vec![1.0]) -> bool));
-            assert!(make_call!(Test.returnValue(context, 1.0) -> bool));
+            assert!(make_call!( Test.returnTrue(context) -> bool             ));
+            assert!(make_call!( Test.returnValue(context, true) -> bool      ));
+            assert!(make_call!( Test.returnValue(context, "") -> bool        ));
+            assert!(make_call!( Test.returnValue(context, "Test") -> bool    ));
+            assert!(make_call!( Test.returnValue(context, Test) -> bool      ));
+            assert!(make_call!( Test.returnValue(context, vec![1.0]) -> bool ));
+            assert!(make_call!( Test.returnValue(context, 1.0) -> bool       ));
         }
 
         // Make sure vm lives long enough
