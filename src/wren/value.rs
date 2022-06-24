@@ -2,7 +2,7 @@
 
 use std::ffi::CString;
 
-use wren_sys::{wrenGetSlotString, wrenSetSlotDouble, wrenSetSlotNull, wrenSetSlotString};
+use wren_sys::{wrenGetSlotBytes, wrenSetSlotDouble, wrenSetSlotNull, wrenSetSlotString};
 
 use super::{Handle, Slot, VMPtr};
 
@@ -164,9 +164,11 @@ str_set_impl!(String);
 
 impl Get for String {
     unsafe fn get_from_vm(vm: VMPtr, slot: Slot) -> Self {
-        let res = wrenGetSlotString(vm.0.as_ptr(), slot);
-        let res = CString::from_raw(res as *mut i8);
-        res.to_string_lossy().to_string()
+        let mut len = 0;
+        let ptr = wrenGetSlotBytes(vm.0.as_ptr(), slot, &mut len).cast();
+        let len = len.try_into().unwrap();
+        let slice = std::slice::from_raw_parts(ptr, len);
+        Self::from_utf8_lossy(slice).to_string()
     }
 }
 
