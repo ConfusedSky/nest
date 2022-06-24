@@ -5,7 +5,7 @@ use std::{future::Future, pin::Pin};
 use crate::wren::{Handle, Set as WrenSet};
 use crate::{wren, MyUserData};
 
-use super::{Class, Module};
+use super::{source_file, Class, Module};
 
 unsafe fn _resume(vm: wren::VMPtr, method: &Handle) {
     let result = vm.call(method);
@@ -184,16 +184,14 @@ impl Scheduler {
 unsafe fn capture_methods(vm: wren::VMPtr) {
     let mut user_data = vm.get_user_data::<MyUserData>().unwrap();
     vm.ensure_slots(1);
-    vm.get_variable_unchecked("scheduler", "Scheduler", 0);
-    // TODO: Figure out if we actually should check this
-    let class = vm.get_stack::<Handle>();
+    let class = vm.get_variable_unchecked("scheduler", "Scheduler", 0);
 
-    let resume1 = vm.make_call_handle("resume_(_)");
-    let resume2 = vm.make_call_handle("resume_(_,_)");
-    let resume_error = vm.make_call_handle("resumeError_(_,_)");
-    let resume_waiting = vm.make_call_handle("resumeWaitingFibers_()");
-    let has_next = vm.make_call_handle("hasNext_");
-    let run_next_scheduled = vm.make_call_handle("runNextScheduled_()");
+    let resume1 = wren::make_call_handle!(vm, "resume_(_)");
+    let resume2 = wren::make_call_handle!(vm, "resume_(_,_)");
+    let resume_error = wren::make_call_handle!(vm, "resumeError_(_,_)");
+    let resume_waiting = wren::make_call_handle!(vm, "resumeWaitingFibers_()");
+    let has_next = wren::make_call_handle!(vm, "hasNext_");
+    let run_next_scheduled = wren::make_call_handle!(vm, "runNextScheduled_()");
 
     user_data.scheduler = Some(Scheduler {
         queue: Vec::default(),

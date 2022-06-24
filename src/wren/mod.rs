@@ -174,6 +174,28 @@ unsafe extern "C" fn error_fn<V: VmUserData>(
 #[derive(Debug, Clone, Copy)]
 pub struct VMPtr(NonNull<WrenVM>);
 
+#[macro_export]
+macro_rules! cstr {
+    ($s:expr) => {
+        (concat!($s, "\0") as *const str as *const [::std::os::raw::c_char]).cast::<i8>()
+    };
+}
+pub use cstr;
+
+#[macro_export]
+macro_rules! make_call_handle {
+    ($vm:ident, $signature:literal) => {{
+        use crate::wren::cstr;
+        const SIGNATURE: *const i8 = cstr!($signature);
+
+        #[allow(unused_unsafe)]
+        unsafe {
+            $vm.make_call_handle(SIGNATURE)
+        }
+    }};
+}
+pub use make_call_handle;
+
 // Ensure that VMPtr is the same Size as `*mut WrenVM`
 // the whole purpose of it is to make it easier to access
 // the wren api, without having to sacrifice size, performance or ergonomics
@@ -211,32 +233,33 @@ impl VMPtr {
     /// is asked for
     /// MAYBE: Will seg fault if the variable does not exist?
     /// Still need to set up module resolution
-    pub unsafe fn get_variable_unchecked<Module, Name>(self, module: Module, name: Name, slot: Slot)
+    pub unsafe fn get_variable_unchecked<Module, Name>(
+        self,
+        module: Module,
+        name: Name,
+        slot: Slot,
+    ) -> Handle
     where
         Module: AsRef<str>,
         Name: AsRef<str>,
     {
-        let vm = self.0;
         let module = CString::new(module.as_ref()).unwrap();
         let name = CString::new(name.as_ref()).unwrap();
 
-        wrenGetVariable(vm.as_ptr(), module.as_ptr(), name.as_ptr(), slot);
+        wrenGetVariable(self.as_ptr(), module.as_ptr(), name.as_ptr(), slot);
+
+        Handle::get_from_vm(self, slot)
     }
 
-    pub fn make_call_handle<Signature>(self, signature: Signature) -> Handle
-    where
-        Signature: AsRef<str>,
-    {
+    pub unsafe fn make_call_handle(self, signature: *const i8) -> Handle {
         let vm = self.0;
-        let signature = CString::new(signature.as_ref()).unwrap();
+        println!("BEFORE MAKE HANDLE");
+        let ptr = wrenMakeCallHandle(vm.as_ptr(), signature);
+        println!("AFTER MAKE HANDLE");
+
         // SAFETY: this function is always safe to call but may be unsafe to use the handle it returns
         // as that handle might not be valid
-        unsafe {
-            Handle::new(
-                self,
-                NonNull::new_unchecked(wrenMakeCallHandle(vm.as_ptr(), signature.as_ptr())),
-            )
-        }
+        Handle::new(self, NonNull::new_unchecked(ptr))
     }
 
     /// Safety: Will segfault if used with an invalid method
@@ -352,7 +375,7 @@ struct SystemMethods {
 impl SystemMethods {
     fn new(vm: VMPtr) -> Self {
         Self {
-            object_to_string: vm.make_call_handle("toString"),
+            object_to_string: make_call_handle!(vm, "toString"),
         }
     }
 }
@@ -397,8 +420,9 @@ where
 {
     pub fn new(user_data: V) -> Option<Self> {
         unsafe {
-            let mut config: WrenConfiguration = MaybeUninit::zeroed().assume_init();
-            wrenInitConfiguration(&mut config);
+            let mut config: MaybeUninit<WrenConfiguration> = MaybeUninit::zeroed();
+            wrenInitConfiguration(config.as_mut_ptr());
+            let mut config = config.assume_init();
 
             // TODO: Check if this is a zst and don't allocate space if not
             let user_data = SystemUserData::new(user_data);

@@ -2,7 +2,7 @@
 
 use crate::wren::VMPtr;
 
-use super::{Class, Module};
+use super::{source_file, Class, Module};
 use std::io::{stdout, Write};
 
 pub fn init_module() -> Module {

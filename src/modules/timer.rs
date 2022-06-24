@@ -5,7 +5,7 @@ use tokio::time::{sleep, Duration};
 use crate::wren;
 use crate::MyUserData;
 
-use super::{Class, Module};
+use super::{source_file, Class, Module};
 use crate::wren::Handle;
 
 pub fn init_module() -> Module {

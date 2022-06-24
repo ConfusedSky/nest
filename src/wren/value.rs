@@ -334,9 +334,12 @@ impl_get_args!(T = 0, U = 1, V = 2, W = 3, W2 = 4, W3 = 5, W4 = 6);
 
 #[cfg(test)]
 mod test {
-    use crate::wren::{Get, Handle, VMPtr, Vm, VmUserData};
+    use crate::wren::{Handle, VMPtr, Vm, VmUserData};
 
     use super::SetArgs;
+
+    struct Test;
+    impl VmUserData for Test {}
 
     // TODO: Figure out how to test set_wren_stack
 
@@ -350,12 +353,31 @@ mod test {
         assert_eq!(<(&f64, &f64, &f64, &f64)>::REQUIRED_SLOTS, 4);
     }
 
-    // Test that all values other than null and false are falsy
-    #[test]
-    fn test_bool() {
-        struct Test;
-        impl VmUserData for Test {}
+    macro_rules! make_args {
+        ($class:ident, $($args:tt),+) => {
+            &(&$class, $( &$args )+)
+        };
+        ($class:ident) => {
+            &(&$class)
+        };
+    }
 
+    unsafe fn make_call(vm: VMPtr, handle: &Handle, args: &impl SetArgs) -> bool {
+        vm.set_stack(args);
+        vm.call(handle).unwrap();
+        vm.get_return_value::<bool>()
+    }
+
+    macro_rules! make_call {
+        ($vm:ident, $class:ident, $handle:ident) => {{
+            make_call($vm, &$handle, (make_args!($class)))
+        }};
+        ($vm:ident, $class:ident, $handle:ident, $($args:expr),+ ) => {{
+            make_call($vm, &$handle, (make_args!($class, $($args),+)))
+        }};
+    }
+
+    fn create_test_vm() -> (Vm<Test>, VMPtr, Handle) {
         let vm = Vm::new(Test).expect("VM shouldn't fail to initialize");
 
         vm.interpret(
@@ -368,27 +390,33 @@ mod test {
         )
         .expect("Code should run successfully");
 
-        let vm = vm.get_ptr();
+        let vmptr = vm.get_ptr();
+
+        vmptr.ensure_slots(1);
+        let class = unsafe { vmptr.get_variable_unchecked("<test>", "Test", 0) };
+
+        (vm, vmptr, class)
+    }
+
+    // Test that all values other than null and false are falsy
+    #[test]
+    fn test_bool() {
+        use crate::wren::make_call_handle;
+        let (x, vm, class) = create_test_vm();
+        let return_true = make_call_handle!(vm, "returnTrue()");
+        let return_null = make_call_handle!(vm, "returnNull()");
+        let return_value = make_call_handle!(vm, "returnValue(_)");
+
         unsafe {
-            unsafe fn make_call(vm: VMPtr, signature: &str, args: &impl SetArgs) -> bool {
-                vm.ensure_slots(1);
-                let handle = vm.make_call_handle(signature);
-                vm.set_stack(args);
-
-                vm.call(&handle).unwrap();
-                vm.get_return_value::<bool>()
-            }
-
-            vm.ensure_slots(1);
-            vm.get_variable_unchecked("<test>", "Test", 0);
-            let class = Handle::get_from_vm(vm, 0);
-
-            assert!(make_call(vm, "returnTrue()", &(&class)));
-            assert!(!make_call(vm, "returnNull()", &(&class)));
-            assert!(!make_call(vm, "returnValue(_)", &(&class, &false)));
-            assert!(make_call(vm, "returnValue(_)", &(&class, &"".to_string())));
-            assert!(make_call(vm, "returnValue(_)", &(&class, &class)));
-            assert!(make_call(vm, "returnValue(_)", &(&class, &vec![1.0])));
+            assert!(make_call!(vm, class, return_true));
+            assert!(!make_call!(vm, class, return_null));
+            assert!(!make_call!(vm, class, return_value, false));
+            assert!(make_call!(vm, class, return_value, "".to_string()));
+            assert!(make_call!(vm, class, return_value, class));
+            assert!(make_call!(vm, class, return_value, vec![1.0]));
         }
+
+        // Make sure vm lives long enough
+        drop(x);
     }
 }

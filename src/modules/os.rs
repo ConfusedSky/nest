@@ -1,7 +1,7 @@
 use crate::wren::VMPtr;
 use crate::wren::VERSION;
 
-use super::{Class, Module};
+use super::{source_file, Class, Module};
 use std::env::args;
 use std::env::current_dir;
 
