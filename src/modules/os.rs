@@ -2,12 +2,10 @@ use crate::wren::VMPtr;
 use crate::wren::VERSION;
 
 use super::{Class, Module};
+use std::env::args;
 use std::env::current_dir;
-use std::{env::args, ffi::CString};
 
 pub fn init_module() -> Module {
-    let module_source = include_str!("os.wren");
-
     let mut platform_class = Class::new();
     platform_class.static_methods.insert("isPosix", is_posix);
     platform_class.static_methods.insert("name", name);
@@ -22,7 +20,7 @@ pub fn init_module() -> Module {
     process_class.static_methods.insert("pid", pid);
     process_class.static_methods.insert("ppid", ppid);
 
-    let mut module = Module::new(CString::new(module_source).unwrap());
+    let mut module = Module::new(source_file!("os.wren"));
     module.classes.insert("Process", process_class);
     module.classes.insert("Platform", platform_class);
 

@@ -3,18 +3,13 @@
 use crate::wren::VMPtr;
 
 use super::{Class, Module};
-use std::{
-    ffi::CString,
-    io::{stdout, Write},
-};
+use std::io::{stdout, Write};
 
 pub fn init_module() -> Module {
-    let timer_source = include_str!("io.wren");
-
     let mut stdout_class = Class::new();
     stdout_class.static_methods.insert("flush()", flush);
 
-    let mut timer_module = Module::new(CString::new(timer_source).unwrap());
+    let mut timer_module = Module::new(source_file!("io.wren"));
     timer_module.classes.insert("Stdout", stdout_class);
 
     timer_module

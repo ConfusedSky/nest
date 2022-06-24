@@ -17,8 +17,6 @@ unsafe fn _resume(vm: wren::VMPtr, method: &Handle) {
 }
 
 pub fn init_module() -> Module {
-    let scheduler_source = include_str!("scheduler.wren");
-
     let mut scheduler_class = Class::new();
     scheduler_class
         .static_methods
@@ -27,7 +25,7 @@ pub fn init_module() -> Module {
         .static_methods
         .insert("awaitAll_()", await_all);
 
-    let mut scheduler_module = Module::new(CString::new(scheduler_source).unwrap());
+    let mut scheduler_module = Module::new(source_file!("scheduler.wren"));
     scheduler_module
         .classes
         .insert("Scheduler", scheduler_class);
