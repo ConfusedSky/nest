@@ -18,15 +18,14 @@ use std::{
 };
 
 use wren_sys::{
-    self, wrenAbortFiber, wrenCall, wrenFreeVM, wrenGetUserData, wrenGetVariable,
-    wrenInitConfiguration, wrenInterpret, wrenMakeCallHandle, wrenNewVM, WrenConfiguration,
-    WrenErrorType, WrenInterpretResult, WrenLoadModuleResult, WrenVM,
+    self as ffi, WrenConfiguration, WrenErrorType, WrenInterpretResult, WrenLoadModuleResult,
+    WrenVM,
 };
 
 pub type ForeignMethod = unsafe fn(vm: VMPtr);
 
 unsafe fn get_system_user_data<'s, V>(vm: *mut WrenVM) -> Option<&'s mut SystemUserData<V>> {
-    let user_data = wrenGetUserData(vm);
+    let user_data = ffi::wrenGetUserData(vm);
     if user_data.is_null() {
         None
     } else {
@@ -246,14 +245,14 @@ impl VMPtr {
         let module = CString::new(module.as_ref()).unwrap();
         let name = CString::new(name.as_ref()).unwrap();
 
-        wrenGetVariable(self.as_ptr(), module.as_ptr(), name.as_ptr(), slot);
+        ffi::wrenGetVariable(self.as_ptr(), module.as_ptr(), name.as_ptr(), slot);
 
         Handle::get_from_vm(self, slot)
     }
 
     pub unsafe fn make_call_handle(self, signature: *const i8) -> Handle {
         let vm = self.0;
-        let ptr = wrenMakeCallHandle(vm.as_ptr(), signature);
+        let ptr = ffi::wrenMakeCallHandle(vm.as_ptr(), signature);
 
         // SAFETY: this function is always safe to call but may be unsafe to use the handle it returns
         // as that handle might not be valid
@@ -263,7 +262,7 @@ impl VMPtr {
     /// Safety: Will segfault if used with an invalid method
     pub unsafe fn call(self, method: &Handle) -> Result<(), InterpretResultErrorKind> {
         let vm = self.0;
-        let result = wrenCall(vm.as_ptr(), method.as_ptr());
+        let result = ffi::wrenCall(vm.as_ptr(), method.as_ptr());
 
         InterpretResultErrorKind::new_from_result(result)
     }
@@ -297,7 +296,7 @@ impl VMPtr {
     {
         self.set_return_value(&value.as_ref());
         unsafe {
-            wrenAbortFiber(self.as_ptr(), 0);
+            ffi::wrenAbortFiber(self.as_ptr(), 0);
         }
     }
 }
@@ -408,7 +407,7 @@ impl<V> Vm<V> {
 
 impl<V> Drop for Vm<V> {
     fn drop(&mut self) {
-        unsafe { wrenFreeVM(self.as_ptr()) }
+        unsafe { ffi::wrenFreeVM(self.as_ptr()) }
     }
 }
 
@@ -419,7 +418,7 @@ where
     pub fn new(user_data: V) -> Option<Self> {
         unsafe {
             let mut config: MaybeUninit<WrenConfiguration> = MaybeUninit::zeroed();
-            wrenInitConfiguration(config.as_mut_ptr());
+            ffi::wrenInitConfiguration(config.as_mut_ptr());
             let mut config = config.assume_init();
 
             // TODO: Check if this is a zst and don't allocate space if not
@@ -433,7 +432,7 @@ where
             config.bindForeignMethodFn = Some(bind_foreign_method::<V>);
             config.userData = user_data.as_ptr().cast::<c_void>();
 
-            let vm = VMPtr(NonNull::new(wrenNewVM(&mut config))?);
+            let vm = VMPtr(NonNull::new(ffi::wrenNewVM(&mut config))?);
             (*user_data.as_ptr()).system_methods = Some(SystemMethods::new(vm));
 
             Some(Self {
@@ -455,7 +454,7 @@ where
         unsafe {
             let module = CString::new(module.as_ref()).unwrap();
             let source = CString::new(source.as_ref()).unwrap();
-            let result = wrenInterpret(self.as_ptr(), module.as_ptr(), source.as_ptr());
+            let result = ffi::wrenInterpret(self.as_ptr(), module.as_ptr(), source.as_ptr());
 
             InterpretResultErrorKind::new_from_result(result)
         }

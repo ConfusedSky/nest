@@ -2,11 +2,7 @@
 
 use std::{ffi::CString, ptr::NonNull};
 
-use wren_sys::{
-    self, wrenGetListCount, wrenGetListElement, wrenGetSlotBool, wrenGetSlotBytes,
-    wrenGetSlotDouble, wrenGetSlotHandle, wrenGetSlotType, wrenInsertInList, wrenSetSlotBool,
-    wrenSetSlotDouble, wrenSetSlotHandle, wrenSetSlotNewList, wrenSetSlotNull, wrenSetSlotString,
-};
+use wren_sys as ffi;
 
 use super::{Handle, Slot, VMPtr};
 
@@ -56,7 +52,7 @@ impl Get for () {
 
 impl Set for () {
     unsafe fn send_to_vm(&self, vm: VMPtr, slot: Slot) {
-        wrenSetSlotNull(vm.as_ptr(), slot);
+        ffi::wrenSetSlotNull(vm.as_ptr(), slot);
     }
 }
 
@@ -75,23 +71,23 @@ impl Value for Handle {
 }
 impl Set for Handle {
     unsafe fn send_to_vm(&self, vm: VMPtr, slot: Slot) {
-        wrenSetSlotHandle(vm.as_ptr(), slot, self.as_ptr());
+        ffi::wrenSetSlotHandle(vm.as_ptr(), slot, self.as_ptr());
     }
 }
 impl Get for Handle {
     // We are always able to get a handle from wren
     unsafe fn get_from_vm(vm: VMPtr, slot: Slot) -> Self {
-        let handle = wrenGetSlotHandle(vm.as_ptr(), slot);
+        let handle = ffi::wrenGetSlotHandle(vm.as_ptr(), slot);
         Self::new(vm, NonNull::new_unchecked(handle))
     }
 }
 
 unsafe fn send_iterator_to_vm<T: Set, I: Iterator<Item = T>>(iterator: I, vm: VMPtr, slot: Slot) {
-    wrenSetSlotNewList(vm.as_ptr(), slot);
+    ffi::wrenSetSlotNewList(vm.as_ptr(), slot);
 
     for value in iterator {
         value.send_to_vm(vm, slot + 1);
-        wrenInsertInList(vm.as_ptr(), slot, -1, slot + 1);
+        ffi::wrenInsertInList(vm.as_ptr(), slot, -1, slot + 1);
     }
 }
 
@@ -131,10 +127,10 @@ impl<T: Get> Get for Vec<T> {
 
         let mut vec = vec![];
 
-        let count = wrenGetListCount(vm.as_ptr(), slot);
+        let count = ffi::wrenGetListCount(vm.as_ptr(), slot);
 
         for i in 0..count {
-            wrenGetListElement(vm.as_ptr(), slot, i, item_slot);
+            ffi::wrenGetListElement(vm.as_ptr(), slot, i, item_slot);
             vec.push(T::get_from_vm(vm, item_slot));
         }
 
@@ -148,7 +144,7 @@ impl Value for CString {
 
 impl Set for CString {
     unsafe fn send_to_vm(&self, vm: VMPtr, slot: Slot) {
-        wrenSetSlotString(vm.as_ptr(), slot, self.as_ptr());
+        ffi::wrenSetSlotString(vm.as_ptr(), slot, self.as_ptr());
     }
 }
 
@@ -186,7 +182,7 @@ impl Set for String {
 impl Get for String {
     unsafe fn get_from_vm(vm: VMPtr, slot: Slot) -> Self {
         let mut len = 0;
-        let ptr = wrenGetSlotBytes(vm.as_ptr(), slot, &mut len).cast();
+        let ptr = ffi::wrenGetSlotBytes(vm.as_ptr(), slot, &mut len).cast();
         let len = len.try_into().unwrap();
         let slice = std::slice::from_raw_parts(ptr, len);
         Self::from_utf8_lossy(slice).to_string()
@@ -199,13 +195,13 @@ impl Value for f64 {
 
 impl Set for f64 {
     unsafe fn send_to_vm(&self, vm: VMPtr, slot: Slot) {
-        wrenSetSlotDouble(vm.as_ptr(), slot, *self);
+        ffi::wrenSetSlotDouble(vm.as_ptr(), slot, *self);
     }
 }
 
 impl Get for f64 {
     unsafe fn get_from_vm(vm: VMPtr, slot: Slot) -> Self {
-        wrenGetSlotDouble(vm.as_ptr(), slot)
+        ffi::wrenGetSlotDouble(vm.as_ptr(), slot)
     }
 }
 
@@ -215,15 +211,15 @@ impl Value for bool {
 
 impl Set for bool {
     unsafe fn send_to_vm(&self, vm: VMPtr, slot: Slot) {
-        wrenSetSlotBool(vm.as_ptr(), slot, *self);
+        ffi::wrenSetSlotBool(vm.as_ptr(), slot, *self);
     }
 }
 
 impl Get for bool {
     unsafe fn get_from_vm(vm: VMPtr, slot: Slot) -> Self {
-        let t = wrenGetSlotType(vm.as_ptr(), slot);
+        let t = ffi::wrenGetSlotType(vm.as_ptr(), slot);
         match t {
-            wren_sys::WrenType_WREN_TYPE_BOOL => wrenGetSlotBool(vm.as_ptr(), slot),
+            wren_sys::WrenType_WREN_TYPE_BOOL => ffi::wrenGetSlotBool(vm.as_ptr(), slot),
             wren_sys::WrenType_WREN_TYPE_NULL => false,
             _ => true,
         }
@@ -403,29 +399,29 @@ mod test {
                 static returnValue(value) { value }
             }";
 
-        let (x, vm, Test) = create_test_vm(source);
-        let returnTrue = make_call_handle!(vm, "returnTrue()");
-        let returnFalse = make_call_handle!(vm, "returnFalse()");
-        let returnNull = make_call_handle!(vm, "returnNull()");
-        let returnValue = make_call_handle!(vm, "returnValue(_)");
+        let (vm, context, Test) = create_test_vm(source);
+        let returnTrue = make_call_handle!(context, "returnTrue()");
+        let returnFalse = make_call_handle!(context, "returnFalse()");
+        let returnNull = make_call_handle!(context, "returnNull()");
+        let returnValue = make_call_handle!(context, "returnValue(_)");
 
         unsafe {
             // False cases
-            assert!(!make_call!(Test.returnNull(vm)));
-            assert!(!make_call!(Test.returnFalse(vm)));
-            assert!(!make_call!(Test.returnValue(vm, false)));
+            assert!(!make_call!(Test.returnNull(context)));
+            assert!(!make_call!(Test.returnFalse(context)));
+            assert!(!make_call!(Test.returnValue(context, false)));
 
             // True cases
-            assert!(make_call!(Test.returnTrue(vm)));
-            assert!(make_call!(Test.returnValue(vm, "")));
-            assert!(make_call!(Test.returnValue(vm, "Test")));
-            assert!(make_call!(Test.returnValue(vm, Test)));
-            assert!(make_call!(Test.returnValue(vm, vec![1.0])));
-            assert!(make_call!(Test.returnValue(vm, 1.0)));
+            assert!(make_call!(Test.returnTrue(context)));
+            assert!(make_call!(Test.returnValue(context, "")));
+            assert!(make_call!(Test.returnValue(context, "Test")));
+            assert!(make_call!(Test.returnValue(context, Test)));
+            assert!(make_call!(Test.returnValue(context, vec![1.0])));
+            assert!(make_call!(Test.returnValue(context, 1.0)));
         }
 
         // Make sure vm lives long enough
         // TODO: Make sure the ptr always outlives the vm
-        drop(x);
+        drop(vm);
     }
 }
