@@ -11,7 +11,7 @@ use modules::scheduler::Scheduler;
 use std::{env, ffi::CString, fs, path::PathBuf};
 use tokio::runtime::Builder;
 
-use wren::VMPtr;
+use wren::VmContext;
 
 mod modules;
 mod wren;
@@ -27,7 +27,7 @@ impl MyUserData {
 }
 
 impl wren::VmUserData for MyUserData {
-    fn on_error(&mut self, _: VMPtr, kind: wren::ErrorKind) {
+    fn on_error(&mut self, _: VmContext, kind: wren::ErrorKind) {
         match kind {
             wren::ErrorKind::Compile(ctx) => {
                 println!("[{} line {}] [Error] {}", ctx.module, ctx.line, ctx.msg);
@@ -44,7 +44,7 @@ impl wren::VmUserData for MyUserData {
             }
         }
     }
-    fn on_write(&mut self, _: VMPtr, text: &str) {
+    fn on_write(&mut self, _: VmContext, text: &str) {
         print!("{}", text);
     }
     fn load_module(&mut self, name: &str) -> Option<CString> {

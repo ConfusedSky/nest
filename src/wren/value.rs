@@ -4,10 +4,10 @@ use std::{ffi::CString, ptr::NonNull};
 
 use wren_sys as ffi;
 
-use super::{Handle, Slot, VMPtr};
+use super::{Handle, Slot, VmContext};
 
 struct SlotStorage {
-    vm: VMPtr,
+    vm: VmContext,
     slot: Slot,
     handle: Handle,
 }
@@ -18,7 +18,7 @@ impl Drop for SlotStorage {
     }
 }
 
-unsafe fn store_slot(vm: VMPtr, slot: Slot) -> SlotStorage {
+unsafe fn store_slot(vm: VmContext, slot: Slot) -> SlotStorage {
     let handle = Handle::get_from_vm(vm, slot);
     SlotStorage { vm, slot, handle }
 }
@@ -33,11 +33,11 @@ pub trait Value {
 }
 
 pub trait Set: Value {
-    unsafe fn send_to_vm(&self, vm: VMPtr, slot: Slot);
+    unsafe fn send_to_vm(&self, vm: VmContext, slot: Slot);
 }
 
 pub trait Get: Value {
-    unsafe fn get_from_vm(vm: VMPtr, slot: Slot) -> Self;
+    unsafe fn get_from_vm(vm: VmContext, slot: Slot) -> Self;
 }
 
 // () is implemented to allow skipping slots
@@ -47,11 +47,11 @@ impl Value for () {
 }
 
 impl Get for () {
-    unsafe fn get_from_vm(_vm: VMPtr, _slot: Slot) -> Self {}
+    unsafe fn get_from_vm(_vm: VmContext, _slot: Slot) -> Self {}
 }
 
 impl Set for () {
-    unsafe fn send_to_vm(&self, vm: VMPtr, slot: Slot) {
+    unsafe fn send_to_vm(&self, vm: VmContext, slot: Slot) {
         ffi::wrenSetSlotNull(vm.as_ptr(), slot);
     }
 }
@@ -61,7 +61,7 @@ impl<T: Value> Value for &T {
 }
 
 impl<T: Set> Set for &T {
-    unsafe fn send_to_vm(&self, vm: VMPtr, slot: Slot) {
+    unsafe fn send_to_vm(&self, vm: VmContext, slot: Slot) {
         (*self).send_to_vm(vm, slot);
     }
 }
@@ -70,19 +70,23 @@ impl Value for Handle {
     const ADDITIONAL_SLOTS_NEEDED: Slot = 0;
 }
 impl Set for Handle {
-    unsafe fn send_to_vm(&self, vm: VMPtr, slot: Slot) {
+    unsafe fn send_to_vm(&self, vm: VmContext, slot: Slot) {
         ffi::wrenSetSlotHandle(vm.as_ptr(), slot, self.as_ptr());
     }
 }
 impl Get for Handle {
     // We are always able to get a handle from wren
-    unsafe fn get_from_vm(vm: VMPtr, slot: Slot) -> Self {
+    unsafe fn get_from_vm(vm: VmContext, slot: Slot) -> Self {
         let handle = ffi::wrenGetSlotHandle(vm.as_ptr(), slot);
         Self::new(vm, NonNull::new_unchecked(handle))
     }
 }
 
-unsafe fn send_iterator_to_vm<T: Set, I: Iterator<Item = T>>(iterator: I, vm: VMPtr, slot: Slot) {
+unsafe fn send_iterator_to_vm<T: Set, I: Iterator<Item = T>>(
+    iterator: I,
+    vm: VmContext,
+    slot: Slot,
+) {
     ffi::wrenSetSlotNewList(vm.as_ptr(), slot);
 
     for value in iterator {
@@ -98,7 +102,7 @@ impl<T: Value> Value for Vec<T> {
 }
 
 impl<T: Set> Set for Vec<T> {
-    unsafe fn send_to_vm(&self, vm: VMPtr, slot: Slot) {
+    unsafe fn send_to_vm(&self, vm: VmContext, slot: Slot) {
         send_iterator_to_vm(self.iter(), vm, slot);
     }
 }
@@ -110,13 +114,13 @@ impl<T: Value> Value for [T] {
 }
 
 impl<T: Set> Set for [T] {
-    unsafe fn send_to_vm(&self, vm: VMPtr, slot: Slot) {
+    unsafe fn send_to_vm(&self, vm: VmContext, slot: Slot) {
         send_iterator_to_vm(self.iter(), vm, slot);
     }
 }
 
 impl<T: Get> Get for Vec<T> {
-    unsafe fn get_from_vm(vm: VMPtr, slot: Slot) -> Self {
+    unsafe fn get_from_vm(vm: VmContext, slot: Slot) -> Self {
         // Store the next slot so we don't overwrite it's value
         // Or use the previous slot instead of juggling slots
         let (_store, item_slot) = if slot == 0 {
@@ -143,12 +147,12 @@ impl Value for CString {
 }
 
 impl Set for CString {
-    unsafe fn send_to_vm(&self, vm: VMPtr, slot: Slot) {
+    unsafe fn send_to_vm(&self, vm: VmContext, slot: Slot) {
         ffi::wrenSetSlotString(vm.as_ptr(), slot, self.as_ptr());
     }
 }
 
-unsafe fn send_string_to_vm<S: AsRef<str>>(vm: VMPtr, value: S, slot: Slot) {
+unsafe fn send_string_to_vm<S: AsRef<str>>(vm: VmContext, value: S, slot: Slot) {
     let str = value.as_ref();
     wren_sys::wrenSetSlotBytes(
         vm.as_ptr(),
@@ -164,7 +168,7 @@ impl Value for &str {
 }
 
 impl Set for &str {
-    unsafe fn send_to_vm(&self, vm: VMPtr, slot: Slot) {
+    unsafe fn send_to_vm(&self, vm: VmContext, slot: Slot) {
         send_string_to_vm(vm, self, slot);
     }
 }
@@ -174,13 +178,13 @@ impl Value for String {
 }
 
 impl Set for String {
-    unsafe fn send_to_vm(&self, vm: VMPtr, slot: Slot) {
+    unsafe fn send_to_vm(&self, vm: VmContext, slot: Slot) {
         send_string_to_vm(vm, self, slot);
     }
 }
 
 impl Get for String {
-    unsafe fn get_from_vm(vm: VMPtr, slot: Slot) -> Self {
+    unsafe fn get_from_vm(vm: VmContext, slot: Slot) -> Self {
         let mut len = 0;
         let ptr = ffi::wrenGetSlotBytes(vm.as_ptr(), slot, &mut len).cast();
         let len = len.try_into().unwrap();
@@ -194,13 +198,13 @@ impl Value for f64 {
 }
 
 impl Set for f64 {
-    unsafe fn send_to_vm(&self, vm: VMPtr, slot: Slot) {
+    unsafe fn send_to_vm(&self, vm: VmContext, slot: Slot) {
         ffi::wrenSetSlotDouble(vm.as_ptr(), slot, *self);
     }
 }
 
 impl Get for f64 {
-    unsafe fn get_from_vm(vm: VMPtr, slot: Slot) -> Self {
+    unsafe fn get_from_vm(vm: VmContext, slot: Slot) -> Self {
         ffi::wrenGetSlotDouble(vm.as_ptr(), slot)
     }
 }
@@ -210,13 +214,13 @@ impl Value for bool {
 }
 
 impl Set for bool {
-    unsafe fn send_to_vm(&self, vm: VMPtr, slot: Slot) {
+    unsafe fn send_to_vm(&self, vm: VmContext, slot: Slot) {
         ffi::wrenSetSlotBool(vm.as_ptr(), slot, *self);
     }
 }
 
 impl Get for bool {
-    unsafe fn get_from_vm(vm: VMPtr, slot: Slot) -> Self {
+    unsafe fn get_from_vm(vm: VmContext, slot: Slot) -> Self {
         let t = ffi::wrenGetSlotType(vm.as_ptr(), slot);
         match t {
             wren_sys::WrenType_WREN_TYPE_BOOL => ffi::wrenGetSlotBool(vm.as_ptr(), slot),
@@ -260,7 +264,7 @@ macro_rules! impl_set_args {
                 expand_required_slots!($( $xs ), *);
 
 
-            unsafe fn set_slots(&self, vm: VMPtr) {
+            unsafe fn set_slots(&self, vm: VmContext) {
                 expand_set_slots!(self, vm, send_to_vm, $( $i ), *);
             }
         }
@@ -269,14 +273,14 @@ macro_rules! impl_set_args {
 
 pub trait SetArgs {
     const REQUIRED_SLOTS: Slot;
-    unsafe fn set_slots(&self, vm: VMPtr);
+    unsafe fn set_slots(&self, vm: VmContext);
     /// This fn should probably never be used directly since it only existed
     /// before required slots was a constant
-    unsafe fn set_wren_stack_unchecked(&self, vm: VMPtr, num_slots: Slot) {
+    unsafe fn set_wren_stack_unchecked(&self, vm: VmContext, num_slots: Slot) {
         vm.ensure_slots(num_slots);
         self.set_slots(vm);
     }
-    fn set_wren_stack(&self, vm: VMPtr) {
+    fn set_wren_stack(&self, vm: VmContext) {
         // This is guarenteed to be safe because we ensured that we had enough
         // slots for T using REQUIRED_SLOTS
         unsafe {
@@ -287,7 +291,7 @@ pub trait SetArgs {
 
 impl<T: Set + ?Sized> SetArgs for T {
     const REQUIRED_SLOTS: Slot = 1 + T::ADDITIONAL_SLOTS_NEEDED;
-    unsafe fn set_slots(&self, vm: VMPtr) {
+    unsafe fn set_slots(&self, vm: VmContext) {
         self.send_to_vm(vm, 0);
     }
 }
@@ -300,11 +304,11 @@ impl_set_args!(T = 0, U = 1, V = 2, W = 3, W2 = 4, W3 = 5);
 impl_set_args!(T = 0, U = 1, V = 2, W = 3, W2 = 4, W3 = 5, W4 = 6);
 
 pub trait GetArgs {
-    unsafe fn get_slots(vm: VMPtr) -> Self;
+    unsafe fn get_slots(vm: VmContext) -> Self;
 }
 
 impl<T: Get> GetArgs for T {
-    unsafe fn get_slots(vm: VMPtr) -> Self {
+    unsafe fn get_slots(vm: VmContext) -> Self {
         T::get_from_vm(vm, 0)
     }
 }
@@ -312,7 +316,7 @@ impl<T: Get> GetArgs for T {
 macro_rules! impl_get_args {
     ($( $xs:ident = $i:tt ), *) => {
         impl<$( $xs: Get, )*> GetArgs for ($( $xs, )*) {
-            unsafe fn get_slots(vm: VMPtr) -> Self{
+            unsafe fn get_slots(vm: VmContext) -> Self{
                 (
                     $( $xs::get_from_vm(vm, $i) ), *
                 )
@@ -330,7 +334,7 @@ impl_get_args!(T = 0, U = 1, V = 2, W = 3, W2 = 4, W3 = 5, W4 = 6);
 
 #[cfg(test)]
 mod test {
-    use crate::wren::{Handle, VMPtr, Vm, VmUserData};
+    use crate::wren::{Handle, Vm, VmContext, VmUserData};
 
     use super::SetArgs;
 
@@ -358,7 +362,7 @@ mod test {
         };
     }
 
-    unsafe fn make_call(vm: VMPtr, method: &Handle, args: &impl SetArgs) -> bool {
+    unsafe fn make_call(vm: VmContext, method: &Handle, args: &impl SetArgs) -> bool {
         vm.set_stack(args);
         vm.call(method).unwrap();
         vm.get_return_value::<bool>()
@@ -373,7 +377,7 @@ mod test {
         }};
     }
 
-    fn create_test_vm(source: &str) -> (Vm<TestUserData>, VMPtr, Handle) {
+    fn create_test_vm(source: &str) -> (Vm<TestUserData>, VmContext, Handle) {
         let vm = Vm::new(TestUserData).expect("VM shouldn't fail to initialize");
 
         vm.interpret("<test>", source)

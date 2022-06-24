@@ -2,15 +2,15 @@ use std::ptr::NonNull;
 
 use wren_sys::{wrenReleaseHandle, WrenHandle};
 
-use super::VMPtr;
+use super::VmContext;
 
 pub struct Handle {
-    vm: VMPtr,
+    vm: VmContext,
     pointer: NonNull<WrenHandle>,
 }
 
 impl Handle {
-    pub(crate) const fn new(vm: VMPtr, pointer: NonNull<WrenHandle>) -> Self {
+    pub(crate) const fn new(vm: VmContext, pointer: NonNull<WrenHandle>) -> Self {
         Self { vm, pointer }
     }
 

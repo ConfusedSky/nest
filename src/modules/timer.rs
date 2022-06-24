@@ -18,7 +18,7 @@ pub fn init_module() -> Module {
     timer_module
 }
 
-unsafe fn start(vm: wren::VMPtr) {
+unsafe fn start(vm: wren::VmContext) {
     let user_data = vm.get_user_data::<MyUserData>().unwrap();
     let scheduler = user_data.scheduler.as_mut().unwrap();
 

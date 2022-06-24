@@ -7,7 +7,7 @@ use crate::{wren, MyUserData};
 
 use super::{source_file, Class, Module};
 
-unsafe fn _resume(vm: wren::VMPtr, method: &Handle) {
+unsafe fn _resume(vm: wren::VmContext, method: &Handle) {
     let result = vm.call(method);
 
     if let Err(wren::InterpretResultErrorKind::Runtime) = result {
@@ -34,7 +34,7 @@ pub fn init_module() -> Module {
 
 // #[derive(Debug)]
 pub struct Scheduler {
-    vm: wren::VMPtr,
+    vm: wren::VmContext,
     // A handle to the "Scheduler" class object. Used to call static methods on it.
     class: Handle,
 
@@ -181,7 +181,7 @@ impl Scheduler {
     }
 }
 
-unsafe fn capture_methods(vm: wren::VMPtr) {
+unsafe fn capture_methods(vm: wren::VmContext) {
     let mut user_data = vm.get_user_data::<MyUserData>().unwrap();
     vm.ensure_slots(1);
     let class = vm.get_variable_unchecked("scheduler", "Scheduler", 0);
@@ -207,7 +207,7 @@ unsafe fn capture_methods(vm: wren::VMPtr) {
     });
 }
 
-unsafe fn await_all(vm: wren::VMPtr) {
+unsafe fn await_all(vm: wren::VmContext) {
     vm.get_user_data::<MyUserData>()
         .unwrap()
         .scheduler

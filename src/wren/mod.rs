@@ -22,7 +22,7 @@ use wren_sys::{
     WrenVM,
 };
 
-pub type ForeignMethod = unsafe fn(vm: VMPtr);
+pub type ForeignMethod = unsafe fn(vm: VmContext);
 
 unsafe fn get_system_user_data<'s, V>(vm: *mut WrenVM) -> Option<&'s mut SystemUserData<V>> {
     let user_data = ffi::wrenGetUserData(vm);
@@ -130,7 +130,7 @@ unsafe extern "C" fn write_fn<V: VmUserData>(vm: *mut WrenVM, text: *const i8) {
 
     if let Some(user_data) = user_data {
         let text = CStr::from_ptr(text).to_string_lossy();
-        user_data.on_write(VMPtr::new_unchecked(vm), text.as_ref());
+        user_data.on_write(VmContext::new_unchecked(vm), text.as_ref());
     }
 }
 
@@ -165,13 +165,9 @@ unsafe extern "C" fn error_fn<V: VmUserData>(
             }
         };
 
-        user_data.on_error(VMPtr::new_unchecked(vm), kind);
+        user_data.on_error(VmContext::new_unchecked(vm), kind);
     }
 }
-
-#[repr(transparent)]
-#[derive(Debug, Clone, Copy)]
-pub struct VMPtr(NonNull<WrenVM>);
 
 #[macro_export]
 macro_rules! cstr {
@@ -195,16 +191,20 @@ macro_rules! make_call_handle {
 }
 pub use make_call_handle;
 
+#[repr(transparent)]
+#[derive(Debug, Clone, Copy)]
+pub struct VmContext(NonNull<WrenVM>);
+
 // Ensure that VMPtr is the same Size as `*mut WrenVM`
 // the whole purpose of it is to make it easier to access
 // the wren api, without having to sacrifice size, performance or ergonomics
 // So they should be directly castable
-static_assertions::assert_eq_align!(VMPtr, *mut WrenVM);
-static_assertions::assert_eq_size!(VMPtr, *mut WrenVM);
+static_assertions::assert_eq_align!(VmContext, *mut WrenVM);
+static_assertions::assert_eq_size!(VmContext, *mut WrenVM);
 
 pub type Slot = std::os::raw::c_int;
 
-impl VMPtr {
+impl VmContext {
     const fn as_ptr(self) -> *mut WrenVM {
         self.0.as_ptr()
     }
@@ -361,8 +361,8 @@ pub trait VmUserData {
     ) -> wren_sys::WrenForeignClassMethods {
         unsafe { std::mem::zeroed() }
     }
-    fn on_write(&mut self, vm: VMPtr, text: &str) {}
-    fn on_error(&mut self, vm: VMPtr, kind: ErrorKind) {}
+    fn on_write(&mut self, vm: VmContext, text: &str) {}
+    fn on_error(&mut self, vm: VmContext, kind: ErrorKind) {}
 }
 
 struct SystemMethods {
@@ -370,7 +370,7 @@ struct SystemMethods {
 }
 
 impl SystemMethods {
-    fn new(vm: VMPtr) -> Self {
+    fn new(vm: VmContext) -> Self {
         Self {
             object_to_string: make_call_handle!(vm, "toString"),
         }
@@ -392,7 +392,7 @@ impl<V> SystemUserData<V> {
 }
 
 pub struct Vm<V> {
-    vm: VMPtr,
+    vm: VmContext,
     // This value is held here so that it is
     // disposed of properly when execution is finished
     // but it isn't actually used in the struct
@@ -432,7 +432,7 @@ where
             config.bindForeignMethodFn = Some(bind_foreign_method::<V>);
             config.userData = user_data.as_ptr().cast::<c_void>();
 
-            let vm = VMPtr(NonNull::new(ffi::wrenNewVM(&mut config))?);
+            let vm = VmContext(NonNull::new(ffi::wrenNewVM(&mut config))?);
             (*user_data.as_ptr()).system_methods = Some(SystemMethods::new(vm));
 
             Some(Self {
@@ -442,7 +442,7 @@ where
         }
     }
 
-    pub const fn get_ptr(&self) -> VMPtr {
+    pub const fn get_ptr(&self) -> VmContext {
         self.vm
     }
 

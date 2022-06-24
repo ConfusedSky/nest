@@ -1,4 +1,4 @@
-use crate::wren::VMPtr;
+use crate::wren::VmContext;
 use crate::wren::VERSION;
 
 use super::{source_file, Class, Module};
@@ -27,16 +27,16 @@ pub fn init_module() -> Module {
     module
 }
 
-fn is_posix(vm: VMPtr) {
+fn is_posix(vm: VmContext) {
     vm.set_return_value(&std::env::consts::OS);
 }
 
-fn name(vm: VMPtr) {
+fn name(vm: VmContext) {
     let value = std::env::consts::FAMILY == "unix";
     vm.set_return_value(&(value));
 }
 
-fn home_path(vm: VMPtr) {
+fn home_path(vm: VmContext) {
     let dir = dirs::home_dir();
 
     dir.map_or_else(
@@ -49,17 +49,17 @@ fn home_path(vm: VMPtr) {
     );
 }
 
-fn all_arguments(vm: VMPtr) {
+fn all_arguments(vm: VmContext) {
     let arguments = args().collect::<Vec<String>>();
     vm.set_return_value(&arguments);
 }
 
-fn version(vm: VMPtr) {
+fn version(vm: VmContext) {
     let version = unsafe { std::ffi::CString::from_vec_with_nul_unchecked(VERSION.to_vec()) };
     vm.set_return_value(&version);
 }
 
-fn cwd(vm: VMPtr) {
+fn cwd(vm: VmContext) {
     let dir = current_dir();
 
     if let Ok(dir) = dir {
@@ -69,10 +69,10 @@ fn cwd(vm: VMPtr) {
     }
 }
 
-fn pid(vm: VMPtr) {
+fn pid(vm: VmContext) {
     vm.set_return_value(&(f64::from(std::process::id())));
 }
 
-fn ppid(vm: VMPtr) {
+fn ppid(vm: VmContext) {
     vm.abort_fiber("Unimplemented!");
 }

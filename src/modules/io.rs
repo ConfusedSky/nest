@@ -1,6 +1,6 @@
 #![allow(unsafe_code)]
 
-use crate::wren::VMPtr;
+use crate::wren::VmContext;
 
 use super::{source_file, Class, Module};
 use std::io::{stdout, Write};
@@ -15,7 +15,7 @@ pub fn init_module() -> Module {
     timer_module
 }
 
-fn flush(vm: VMPtr) {
+fn flush(vm: VmContext) {
     stdout().flush().map_or_else(
         |_| {
             vm.abort_fiber("Stdout failed to flush");
