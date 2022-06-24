@@ -53,7 +53,7 @@ impl Get for () {
 
 impl Set for () {
     unsafe fn send_to_vm(&self, vm: VMPtr, slot: Slot) {
-        wrenSetSlotNull(vm.0.as_ptr(), slot);
+        wrenSetSlotNull(vm.as_ptr(), slot);
     }
 }
 
@@ -119,10 +119,10 @@ impl<T: Set> Set for [T] {
 // unsafe fn get_from_vm(vm: VMPtr, slot: Slot) -> Self {
 // let mut vec = vec![];
 
-// let count = wrenGetListCount(vm.0.as_ptr(), slot);
+// let count = wrenGetListCount(vm.as_ptr(), slot);
 
 // for i in 0..count {
-// wrenGetListElement(vm.0.as_ptr(), slot, i, slot + 1);
+// wrenGetListElement(vm.as_ptr(), slot, i, slot + 1);
 // vec.push(T::get_from_vm(vm, slot + 1));
 // }
 
@@ -136,7 +136,7 @@ impl Value for CString {
 
 impl Set for CString {
     unsafe fn send_to_vm(&self, vm: VMPtr, slot: Slot) {
-        wrenSetSlotString(vm.0.as_ptr(), slot, self.as_ptr());
+        wrenSetSlotString(vm.as_ptr(), slot, self.as_ptr());
     }
 }
 
@@ -149,7 +149,7 @@ macro_rules! str_set_impl {
         impl Set for $t {
             unsafe fn send_to_vm(&self, vm: VMPtr, slot: Slot) {
                 wren_sys::wrenSetSlotBytes(
-                    vm.0.as_ptr(),
+                    vm.as_ptr(),
                     slot,
                     self.as_ptr().cast(),
                     self.len().try_into().unwrap(),
@@ -165,7 +165,7 @@ str_set_impl!(String);
 impl Get for String {
     unsafe fn get_from_vm(vm: VMPtr, slot: Slot) -> Self {
         let mut len = 0;
-        let ptr = wrenGetSlotBytes(vm.0.as_ptr(), slot, &mut len).cast();
+        let ptr = wrenGetSlotBytes(vm.as_ptr(), slot, &mut len).cast();
         let len = len.try_into().unwrap();
         let slice = std::slice::from_raw_parts(ptr, len);
         Self::from_utf8_lossy(slice).to_string()
@@ -178,7 +178,7 @@ impl Value for f64 {
 
 impl Set for f64 {
     unsafe fn send_to_vm(&self, vm: VMPtr, slot: Slot) {
-        wrenSetSlotDouble(vm.0.as_ptr(), slot, *self);
+        wrenSetSlotDouble(vm.as_ptr(), slot, *self);
     }
 }
 

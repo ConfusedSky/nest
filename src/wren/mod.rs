@@ -180,6 +180,9 @@ static_assertions::assert_eq_size!(VMPtr, *mut WrenVM);
 pub type Slot = std::os::raw::c_int;
 
 impl VMPtr {
+    const fn as_ptr(self) -> *mut WrenVM {
+        self.0.as_ptr()
+    }
     pub const unsafe fn new_unchecked(vm: *mut WrenVM) -> Self {
         Self(NonNull::new_unchecked(vm))
     }
@@ -187,34 +190,34 @@ impl VMPtr {
     /// SAFETY: This is not guarenteed to be safe the user needs to know to input
     /// the correct type
     pub unsafe fn get_user_data<'s, V: VmUserData>(self) -> Option<&'s mut V> {
-        get_user_data(self.0.as_ptr())
+        get_user_data(self.as_ptr())
     }
 
     /// SAFETY: Will segfault if an invalid slot
     /// is asked for
     unsafe fn set_slot_handle_unchecked(self, slot: Slot, handle: &Handle) {
-        wren_sys::wrenSetSlotHandle(self.0.as_ptr(), slot, handle.as_ptr());
+        wren_sys::wrenSetSlotHandle(self.as_ptr(), slot, handle.as_ptr());
     }
 
     /// SAFETY: Will segfault if an invalid slot
     /// is asked for
     unsafe fn set_slot_new_list_unchecked(self, slot: Slot) {
-        wren_sys::wrenSetSlotNewList(self.0.as_ptr(), slot);
+        wren_sys::wrenSetSlotNewList(self.as_ptr(), slot);
     }
 
     unsafe fn insert_in_list(self, list_slot: Slot, index: i32, element_slot: Slot) {
-        wrenInsertInList(self.0.as_ptr(), list_slot, index, element_slot);
+        wrenInsertInList(self.as_ptr(), list_slot, index, element_slot);
     }
 
     /// SAFETY: Will segfault if an invalid slot
     /// is set for
     unsafe fn set_slot_bool_unchecked(self, slot: Slot, value: bool) {
-        wren_sys::wrenSetSlotBool(self.0.as_ptr(), slot, value);
+        wren_sys::wrenSetSlotBool(self.as_ptr(), slot, value);
     }
 
     /// SAFETY: Calling this on a slot that isn't a bool or a valid slot is undefined behavior
     unsafe fn get_slot_bool_unchecked(self, slot: Slot) -> bool {
-        wren_sys::wrenGetSlotBool(self.0.as_ptr(), slot)
+        wren_sys::wrenGetSlotBool(self.as_ptr(), slot)
     }
 
     /// SAFETY: this is always non null but will segfault if an invalid slot
@@ -223,13 +226,13 @@ impl VMPtr {
     unsafe fn get_slot_handle_unchecked(self, slot: Slot) -> Handle {
         Handle::new(
             self,
-            NonNull::new_unchecked(wren_sys::wrenGetSlotHandle(self.0.as_ptr(), slot)),
+            NonNull::new_unchecked(wren_sys::wrenGetSlotHandle(self.as_ptr(), slot)),
         )
     }
 
     /// SAFETY: Calling this on a slot that isn't a bool or a valid slot is undefined behavior
     unsafe fn get_slot_double_unchecked(self, slot: Slot) -> f64 {
-        wren_sys::wrenGetSlotDouble(self.0.as_ptr(), slot)
+        wren_sys::wrenGetSlotDouble(self.as_ptr(), slot)
     }
 
     /// SAFETY: this is always non null but will segfault if an invalid slot
@@ -275,7 +278,7 @@ impl VMPtr {
     pub fn ensure_slots(self, num_slots: Slot) {
         // SAFETY: this one is always safe to call even if the value is negative
         unsafe {
-            wren_sys::wrenEnsureSlots(self.0.as_ptr(), num_slots);
+            wren_sys::wrenEnsureSlots(self.as_ptr(), num_slots);
         }
     }
 
@@ -301,7 +304,7 @@ impl VMPtr {
     {
         self.set_return_value(value.as_ref());
         unsafe {
-            wrenAbortFiber(self.0.as_ptr(), 0);
+            wrenAbortFiber(self.as_ptr(), 0);
         }
     }
 }
@@ -378,9 +381,15 @@ pub struct Vm<V> {
     _user_data: Pin<Box<RefCell<V>>>,
 }
 
+impl<V> Vm<V> {
+    const fn as_ptr(&self) -> *mut WrenVM {
+        self.vm.as_ptr()
+    }
+}
+
 impl<V> Drop for Vm<V> {
     fn drop(&mut self) {
-        unsafe { wrenFreeVM(self.vm.0.as_ptr()) }
+        unsafe { wrenFreeVM(self.as_ptr()) }
     }
 }
 
@@ -424,7 +433,7 @@ where
         unsafe {
             let module = CString::new(module.as_ref()).unwrap();
             let source = CString::new(source.as_ref()).unwrap();
-            let result = wrenInterpret(self.vm.0.as_ptr(), module.as_ptr(), source.as_ptr());
+            let result = wrenInterpret(self.as_ptr(), module.as_ptr(), source.as_ptr());
 
             InterpretResultErrorKind::new_from_result(result)
         }

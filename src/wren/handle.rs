@@ -21,6 +21,6 @@ impl Handle {
 
 impl Drop for Handle {
     fn drop(&mut self) {
-        unsafe { wrenReleaseHandle(self.vm.0.as_ptr(), self.pointer.as_ptr()) }
+        unsafe { wrenReleaseHandle(self.vm.as_ptr(), self.pointer.as_ptr()) }
     }
 }
