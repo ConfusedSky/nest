@@ -295,7 +295,7 @@ impl VMPtr {
     where
         S: AsRef<str>,
     {
-        self.set_return_value(value.as_ref());
+        self.set_return_value(&value.as_ref());
         unsafe {
             wrenAbortFiber(self.as_ptr(), 0);
         }

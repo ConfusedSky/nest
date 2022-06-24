@@ -163,11 +163,11 @@ unsafe fn send_string_to_vm<S: AsRef<str>>(vm: VMPtr, value: S, slot: Slot) {
     );
 }
 
-impl Value for str {
+impl Value for &str {
     const ADDITIONAL_SLOTS_NEEDED: Slot = 0;
 }
 
-impl Set for str {
+impl Set for &str {
     unsafe fn send_to_vm(&self, vm: VMPtr, slot: Slot) {
         send_string_to_vm(vm, self, slot);
     }
@@ -417,7 +417,8 @@ mod test {
 
             // True cases
             assert!(make_call!(Test.returnTrue(vm)));
-            assert!(make_call!(Test.returnValue(vm, "".to_string())));
+            assert!(make_call!(Test.returnValue(vm, "")));
+            assert!(make_call!(Test.returnValue(vm, "Test")));
             assert!(make_call!(Test.returnValue(vm, Test)));
             assert!(make_call!(Test.returnValue(vm, vec![1.0])));
             assert!(make_call!(Test.returnValue(vm, 1.0)));

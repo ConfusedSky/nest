@@ -28,7 +28,7 @@ pub fn init_module() -> Module {
 }
 
 fn is_posix(vm: VMPtr) {
-    vm.set_return_value(std::env::consts::OS);
+    vm.set_return_value(&std::env::consts::OS);
 }
 
 fn name(vm: VMPtr) {
@@ -44,7 +44,7 @@ fn home_path(vm: VMPtr) {
             vm.abort_fiber("Cannot get the user's home directory");
         },
         |dir| {
-            vm.set_return_value(dir.to_string_lossy().as_ref());
+            vm.set_return_value(&dir.to_string_lossy().as_ref());
         },
     );
 }
@@ -63,7 +63,7 @@ fn cwd(vm: VMPtr) {
     let dir = current_dir();
 
     if let Ok(dir) = dir {
-        vm.set_return_value(dir.to_string_lossy().as_ref());
+        vm.set_return_value(&dir.to_string_lossy().as_ref());
     } else {
         vm.abort_fiber("Cannot get current working directory.");
     }
