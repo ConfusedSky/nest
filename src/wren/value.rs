@@ -377,18 +377,11 @@ mod test {
         }};
     }
 
-    fn create_test_vm() -> (Vm<Test>, VMPtr, Handle) {
+    fn create_test_vm(source: &str) -> (Vm<Test>, VMPtr, Handle) {
         let vm = Vm::new(Test).expect("VM shouldn't fail to initialize");
 
-        vm.interpret(
-            "<test>",
-            "class Test {
-                static returnTrue() { true }
-                static returnNull() { null }
-                static returnValue(value) { value }
-            }",
-        )
-        .expect("Code should run successfully");
+        vm.interpret("<test>", source)
+            .expect("Code should run successfully");
 
         let vmptr = vm.get_ptr();
 
@@ -402,7 +395,13 @@ mod test {
     #[test]
     fn test_bool() {
         use crate::wren::make_call_handle;
-        let (x, vm, class) = create_test_vm();
+        let source = "class Test {
+                static returnTrue() { true }
+                static returnNull() { null }
+                static returnValue(value) { value }
+            }";
+
+        let (x, vm, class) = create_test_vm(source);
         let return_true = make_call_handle!(vm, "returnTrue()");
         let return_null = make_call_handle!(vm, "returnNull()");
         let return_value = make_call_handle!(vm, "returnValue(_)");
@@ -417,6 +416,7 @@ mod test {
             assert!(make_call!(vm, class, return_value, "".to_string()));
             assert!(make_call!(vm, class, return_value, class));
             assert!(make_call!(vm, class, return_value, vec![1.0]));
+            assert!(make_call!(vm, class, return_value, 1.0));
         }
 
         // Make sure vm lives long enough
