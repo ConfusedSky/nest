@@ -336,7 +336,7 @@ impl_get_args!(T = 0, U = 1, V = 2, W = 3, W2 = 4, W3 = 5, W4 = 6);
 mod test {
     use crate::wren::{Handle, Vm, VmContext, VmUserData};
 
-    use super::SetArgs;
+    use super::{Get, SetArgs};
 
     struct TestUserData;
     impl VmUserData for TestUserData {}
@@ -362,18 +362,18 @@ mod test {
         };
     }
 
-    unsafe fn make_call(vm: VmContext, method: &Handle, args: &impl SetArgs) -> bool {
+    unsafe fn make_call<T: Get, Args: SetArgs>(vm: VmContext, method: &Handle, args: &Args) -> T {
         vm.set_stack(args);
         vm.call(method).unwrap();
-        vm.get_return_value::<bool>()
+        vm.get_return_value::<T>()
     }
 
     macro_rules! make_call {
-        ($class:ident.$handle:ident($vm:ident)) => {{
-            make_call($vm, &$handle, (make_args!($class)))
+        ($class:ident.$handle:ident($vm:ident) -> $ret:ty) => {{
+            make_call::<$ret, _>($vm, &$handle, (make_args!($class)))
         }};
-        ($class:ident.$handle:ident($vm:ident, $($args:expr),+ )) => {{
-            make_call($vm, &$handle, (make_args!($class, $($args),+)))
+        ($class:ident.$handle:ident($vm:ident, $($args:expr),+ ) -> $ret:ty) => {{
+            make_call::<$ret, _>($vm, &$handle, (make_args!($class, $($args),+)))
         }};
     }
 
@@ -392,8 +392,8 @@ mod test {
     }
 
     // Test that all values other than null and false are falsy
-    #[allow(non_snake_case)]
     #[test]
+    #[allow(non_snake_case)]
     fn test_bool() {
         use crate::wren::make_call_handle;
         let source = "class Test {
@@ -411,17 +411,17 @@ mod test {
 
         unsafe {
             // False cases
-            assert!(!make_call!(Test.returnNull(context)));
-            assert!(!make_call!(Test.returnFalse(context)));
-            assert!(!make_call!(Test.returnValue(context, false)));
+            assert!(!make_call!(Test.returnNull(context) -> bool));
+            assert!(!make_call!(Test.returnFalse(context) -> bool));
+            assert!(!make_call!(Test.returnValue(context, false) -> bool));
 
             // True cases
-            assert!(make_call!(Test.returnTrue(context)));
-            assert!(make_call!(Test.returnValue(context, "")));
-            assert!(make_call!(Test.returnValue(context, "Test")));
-            assert!(make_call!(Test.returnValue(context, Test)));
-            assert!(make_call!(Test.returnValue(context, vec![1.0])));
-            assert!(make_call!(Test.returnValue(context, 1.0)));
+            assert!(make_call!(Test.returnTrue(context) -> bool));
+            assert!(make_call!(Test.returnValue(context, "") -> bool));
+            assert!(make_call!(Test.returnValue(context, "Test") -> bool));
+            assert!(make_call!(Test.returnValue(context, Test) -> bool));
+            assert!(make_call!(Test.returnValue(context, vec![1.0]) -> bool));
+            assert!(make_call!(Test.returnValue(context, 1.0) -> bool));
         }
 
         // Make sure vm lives long enough
