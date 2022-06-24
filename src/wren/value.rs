@@ -397,18 +397,21 @@ mod test {
         use crate::wren::make_call_handle;
         let source = "class Test {
                 static returnTrue() { true }
+                static returnFalse() { false }
                 static returnNull() { null }
                 static returnValue(value) { value }
             }";
 
         let (x, vm, class) = create_test_vm(source);
         let return_true = make_call_handle!(vm, "returnTrue()");
+        let return_false = make_call_handle!(vm, "returnFalse()");
         let return_null = make_call_handle!(vm, "returnNull()");
         let return_value = make_call_handle!(vm, "returnValue(_)");
 
         unsafe {
             // False cases
             assert!(!make_call!(vm, class, return_null));
+            assert!(!make_call!(vm, class, return_false));
             assert!(!make_call!(vm, class, return_value, false));
 
             // True cases
