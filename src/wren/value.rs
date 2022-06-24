@@ -338,8 +338,8 @@ mod test {
 
     use super::SetArgs;
 
-    struct Test;
-    impl VmUserData for Test {}
+    struct TestUserData;
+    impl VmUserData for TestUserData {}
 
     // TODO: Figure out how to test set_wren_stack
 
@@ -362,23 +362,23 @@ mod test {
         };
     }
 
-    unsafe fn make_call(vm: VMPtr, handle: &Handle, args: &impl SetArgs) -> bool {
+    unsafe fn make_call(vm: VMPtr, method: &Handle, args: &impl SetArgs) -> bool {
         vm.set_stack(args);
-        vm.call(handle).unwrap();
+        vm.call(method).unwrap();
         vm.get_return_value::<bool>()
     }
 
     macro_rules! make_call {
-        ($vm:ident, $class:ident, $handle:ident) => {{
+        ($class:ident.$handle:ident($vm:ident)) => {{
             make_call($vm, &$handle, (make_args!($class)))
         }};
-        ($vm:ident, $class:ident, $handle:ident, $($args:expr),+ ) => {{
+        ($class:ident.$handle:ident($vm:ident, $($args:expr),+ )) => {{
             make_call($vm, &$handle, (make_args!($class, $($args),+)))
         }};
     }
 
-    fn create_test_vm(source: &str) -> (Vm<Test>, VMPtr, Handle) {
-        let vm = Vm::new(Test).expect("VM shouldn't fail to initialize");
+    fn create_test_vm(source: &str) -> (Vm<TestUserData>, VMPtr, Handle) {
+        let vm = Vm::new(TestUserData).expect("VM shouldn't fail to initialize");
 
         vm.interpret("<test>", source)
             .expect("Code should run successfully");
@@ -392,6 +392,7 @@ mod test {
     }
 
     // Test that all values other than null and false are falsy
+    #[allow(non_snake_case)]
     #[test]
     fn test_bool() {
         use crate::wren::make_call_handle;
@@ -402,24 +403,24 @@ mod test {
                 static returnValue(value) { value }
             }";
 
-        let (x, vm, class) = create_test_vm(source);
-        let return_true = make_call_handle!(vm, "returnTrue()");
-        let return_false = make_call_handle!(vm, "returnFalse()");
-        let return_null = make_call_handle!(vm, "returnNull()");
-        let return_value = make_call_handle!(vm, "returnValue(_)");
+        let (x, vm, Test) = create_test_vm(source);
+        let returnTrue = make_call_handle!(vm, "returnTrue()");
+        let returnFalse = make_call_handle!(vm, "returnFalse()");
+        let returnNull = make_call_handle!(vm, "returnNull()");
+        let returnValue = make_call_handle!(vm, "returnValue(_)");
 
         unsafe {
             // False cases
-            assert!(!make_call!(vm, class, return_null));
-            assert!(!make_call!(vm, class, return_false));
-            assert!(!make_call!(vm, class, return_value, false));
+            assert!(!make_call!(Test.returnNull(vm)));
+            assert!(!make_call!(Test.returnFalse(vm)));
+            assert!(!make_call!(Test.returnValue(vm, false)));
 
             // True cases
-            assert!(make_call!(vm, class, return_true));
-            assert!(make_call!(vm, class, return_value, "".to_string()));
-            assert!(make_call!(vm, class, return_value, class));
-            assert!(make_call!(vm, class, return_value, vec![1.0]));
-            assert!(make_call!(vm, class, return_value, 1.0));
+            assert!(make_call!(Test.returnTrue(vm)));
+            assert!(make_call!(Test.returnValue(vm, "".to_string())));
+            assert!(make_call!(Test.returnValue(vm, Test)));
+            assert!(make_call!(Test.returnValue(vm, vec![1.0])));
+            assert!(make_call!(Test.returnValue(vm, 1.0)));
         }
 
         // Make sure vm lives long enough
