@@ -369,21 +369,21 @@ mod test {
     }
 
     macro_rules! make_call {
-        ($class:ident.$handle:ident($vm:ident) -> $ty:ty) => {{
+        ($class:ident.$handle:ident($vm:ident) -> $ty:ty) => {
             make_call::<$ty, _>($vm, &$handle, (make_args!($class)))
-        }};
-        ($class:ident.$handle:ident($vm:ident, $($args:expr),+ ) -> $ty:ty) => {{
+        };
+        ($class:ident.$handle:ident($vm:ident, $($args:expr),+ ) -> $ty:ty) => {
             make_call::<$ty, _>($vm, &$handle, (make_args!($class, $($args),+)))
-        }};
+        };
     }
 
     macro_rules! make_test_call {
-        ($class:ident.$handle:ident($vm:ident) -> $ty:ty = $res:expr) => {{
-            assert_eq!(make_call!($class.$handle($vm) -> $ty), $res)
-        }};
-        ($class:ident.$handle:ident($vm:ident, $($args:expr),+ ) -> $ty:ty = $res:expr) => {{
-            assert_eq!(make_call!($class.$handle($vm, $($args),+ ) -> $ty), $res)
-        }};
+        ($class:ident.$handle:ident($vm:ident) -> $ty:ty = $res:expr) => {
+            assert!(make_call!($class.$handle($vm) -> $ty) == $res)
+        };
+        ($class:ident.$handle:ident($vm:ident, $($args:expr),+ ) -> $ty:ty = $res:expr) => {
+            assert!(make_call!($class.$handle($vm, $($args),+ ) -> $ty) == $res)
+        };
     }
 
     fn create_test_vm(source: &str) -> (Vm<TestUserData>, VmContext, Handle) {
@@ -410,6 +410,7 @@ mod test {
                 static returnFalse() { false }
                 static returnNull() { null }
                 static returnValue(value) { value }
+                static returnNegate(value) { !value }
             }";
 
         let (vm, context, Test) = create_test_vm(source);
@@ -417,16 +418,20 @@ mod test {
         let returnFalse = make_call_handle!(context, "returnFalse()");
         let returnNull = make_call_handle!(context, "returnNull()");
         let returnValue = make_call_handle!(context, "returnValue(_)");
+        let returnNegate = make_call_handle!(context, "returnNegate(_)");
 
         unsafe {
             // False cases
             make_test_call!(Test.returnNull(context) -> bool = false);
             make_test_call!(Test.returnFalse(context) -> bool  = false);
             make_test_call!(Test.returnValue(context, false) -> bool  = false);
+            make_test_call!(Test.returnNegate(context, true) -> bool  = false);
+            make_test_call!(Test.returnNegate(context, "") -> bool  = false);
 
             // True cases
             make_test_call!(Test.returnTrue(context) -> bool = true);
             make_test_call!(Test.returnValue(context, true) -> bool = true);
+            make_test_call!(Test.returnNegate(context, false) -> bool = true);
             make_test_call!(Test.returnValue(context, "") -> bool = true);
             make_test_call!(Test.returnValue(context, "Test") -> bool = true);
             make_test_call!(Test.returnValue(context, Test) -> bool = true);
