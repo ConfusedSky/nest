@@ -369,11 +369,20 @@ mod test {
     }
 
     macro_rules! make_call {
-        ($class:ident.$handle:ident($vm:ident) -> $ret:ty) => {{
-            make_call::<$ret, _>($vm, &$handle, (make_args!($class)))
+        ($class:ident.$handle:ident($vm:ident) -> $ty:ty) => {{
+            make_call::<$ty, _>($vm, &$handle, (make_args!($class)))
         }};
-        ($class:ident.$handle:ident($vm:ident, $($args:expr),+ ) -> $ret:ty) => {{
-            make_call::<$ret, _>($vm, &$handle, (make_args!($class, $($args),+)))
+        ($class:ident.$handle:ident($vm:ident, $($args:expr),+ ) -> $ty:ty) => {{
+            make_call::<$ty, _>($vm, &$handle, (make_args!($class, $($args),+)))
+        }};
+    }
+
+    macro_rules! make_test_call {
+        ($class:ident.$handle:ident($vm:ident) -> $ty:ty = $res:expr) => {{
+            assert_eq!(make_call!($class.$handle($vm) -> $ty), $res)
+        }};
+        ($class:ident.$handle:ident($vm:ident, $($args:expr),+ ) -> $ty:ty = $res:expr) => {{
+            assert_eq!(make_call!($class.$handle($vm, $($args),+ ) -> $ty), $res)
         }};
     }
 
@@ -411,18 +420,18 @@ mod test {
 
         unsafe {
             // False cases
-            assert!(!make_call!( Test.returnNull(context) -> bool            ));
-            assert!(!make_call!( Test.returnFalse(context) -> bool           ));
-            assert!(!make_call!( Test.returnValue(context, false) -> bool    ));
+            make_test_call!(Test.returnNull(context) -> bool = false);
+            make_test_call!(Test.returnFalse(context) -> bool  = false);
+            make_test_call!(Test.returnValue(context, false) -> bool  = false);
 
             // True cases
-            assert!(make_call!( Test.returnTrue(context) -> bool             ));
-            assert!(make_call!( Test.returnValue(context, true) -> bool      ));
-            assert!(make_call!( Test.returnValue(context, "") -> bool        ));
-            assert!(make_call!( Test.returnValue(context, "Test") -> bool    ));
-            assert!(make_call!( Test.returnValue(context, Test) -> bool      ));
-            assert!(make_call!( Test.returnValue(context, vec![1.0]) -> bool ));
-            assert!(make_call!( Test.returnValue(context, 1.0) -> bool       ));
+            make_test_call!(Test.returnTrue(context) -> bool = true);
+            make_test_call!(Test.returnValue(context, true) -> bool = true);
+            make_test_call!(Test.returnValue(context, "") -> bool = true);
+            make_test_call!(Test.returnValue(context, "Test") -> bool = true);
+            make_test_call!(Test.returnValue(context, Test) -> bool = true);
+            make_test_call!(Test.returnValue(context, vec![1.0]) -> bool = true);
+            make_test_call!(Test.returnValue(context, 1.0) -> bool = true);
         }
 
         // Make sure vm lives long enough
