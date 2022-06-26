@@ -9,7 +9,6 @@ edition = "2021"
 leaks = []
 
 [dependencies]
-lazy_static = "1.4.0"
 tokio = { version = "1.18.2", features = ["full"] }
 wren_sys = { path = "./wren-sys" }
 static_assertions = "1.1.0"

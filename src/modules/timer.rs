@@ -3,12 +3,12 @@
 use tokio::time::{sleep, Duration};
 
 use crate::wren;
-use crate::MyUserData;
+use crate::Context;
 
 use super::{source_file, Class, Module};
 use crate::wren::Handle;
 
-pub fn init_module() -> Module {
+pub fn init_module<'wren>() -> Module<'wren> {
     let mut timer_class = Class::new();
     timer_class.static_methods.insert("startTimer_(_,_)", start);
 
@@ -18,19 +18,19 @@ pub fn init_module() -> Module {
     timer_module
 }
 
-unsafe fn start(vm: wren::VmContext) {
-    let user_data = vm.get_user_data::<MyUserData>().unwrap();
+unsafe fn start(mut vm: Context) {
+    let user_data = vm.get_user_data().unwrap();
     let scheduler = user_data.scheduler.as_mut().unwrap();
 
     // We are guarenteed ms is positive based on usage
     let (_, ms, fiber) = vm.get_stack::<((), f64, Handle)>();
 
-    let task = async move {
-        sleep(Duration::from_secs_f64(ms / 1000.0)).await;
-        let user_data = vm.get_user_data::<MyUserData>().unwrap();
-        let scheduler = user_data.scheduler.as_ref().unwrap();
-        scheduler.resume(fiber);
-    };
+    //let task = async move {
+    // sleep(Duration::from_secs_f64(ms / 1000.0)).await;
+    // let user_data = vm.get_user_data().unwrap();
+    // let scheduler = user_data.scheduler.as_ref().unwrap();
+    // scheduler.resume(fiber);
+    // };
 
-    scheduler.schedule_task(task);
+    // scheduler.schedule_task(task);
 }

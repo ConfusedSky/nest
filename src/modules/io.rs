@@ -1,11 +1,11 @@
 #![allow(unsafe_code)]
 
-use crate::wren::VmContext;
+use crate::Context;
 
 use super::{source_file, Class, Module};
 use std::io::{stdout, Write};
 
-pub fn init_module() -> Module {
+pub fn init_module<'wren>() -> Module<'wren> {
     let mut stdout_class = Class::new();
     stdout_class.static_methods.insert("flush()", flush);
 
@@ -15,13 +15,9 @@ pub fn init_module() -> Module {
     timer_module
 }
 
-fn flush(vm: VmContext) {
-    stdout().flush().map_or_else(
-        |_| {
-            vm.abort_fiber("Stdout failed to flush");
-        },
-        |_| {
-            vm.set_return_value(&());
-        },
-    );
+fn flush(mut vm: Context) {
+    match stdout().flush() {
+        Ok(_) => vm.set_return_value(&()),
+        Err(_) => vm.abort_fiber("Stdout failed to flush"),
+    }
 }

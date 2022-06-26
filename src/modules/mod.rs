@@ -5,7 +5,7 @@ pub mod os;
 pub mod scheduler;
 pub mod timer;
 
-use crate::wren;
+use crate::ForeignMethod;
 use std::collections::HashMap;
 use std::ffi::CString;
 
@@ -21,14 +21,14 @@ mod macros {
     }
     pub use source_file;
 }
-pub(crate) use macros::source_file;
+use macros::source_file;
 
-pub struct Class {
-    pub methods: HashMap<&'static str, wren::ForeignMethod>,
-    pub static_methods: HashMap<&'static str, wren::ForeignMethod>,
+pub struct Class<'wren> {
+    pub methods: HashMap<&'static str, ForeignMethod<'wren>>,
+    pub static_methods: HashMap<&'static str, ForeignMethod<'wren>>,
 }
 
-impl Class {
+impl<'wren> Class<'wren> {
     fn new() -> Self {
         Self {
             methods: HashMap::new(),
@@ -37,12 +37,12 @@ impl Class {
     }
 }
 
-pub struct Module {
+pub struct Module<'wren> {
     pub source: CString,
-    pub classes: HashMap<&'static str, Class>,
+    pub classes: HashMap<&'static str, Class<'wren>>,
 }
 
-impl Module {
+impl<'wren> Module<'wren> {
     fn new(source: CString) -> Self {
         Self {
             source,
@@ -51,26 +51,25 @@ impl Module {
     }
 }
 
-fn modules_init() -> HashMap<&'static str, Module> {
-    let mut m = HashMap::new();
-    m.insert("scheduler", scheduler::init_module());
-    m.insert("timer", timer::init_module());
-    m.insert("os", os::init_module());
-    m.insert("io", io::init_module());
-
-    m
+pub struct Modules<'wren> {
+    hash_map: HashMap<&'static str, Module<'wren>>,
 }
 
-lazy_static! {
-    // TODO: Refactor to make this not require modules to stay in memory indefinitely
-    static ref MODULES: HashMap<&'static str, Module> = {
-        modules_init()
-    };
-}
+impl<'wren> Modules<'wren> {
+    pub fn new() -> Self {
+        let mut m = HashMap::new();
+        m.insert("scheduler", scheduler::init_module());
+        m.insert("timer", timer::init_module());
+        m.insert("os", os::init_module());
+        m.insert("io", io::init_module());
 
-pub fn get_module<S>(name: S) -> Option<&'static Module>
-where
-    S: AsRef<str>,
-{
-    MODULES.get(name.as_ref())
+        Modules { hash_map: m }
+    }
+
+    pub fn get_module<S>(&self, name: S) -> Option<&Module<'wren>>
+    where
+        S: AsRef<str>,
+    {
+        self.hash_map.get(name.as_ref())
+    }
 }

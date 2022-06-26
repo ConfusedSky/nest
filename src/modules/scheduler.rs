@@ -2,12 +2,11 @@
 
 use std::{future::Future, pin::Pin};
 
-use crate::wren::{Handle, Set as WrenSet};
-use crate::{wren, MyUserData};
+use crate::{wren, Context, Handle, WrenSet};
 
 use super::{source_file, Class, Module};
 
-unsafe fn _resume(vm: wren::VmContext, method: &Handle) {
+unsafe fn _resume<'wren>(vm: &mut Context<'wren>, method: &Handle<'wren>) {
     let result = vm.call(method);
 
     if let Err(wren::InterpretResultErrorKind::Runtime) = result {
@@ -15,7 +14,7 @@ unsafe fn _resume(vm: wren::VmContext, method: &Handle) {
     }
 }
 
-pub fn init_module() -> Module {
+pub fn init_module<'wren>() -> Module<'wren> {
     let mut scheduler_class = Class::new();
     scheduler_class
         .static_methods
@@ -33,26 +32,26 @@ pub fn init_module() -> Module {
 }
 
 // #[derive(Debug)]
-pub struct Scheduler {
-    vm: wren::VmContext,
+pub struct Scheduler<'wren> {
+    vm: Context<'wren>,
     // A handle to the "Scheduler" class object. Used to call static methods on it.
-    class: Handle,
+    class: Handle<'wren>,
 
     // This method resumes a fiber that is suspended waiting on an asynchronous
     // operation. The first resumes it with zero arguments, and the second passes
     // one.
-    resume1: Handle,
-    resume2: Handle,
-    resume_error: Handle,
-    resume_waiting: Handle,
-    has_next: Handle,
-    run_next_scheduled: Handle,
+    resume1: Handle<'wren>,
+    resume2: Handle<'wren>,
+    resume_error: Handle<'wren>,
+    resume_waiting: Handle<'wren>,
+    has_next: Handle<'wren>,
+    run_next_scheduled: Handle<'wren>,
 
     pub has_waiting_fibers: bool,
     queue: Vec<Pin<Box<dyn Future<Output = ()>>>>,
 }
 
-impl Scheduler {
+impl<'wren> Scheduler<'wren> {
     pub fn schedule_task<F>(&mut self, future: F)
     where
         F: 'static + Future<Output = ()>,
@@ -140,49 +139,53 @@ impl Scheduler {
         }));
     }
 
-    pub unsafe fn resume(&self, fiber: Handle) {
+    pub unsafe fn resume(&mut self, fiber: Handle<'wren>) {
         // resume_wit_arg needs a valid WrenValue type so just set it to
         // a random one
         self.vm.set_stack(&(&self.class, &fiber));
         // this is just here to keep clippy from complaining
         drop(fiber);
-        _resume(self.vm, &self.resume1);
+        _resume(&mut self.vm, &self.resume1);
     }
 
-    pub unsafe fn resume_with_arg<T: WrenSet>(&self, fiber: Handle, additional_argument: T) {
+    pub unsafe fn resume_with_arg<T: WrenSet<'wren>>(
+        &mut self,
+        fiber: Handle<'wren>,
+        additional_argument: T,
+    ) {
         self.vm
             .set_stack(&(&self.class, &fiber, &additional_argument));
         drop(fiber);
-        _resume(self.vm, &self.resume2);
+        _resume(&mut self.vm, &self.resume2);
     }
-    pub unsafe fn resume_error<S>(&self, fiber: Handle, error: S)
+    pub unsafe fn resume_error<S>(&mut self, fiber: Handle<'wren>, error: S)
     where
         S: AsRef<str>,
     {
         let error = error.as_ref().to_string();
         self.vm.set_stack(&(&self.class, &fiber, &error));
         drop(fiber);
-        _resume(self.vm, &self.resume_error);
+        _resume(&mut self.vm, &self.resume_error);
     }
     pub unsafe fn resume_waiting(&mut self) {
         self.has_waiting_fibers = false;
         self.vm.set_stack(&self.class);
-        _resume(self.vm, &self.resume_waiting);
+        _resume(&mut self.vm, &self.resume_waiting);
     }
-    pub unsafe fn has_next(&self) -> bool {
+    pub unsafe fn has_next(&mut self) -> bool {
         self.vm.set_stack(&self.class);
-        _resume(self.vm, &self.has_next);
+        _resume(&mut self.vm, &self.has_next);
 
         self.vm.get_return_value()
     }
-    pub unsafe fn run_next_scheduled(&self) {
+    pub unsafe fn run_next_scheduled(&mut self) {
         self.vm.set_stack(&self.class);
-        _resume(self.vm, &self.run_next_scheduled);
+        _resume(&mut self.vm, &self.run_next_scheduled);
     }
 }
 
-unsafe fn capture_methods(vm: wren::VmContext) {
-    let mut user_data = vm.get_user_data::<MyUserData>().unwrap();
+unsafe fn capture_methods<'wren>(mut vm: Context<'wren>) {
+    let mut user_data = vm.get_user_data().unwrap();
     vm.ensure_slots(1);
     let class = vm.get_variable_unchecked("scheduler", "Scheduler", 0);
 
@@ -193,7 +196,7 @@ unsafe fn capture_methods(vm: wren::VmContext) {
     let has_next = wren::make_call_handle!(vm, "hasNext_");
     let run_next_scheduled = wren::make_call_handle!(vm, "runNextScheduled_()");
 
-    user_data.scheduler = Some(Scheduler {
+    let scheduler: Option<Scheduler<'wren>> = Some(Scheduler {
         queue: Vec::default(),
         has_waiting_fibers: false,
         vm,
@@ -205,10 +208,13 @@ unsafe fn capture_methods(vm: wren::VmContext) {
         has_next,
         run_next_scheduled,
     });
+
+    user_data.scheduler = scheduler;
 }
 
-unsafe fn await_all(vm: wren::VmContext) {
-    vm.get_user_data::<MyUserData>()
+#[allow(clippy::needless_pass_by_value)]
+unsafe fn await_all(vm: Context) {
+    vm.get_user_data()
         .unwrap()
         .scheduler
         .as_mut()

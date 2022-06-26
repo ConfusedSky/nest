@@ -4,30 +4,47 @@
 // right now
 // #![warn(unsafe_code)]
 
-#[macro_use]
-extern crate lazy_static;
-
-use modules::scheduler::Scheduler;
+use modules::{scheduler::Scheduler, Modules};
 use std::{env, ffi::CString, fs, path::PathBuf};
 use tokio::runtime::Builder;
 
 use wren::VmContext;
 
+type Context<'wren> = VmContext<'wren, MyUserData<'wren>>;
+type Handle<'wren> = crate::wren::Handle<'wren>;
+type ForeignMethod<'wren> = crate::wren::ForeignMethod<'wren, MyUserData<'wren>>;
+
+macro_rules! create_trait_alias {
+    ($name:ident, $($bounds:tt)*) => {
+        pub trait $name<'wren>: $($bounds)* {}
+        impl <'wren, T: $($bounds)* > $name<'wren> for T {}
+    };
+}
+
+create_trait_alias!(WrenGet, crate::wren::Get<'wren>);
+create_trait_alias!(WrenSet, crate::wren::Set<'wren>);
+create_trait_alias!(WrenGetArgs, crate::wren::GetArgs<'wren>);
+create_trait_alias!(WrenSetArgs, crate::wren::SetArgs<'wren>);
+
 mod modules;
 mod wren;
 
-struct MyUserData {
-    scheduler: Option<Scheduler>,
+pub struct MyUserData<'wren> {
+    scheduler: Option<Scheduler<'wren>>,
+    modules: Modules<'wren>,
 }
 
-impl MyUserData {
-    pub const fn new() -> Self {
-        Self { scheduler: None }
+impl<'wren> Default for MyUserData<'wren> {
+    fn default() -> Self {
+        Self {
+            scheduler: None,
+            modules: Modules::new(),
+        }
     }
 }
 
-impl wren::VmUserData for MyUserData {
-    fn on_error(&mut self, _: VmContext, kind: wren::ErrorKind) {
+impl<'wren> wren::VmUserData<'wren, MyUserData<'wren>> for MyUserData<'wren> {
+    fn on_error(&mut self, _: Context<'wren>, kind: wren::ErrorKind) {
         match kind {
             wren::ErrorKind::Compile(ctx) => {
                 println!("[{} line {}] [Error] {}", ctx.module, ctx.line, ctx.msg);
@@ -44,11 +61,12 @@ impl wren::VmUserData for MyUserData {
             }
         }
     }
-    fn on_write(&mut self, _: VmContext, text: &str) {
+    fn on_write(&mut self, _: Context<'wren>, text: &str) {
         print!("{}", text);
     }
     fn load_module(&mut self, name: &str) -> Option<CString> {
-        crate::modules::get_module(name)
+        self.modules
+            .get_module(name)
             .map(|module| &module.source)
             .cloned()
     }
@@ -58,8 +76,8 @@ impl wren::VmUserData for MyUserData {
         class_name: &str,
         is_static: bool,
         signature: &str,
-    ) -> Option<wren::ForeignMethod> {
-        let module = crate::modules::get_module(module)?;
+    ) -> Option<wren::ForeignMethod<'wren, Self>> {
+        let module = self.modules.get_module(module)?;
         let class = module.classes.get(class_name)?;
         if is_static {
             class.static_methods.get(signature).copied()
@@ -87,8 +105,8 @@ fn main() {
     let source = fs::read_to_string(&module_path)
         .unwrap_or_else(|_| panic!("Ensure {} is a valid module name to continue", &module));
 
-    let user_data = MyUserData::new();
-    let vm = wren::Vm::new(user_data).expect("VM failed to initialize");
+    let user_data = MyUserData::default();
+    let mut vm = wren::Vm::new(user_data);
 
     let result = vm.interpret(module, source);
 
@@ -103,7 +121,7 @@ fn main() {
 
     // SAFETY: If userdata still exists it's going to be the same type that we passed in
     #[allow(unsafe_code)]
-    let user_data = unsafe { vm.get_ptr().get_user_data::<MyUserData>() };
+    let user_data = vm.get_context().get_user_data();
     if let Some(user_data) = user_data {
         // We only should run the async loop if there is a loop to run
         if let Some(ref mut scheduler) = user_data.scheduler {

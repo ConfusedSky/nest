@@ -1,17 +1,22 @@
-use std::ptr::NonNull;
+use std::{marker::PhantomData, ptr::NonNull};
 
 use wren_sys::{wrenReleaseHandle, WrenHandle};
 
-use super::VmContext;
+use super::RawVMContext;
 
-pub struct Handle {
-    vm: VmContext,
+pub struct Handle<'wren> {
+    vm: RawVMContext<'wren>,
     pointer: NonNull<WrenHandle>,
+    phantom: PhantomData<WrenHandle>,
 }
 
-impl Handle {
-    pub(crate) const fn new(vm: VmContext, pointer: NonNull<WrenHandle>) -> Self {
-        Self { vm, pointer }
+impl<'wren> Handle<'wren> {
+    pub(crate) fn new(vm: &RawVMContext<'wren>, pointer: NonNull<WrenHandle>) -> Self {
+        Self {
+            vm: vm.clone(),
+            pointer,
+            phantom: PhantomData,
+        }
     }
 
     pub(crate) const fn as_ptr(&self) -> *mut WrenHandle {
@@ -19,7 +24,7 @@ impl Handle {
     }
 }
 
-impl Drop for Handle {
+impl<'wren> Drop for Handle<'wren> {
     fn drop(&mut self) {
         unsafe { wrenReleaseHandle(self.vm.as_ptr(), self.pointer.as_ptr()) }
     }
