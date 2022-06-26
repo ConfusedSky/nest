@@ -369,20 +369,26 @@ mod test {
     }
 
     macro_rules! make_call {
-        ($class:ident.$handle:ident($vm:ident) -> $ty:ty) => {
-            make_call::<$ty, _>($vm, &$handle, (make_args!($class)))
+        ($class:ident.$handle:ident($vm:ident)) => {
+            make_call($vm, &$handle, (make_args!($class)))
         };
-        ($class:ident.$handle:ident($vm:ident, $($args:expr),+ ) -> $ty:ty) => {
-            make_call::<$ty, _>($vm, &$handle, (make_args!($class, $($args),+)))
+        ($class:ident.$handle:ident($vm:ident, $($args:expr),+ )) => {
+            make_call($vm, &$handle, (make_args!($class, $($args),+)))
         };
     }
 
-    macro_rules! make_test_call {
-        ($class:ident.$handle:ident($vm:ident) -> $ty:ty = $res:expr) => {
-            assert!(make_call!($class.$handle($vm) -> $ty) == $res)
+    macro_rules! test_case {
+        ($type:ty, $class:ident.$handle:ident($vm:ident) == $res:expr) => {
+            assert!({
+                let res: $type = make_call!($class.$handle($vm));
+                res == $res
+            })
         };
-        ($class:ident.$handle:ident($vm:ident, $($args:expr),+ ) -> $ty:ty = $res:expr) => {
-            assert!(make_call!($class.$handle($vm, $($args),+ ) -> $ty) == $res)
+        ($type:ty, $class:ident.$handle:ident($vm:ident, $($args:expr),+ ) == $res:expr) => {
+            assert!({
+                let res: $type = make_call!($class.$handle($vm, $($args),+ ));
+                res == $res
+            })
         };
     }
 
@@ -422,21 +428,21 @@ mod test {
 
         unsafe {
             // False cases
-            make_test_call!(Test.returnNull(context) -> bool = false);
-            make_test_call!(Test.returnFalse(context) -> bool  = false);
-            make_test_call!(Test.returnValue(context, false) -> bool  = false);
-            make_test_call!(Test.returnNegate(context, true) -> bool  = false);
-            make_test_call!(Test.returnNegate(context, "") -> bool  = false);
+            test_case!(bool, Test.returnNull(context) == false);
+            test_case!(bool, Test.returnFalse(context) == false);
+            test_case!(bool, Test.returnValue(context, false) == false);
+            test_case!(bool, Test.returnNegate(context, true) == false);
+            test_case!(bool, Test.returnNegate(context, "") == false);
 
             // True cases
-            make_test_call!(Test.returnTrue(context) -> bool = true);
-            make_test_call!(Test.returnValue(context, true) -> bool = true);
-            make_test_call!(Test.returnNegate(context, false) -> bool = true);
-            make_test_call!(Test.returnValue(context, "") -> bool = true);
-            make_test_call!(Test.returnValue(context, "Test") -> bool = true);
-            make_test_call!(Test.returnValue(context, Test) -> bool = true);
-            make_test_call!(Test.returnValue(context, vec![1.0]) -> bool = true);
-            make_test_call!(Test.returnValue(context, 1.0) -> bool = true);
+            test_case!(bool, Test.returnTrue(context) == true);
+            test_case!(bool, Test.returnValue(context, true) == true);
+            test_case!(bool, Test.returnNegate(context, false) == true);
+            test_case!(bool, Test.returnValue(context, "") == true);
+            test_case!(bool, Test.returnValue(context, "Test") == true);
+            test_case!(bool, Test.returnValue(context, Test) == true);
+            test_case!(bool, Test.returnValue(context, vec![1.0]) == true);
+            test_case!(bool, Test.returnValue(context, 1.0) == true);
         }
 
         // Make sure vm lives long enough
