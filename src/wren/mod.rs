@@ -8,7 +8,6 @@ pub use value::{Get, GetArgs, Set, SetArgs, Value};
 pub use wren_sys::WREN_VERSION_STRING as VERSION;
 
 use std::{
-    alloc::Layout,
     borrow::Cow,
     cell::RefCell,
     ffi::{c_void, CStr, CString},
@@ -71,16 +70,6 @@ unsafe extern "C" fn load_module<'wren, V: VmUserData<'wren, V>>(
     user_data.map_or_else(
         || std::mem::zeroed(),
         |user_data| {
-            unsafe extern "C" fn cleanup(
-                _vm: *mut WrenVM,
-                _name: *const i8,
-                result: WrenLoadModuleResult,
-            ) {
-                // Deallocate the slice directly, because calling from raw requires
-                // calling strlen which is much slower than just calling dealloc
-                std::alloc::dealloc(result.source as *mut u8, Layout::new::<CString>());
-            }
-
             let name = CStr::from_ptr(name).to_string_lossy();
 
             let source = user_data.load_module(name.as_ref());
@@ -89,8 +78,7 @@ unsafe extern "C" fn load_module<'wren, V: VmUserData<'wren, V>>(
 
             if let Some(source) = source {
                 // SAFETY: we use into raw here and pass in a function that frees the memory
-                result.source = source.into_raw();
-                result.onComplete = Some(cleanup);
+                result.source = source.as_ptr();
             }
 
             result
@@ -397,7 +385,7 @@ pub trait VmUserData<'wren, T> {
     fn resolve_module(&mut self, resolver: &str, name: &str) -> Option<CString> {
         CString::new(name.to_string()).ok()
     }
-    fn load_module(&mut self, name: &str) -> Option<CString> {
+    fn load_module(&mut self, name: &str) -> Option<&'wren CStr> {
         None
     }
     fn bind_foreign_method(

@@ -5,7 +5,7 @@
 // #![warn(unsafe_code)]
 
 use modules::{scheduler::Scheduler, Modules};
-use std::{env, ffi::CString, fs, path::PathBuf};
+use std::{env, ffi::CStr, fs, path::PathBuf};
 use tokio::runtime::Builder;
 
 use wren::VmContext;
@@ -64,11 +64,11 @@ impl<'wren> wren::VmUserData<'wren, MyUserData<'wren>> for MyUserData<'wren> {
     fn on_write(&mut self, _: Context<'wren>, text: &str) {
         print!("{}", text);
     }
-    fn load_module(&mut self, name: &str) -> Option<CString> {
+    fn load_module(&mut self, name: &str) -> Option<&'wren CStr> {
         self.modules
             .get_module(name)
             .map(|module| &module.source)
-            .cloned()
+            .copied()
     }
     fn bind_foreign_method(
         &mut self,

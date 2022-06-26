@@ -7,16 +7,16 @@ pub mod timer;
 
 use crate::ForeignMethod;
 use std::collections::HashMap;
-use std::ffi::CString;
+use std::ffi::CStr;
 
 mod macros {
     #[macro_export]
     macro_rules! source_file {
         ($file:expr) => {{
             use crate::wren;
-            use std::ffi::CString;
+            use std::ffi::CStr;
             let source = wren::cstr!(include_str!($file));
-            unsafe { CString::from_raw(source as *mut _) }
+            unsafe { CStr::from_ptr(source) }
         }};
     }
     pub use source_file;
@@ -38,12 +38,12 @@ impl<'wren> Class<'wren> {
 }
 
 pub struct Module<'wren> {
-    pub source: CString,
+    pub source: &'wren CStr,
     pub classes: HashMap<&'static str, Class<'wren>>,
 }
 
 impl<'wren> Module<'wren> {
-    fn new(source: CString) -> Self {
+    fn new(source: &'wren CStr) -> Self {
         Self {
             source,
             classes: HashMap::new(),

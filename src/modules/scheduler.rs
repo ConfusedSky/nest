@@ -118,7 +118,7 @@ impl<'wren> Scheduler<'wren> {
     /// Would only print "Do 1"
     pub fn run_async_loop(&mut self, runtime: &tokio::runtime::Runtime) {
         let local_set = tokio::task::LocalSet::new();
-        let (mut tx, mut rx) = tokio::sync::mpsc::channel(128);
+        let (tx, mut rx) = tokio::sync::mpsc::channel(128);
 
         let mut resumes = vec![];
         let mut next = self.next_item();
