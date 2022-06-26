@@ -5,6 +5,7 @@ use tokio::time::{sleep, Duration};
 use crate::wren;
 use crate::Context;
 
+use super::scheduler::Resume;
 use super::{source_file, Class, Module};
 use crate::wren::Handle;
 
@@ -32,5 +33,7 @@ unsafe fn start(mut vm: Context) {
     // scheduler.resume(fiber);
     // };
 
-    // scheduler.schedule_task(task);
+    scheduler.schedule_task(Some(Resume::Resume(fiber)), async move {
+        sleep(Duration::from_secs_f64(ms / 1000.0)).await;
+    });
 }

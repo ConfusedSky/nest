@@ -31,6 +31,15 @@ pub fn init_module<'wren>() -> Module<'wren> {
     scheduler_module
 }
 
+pub enum Resume<'wren> {
+    Resume(Handle<'wren>),
+}
+
+type Task<'wren> = (
+    Option<Resume<'wren>>,
+    Pin<Box<dyn Future<Output = ()> + 'static>>,
+);
+
 // #[derive(Debug)]
 pub struct Scheduler<'wren> {
     vm: Context<'wren>,
@@ -48,19 +57,19 @@ pub struct Scheduler<'wren> {
     run_next_scheduled: Handle<'wren>,
 
     pub has_waiting_fibers: bool,
-    queue: Vec<Pin<Box<dyn Future<Output = ()>>>>,
+    queue: Vec<Task<'wren>>,
 }
 
 impl<'wren> Scheduler<'wren> {
-    pub fn schedule_task<F>(&mut self, future: F)
+    pub fn schedule_task<F>(&mut self, resume: Option<Resume<'wren>>, future: F)
     where
         F: 'static + Future<Output = ()>,
     {
         let future = Box::pin(future);
-        self.queue.insert(0, future);
+        self.queue.insert(0, (resume, future));
     }
 
-    pub fn next_item(&mut self) -> Option<Pin<Box<dyn Future<Output = ()>>>> {
+    fn next_item(&mut self) -> Option<Task<'wren>> {
         self.queue.pop()
     }
 
@@ -109,8 +118,9 @@ impl<'wren> Scheduler<'wren> {
     /// Would only print "Do 1"
     pub fn run_async_loop(&mut self, runtime: &tokio::runtime::Runtime) {
         let local_set = tokio::task::LocalSet::new();
+        let (mut tx, mut rx) = tokio::sync::mpsc::channel(128);
 
-        let mut handles = vec![];
+        let mut resumes = vec![];
         let mut next = self.next_item();
 
         runtime.block_on(local_set.run_until(async move {
@@ -118,20 +128,42 @@ impl<'wren> Scheduler<'wren> {
                 // Create a new task on the local set for each of the scheduled tasks
                 // So that they can be run concurrently
                 while let Some(future) = next {
-                    handles.push(tokio::task::spawn_local(future));
+                    let i = resumes.len();
+                    let tx = tx.clone();
+                    resumes.push(future.0);
+                    tokio::task::spawn_local(async move {
+                        future.1.await;
+                        tx.send(i).await.expect("Channel shoudn't fail to send");
+                    });
                     next = self.next_item();
                 }
 
                 // If there are no new handles then break out of the loop
-                if handles.is_empty() {
+                if resumes.is_empty() {
                     break;
                 }
 
-                // Wait for existing handles then clear the handles
-                for handle in &mut handles {
-                    handle.await.unwrap();
+                // For each resume callback resume if
+                // there is a resume handler
+                // Wait for existing handlers then clear the handlers
+                for _ in 0..resumes.len() {
+                    tokio::select! {
+                        Some(i) = rx.recv() => {
+                            let resume = &mut resumes[i];
+
+                            if let Some(resume) = resume.take() {
+                                match resume {
+                                    Resume::Resume(fiber) => {
+                                        unsafe {
+                                            self.resume(fiber);
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
                 }
-                handles.clear();
+                resumes.clear();
 
                 // Check the queue for another handle
                 next = self.next_item();
