@@ -36,8 +36,8 @@ pub enum Resume<'wren> {
 }
 
 type Task<'wren> = (
-    Option<Resume<'wren>>,
-    Pin<Box<dyn Future<Output = ()> + 'static>>,
+    Option<Box<dyn 'wren + FnOnce(&mut Context<'wren>)>>,
+    Pin<Box<dyn 'static + Future<Output = ()>>>,
 );
 
 // #[derive(Debug)]
@@ -61,12 +61,14 @@ pub struct Scheduler<'wren> {
 }
 
 impl<'wren> Scheduler<'wren> {
-    pub fn schedule_task<F>(&mut self, resume: Option<Resume<'wren>>, future: F)
+    pub fn schedule_task<F, P>(&mut self, future: F, post_task: P)
     where
         F: 'static + Future<Output = ()>,
+        P: 'wren + FnOnce(&mut Context<'wren>),
     {
         let future = Box::pin(future);
-        self.queue.insert(0, (resume, future));
+        let resume = Box::new(post_task);
+        self.queue.insert(0, (Some(resume), future));
     }
 
     fn next_item(&mut self) -> Option<Task<'wren>> {
@@ -150,16 +152,7 @@ impl<'wren> Scheduler<'wren> {
                     tokio::select! {
                         Some(i) = rx.recv() => {
                             let resume = &mut resumes[i];
-
-                            if let Some(resume) = resume.take() {
-                                match resume {
-                                    Resume::Resume(fiber) => {
-                                        unsafe {
-                                            self.resume(fiber);
-                                        }
-                                    }
-                                }
-                            }
+                            resume.take().unwrap()(&mut self.vm);
                         }
                     }
                 }
