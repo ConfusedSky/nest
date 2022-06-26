@@ -10,6 +10,7 @@ leaks = []
 
 [dependencies]
 tokio = { version = "1.18.2", features = ["full"] }
+tokio-scoped = "0.2.0"
 wren_sys = { path = "./wren-sys" }
 static_assertions = "1.1.0"
 dirs = "4.0.0"

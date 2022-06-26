@@ -14,6 +14,7 @@ type Context<'wren> = VmContext<'wren, MyUserData<'wren>>;
 type Handle<'wren> = crate::wren::Handle<'wren>;
 type ForeignMethod<'wren> = crate::wren::ForeignMethod<'wren, MyUserData<'wren>>;
 
+#[macro_export]
 macro_rules! create_trait_alias {
     ($name:ident, $($bounds:tt)*) => {
         pub trait $name<'wren>: $($bounds)* {}
@@ -117,7 +118,7 @@ fn main() {
         Err(wren::InterpretResultErrorKind::Unknown(kind)) => panic!("UNKNOWN ERROR: {}", kind),
     }
 
-    let runtime = Builder::new_current_thread().enable_all().build().unwrap();
+    let runtime = Builder::new_multi_thread().enable_all().build().unwrap();
 
     // SAFETY: If userdata still exists it's going to be the same type that we passed in
     #[allow(unsafe_code)]

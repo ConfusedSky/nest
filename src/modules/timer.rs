@@ -25,12 +25,12 @@ unsafe fn start(mut vm: Context) {
     // We are guarenteed ms is positive based on usage
     let (_, ms, fiber) = vm.get_stack::<((), f64, Handle)>();
 
-    //let task = async move {
-    // sleep(Duration::from_secs_f64(ms / 1000.0)).await;
-    // let user_data = vm.get_user_data().unwrap();
-    // let scheduler = user_data.scheduler.as_ref().unwrap();
-    // scheduler.resume(fiber);
-    // };
+    let task = async move {
+        sleep(Duration::from_secs_f64(ms / 1000.0)).await;
+        let user_data = vm.get_user_data().unwrap();
+        let scheduler = user_data.scheduler.as_mut().unwrap();
+        scheduler.resume(fiber);
+    };
 
-    // scheduler.schedule_task(task);
+    scheduler.schedule_task(task);
 }

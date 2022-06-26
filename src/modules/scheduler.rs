@@ -31,6 +31,9 @@ pub fn init_module<'wren>() -> Module<'wren> {
     scheduler_module
 }
 
+use crate::create_trait_alias;
+create_trait_alias!(WrenFuture, Future<Output = ()> + Send + 'wren);
+
 // #[derive(Debug)]
 pub struct Scheduler<'wren> {
     vm: Context<'wren>,
@@ -48,19 +51,19 @@ pub struct Scheduler<'wren> {
     run_next_scheduled: Handle<'wren>,
 
     pub has_waiting_fibers: bool,
-    queue: Vec<Pin<Box<dyn Future<Output = ()>>>>,
+    queue: Vec<Pin<Box<dyn WrenFuture<'wren>>>>,
 }
 
 impl<'wren> Scheduler<'wren> {
     pub fn schedule_task<F>(&mut self, future: F)
     where
-        F: 'static + Future<Output = ()>,
+        F: WrenFuture<'wren>,
     {
         let future = Box::pin(future);
         self.queue.insert(0, future);
     }
 
-    pub fn next_item(&mut self) -> Option<Pin<Box<dyn Future<Output = ()>>>> {
+    pub fn next_item(&mut self) -> Option<Pin<Box<dyn WrenFuture<'wren>>>> {
         self.queue.pop()
     }
 
@@ -108,35 +111,23 @@ impl<'wren> Scheduler<'wren> {
     /// ```
     /// Would only print "Do 1"
     pub fn run_async_loop(&mut self, runtime: &tokio::runtime::Runtime) {
-        let local_set = tokio::task::LocalSet::new();
-
-        let mut handles = vec![];
         let mut next = self.next_item();
 
-        runtime.block_on(local_set.run_until(async move {
+        runtime.block_on(async move {
             loop {
                 // Create a new task on the local set for each of the scheduled tasks
                 // So that they can be run concurrently
-                while let Some(future) = next {
-                    handles.push(tokio::task::spawn_local(future));
-                    next = self.next_item();
-                }
-
-                // If there are no new handles then break out of the loop
-                if handles.is_empty() {
-                    break;
-                }
-
-                // Wait for existing handles then clear the handles
-                for handle in &mut handles {
-                    handle.await.unwrap();
-                }
-                handles.clear();
+                tokio_scoped::scope(|scope| {
+                    while let Some(future) = next {
+                        scope.spawn(future);
+                        next = self.next_item();
+                    }
+                });
 
                 // Check the queue for another handle
                 next = self.next_item();
             }
-        }));
+        });
     }
 
     pub unsafe fn resume(&mut self, fiber: Handle<'wren>) {
