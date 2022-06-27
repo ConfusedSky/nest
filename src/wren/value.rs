@@ -338,14 +338,9 @@ impl_get_args!(T0 = 0, T1 = 1, T2 = 2, T3 = 3, T4 = 4, T5 = 5, T6 = 6);
 
 #[cfg(test)]
 mod test {
-    use crate::wren::{Handle, Vm, VmUserData};
+    use crate::{call_test_case, wren::test::create_test_vm};
 
     use super::SetArgs;
-
-    struct TestUserData;
-    impl<'wren> VmUserData<'wren, Self> for TestUserData {}
-
-    // TODO: Figure out how to test set_wren_stack
 
     #[test]
     fn test_slot_size() {
@@ -355,35 +350,6 @@ mod test {
         assert_eq!(<(&f64, &Vec<Vec<f64>>)>::REQUIRED_SLOTS, 4);
         assert_eq!(<(&f64, &f64, &f64)>::REQUIRED_SLOTS, 3);
         assert_eq!(<(&f64, &f64, &f64, &f64)>::REQUIRED_SLOTS, 4);
-    }
-
-    macro_rules! test_case {
-        ($type:ty, $class:ident.$handle:ident($vm:ident) == $res:expr) => {
-            assert!({
-                let res: $type = super::super::util::make_call!($class.$handle($vm));
-                res == $res
-            })
-        };
-        ($type:ty, $class:ident.$handle:ident($vm:ident, $($args:expr),+ ) == $res:expr) => {
-            assert!({
-                let res: $type = super::super::util::make_call!($class.$handle($vm, $($args),+ ));
-                res == $res
-            })
-        };
-    }
-
-    fn create_test_vm<'wren>(source: &str) -> (Vm<'wren, TestUserData>, Handle<'wren>) {
-        let mut vm = Vm::new(TestUserData);
-
-        let vmptr = vm.get_context();
-        vmptr
-            .interpret("<test>", source)
-            .expect("Code should run successfully");
-
-        vmptr.ensure_slots(1);
-        let class = unsafe { vmptr.get_variable_unchecked("<test>", "Test", 0) };
-
-        (vm, class)
     }
 
     // Test that all values other than null and false are falsy
@@ -409,21 +375,21 @@ mod test {
 
         unsafe {
             // False cases
-            test_case!(bool, Test.returnNull(context) == false);
-            test_case!(bool, Test.returnFalse(context) == false);
-            test_case!(bool, Test.returnValue(context, false) == false);
-            test_case!(bool, Test.returnNegate(context, true) == false);
-            test_case!(bool, Test.returnNegate(context, "") == false);
+            call_test_case!(bool, context { Test.returnNull() } == false);
+            call_test_case!(bool, context { Test.returnFalse() } == false);
+            call_test_case!(bool, context { Test.returnValue(false) } == false);
+            call_test_case!(bool, context { Test.returnNegate(true) } == false);
+            call_test_case!(bool, context { Test.returnNegate("") } == false);
 
             // True cases
-            test_case!(bool, Test.returnTrue(context) == true);
-            test_case!(bool, Test.returnValue(context, true) == true);
-            test_case!(bool, Test.returnNegate(context, false) == true);
-            test_case!(bool, Test.returnValue(context, "") == true);
-            test_case!(bool, Test.returnValue(context, "Test") == true);
-            test_case!(bool, Test.returnValue(context, Test) == true);
-            test_case!(bool, Test.returnValue(context, vec![1.0]) == true);
-            test_case!(bool, Test.returnValue(context, 1.0) == true);
+            call_test_case!(bool, context { Test.returnTrue() } == true);
+            call_test_case!(bool, context { Test.returnValue(true) } == true);
+            call_test_case!(bool, context { Test.returnNegate(false) } == true);
+            call_test_case!(bool, context { Test.returnValue("") } == true);
+            call_test_case!(bool, context { Test.returnValue("Test") } == true);
+            call_test_case!(bool, context { Test.returnValue(Test) } == true);
+            call_test_case!(bool, context { Test.returnValue(vec![1.0]) } == true);
+            call_test_case!(bool, context { Test.returnValue(1.0) } == true);
         }
     }
 }

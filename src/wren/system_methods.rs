@@ -1,9 +1,9 @@
 use super::{fiber, Handle, RawVMContext};
 
 pub struct SystemMethods<'wren> {
-    object_to_string: Handle<'wren>,
-    object_is: Handle<'wren>,
-    fiber_methods: fiber::Methods<'wren>,
+    pub object_to_string: Handle<'wren>,
+    pub object_is: Handle<'wren>,
+    pub fiber_methods: fiber::Methods<'wren>,
 }
 
 impl<'wren> SystemMethods<'wren> {

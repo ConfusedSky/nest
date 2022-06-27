@@ -3,6 +3,8 @@
 mod fiber;
 mod handle;
 mod system_methods;
+#[cfg(test)]
+mod test;
 mod util;
 mod value;
 pub use handle::Handle;

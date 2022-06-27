@@ -1,3 +1,5 @@
+use crate::make_call;
+
 use super::{Handle, RawVMContext};
 
 pub struct Methods<'wren> {
@@ -42,10 +44,19 @@ impl<'wren> Methods<'wren> {
 
     pub(crate) fn construct(
         &'wren self,
-        vm: &mut RawVMContext,
+        vm: &mut RawVMContext<'wren>,
         raw_handle: Handle<'wren>,
-    ) -> Result<Fiber<'wren>, String> {
-        Err("unimplemented!".to_string())
+    ) -> Option<Fiber<'wren>> {
+        let is_fiber: bool = unsafe {
+            let is = &vm.get_system_methods().object_is;
+            make_call!(vm { raw_handle.is(self.fiber_class) })
+        };
+
+        if is_fiber {
+            Some(unsafe { self.construct_unchecked(raw_handle) })
+        } else {
+            None
+        }
     }
 }
 
