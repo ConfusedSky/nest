@@ -338,9 +338,9 @@ impl_get_args!(T0 = 0, T1 = 1, T2 = 2, T3 = 3, T4 = 4, T5 = 5, T6 = 6);
 
 #[cfg(test)]
 mod test {
-    use crate::wren::{Handle, RawVMContext, Vm, VmUserData};
+    use crate::wren::{Handle, Vm, VmUserData};
 
-    use super::{Get, SetArgs};
+    use super::SetArgs;
 
     struct TestUserData;
     impl<'wren> VmUserData<'wren, Self> for TestUserData {}
@@ -366,35 +366,16 @@ mod test {
         };
     }
 
-    unsafe fn make_call<'wren, T: Get<'wren>, Args: SetArgs<'wren>>(
-        vm: &mut RawVMContext<'wren>,
-        method: &Handle<'wren>,
-        args: &Args,
-    ) -> T {
-        vm.set_stack(args);
-        vm.call(method).unwrap();
-        vm.get_return_value::<T>()
-    }
-
-    macro_rules! make_call {
-        ($class:ident.$handle:ident($vm:ident)) => {
-            make_call($vm, &$handle, (make_args!($class)))
-        };
-        ($class:ident.$handle:ident($vm:ident, $($args:expr),+ )) => {
-            make_call($vm, &$handle, (make_args!($class, $($args),+)))
-        };
-    }
-
     macro_rules! test_case {
         ($type:ty, $class:ident.$handle:ident($vm:ident) == $res:expr) => {
             assert!({
-                let res: $type = make_call!($class.$handle($vm));
+                let res: $type = super::super::util::make_call!($class.$handle($vm));
                 res == $res
             })
         };
         ($type:ty, $class:ident.$handle:ident($vm:ident, $($args:expr),+ ) == $res:expr) => {
             assert!({
-                let res: $type = make_call!($class.$handle($vm, $($args),+ ));
+                let res: $type = super::super::util::make_call!($class.$handle($vm, $($args),+ ));
                 res == $res
             })
         };

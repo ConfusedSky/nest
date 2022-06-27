@@ -3,6 +3,7 @@
 mod fiber;
 mod handle;
 mod system_methods;
+mod util;
 mod value;
 pub use handle::Handle;
 pub use value::{Get, GetArgs, Set, SetArgs, Value};
