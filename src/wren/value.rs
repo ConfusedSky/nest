@@ -357,15 +357,6 @@ mod test {
         assert_eq!(<(&f64, &f64, &f64, &f64)>::REQUIRED_SLOTS, 4);
     }
 
-    macro_rules! make_args {
-        ($class:ident, $($args:tt),+) => {
-            &(&$class, $( &$args )+)
-        };
-        ($class:ident) => {
-            &(&$class)
-        };
-    }
-
     macro_rules! test_case {
         ($type:ty, $class:ident.$handle:ident($vm:ident) == $res:expr) => {
             assert!({
