@@ -9,7 +9,7 @@
             "request": "launch",
             "name": "Debug",
             "program": "${workspaceRoot}/target/debug/rust_wren",
-            "args": ["args"],
+            "args": ["test_scheduler"],
             "cwd": "${workspaceRoot}",
             "sourceLanguages": [
                 "rust"

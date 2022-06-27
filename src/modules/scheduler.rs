@@ -6,14 +6,6 @@ use crate::{wren, Context, Handle, WrenSet};
 
 use super::{source_file, Class, Module};
 
-unsafe fn _resume<'wren>(vm: &mut Context<'wren>, method: &Handle<'wren>) {
-    let result = vm.call(method);
-
-    if let Err(wren::InterpretResultErrorKind::Runtime) = result {
-        panic!("Fiber panicked after resuming.");
-    }
-}
-
 pub fn init_module<'wren>() -> Module<'wren> {
     let mut scheduler_class = Class::new();
     scheduler_class
@@ -31,13 +23,9 @@ pub fn init_module<'wren>() -> Module<'wren> {
     scheduler_module
 }
 
-pub enum Resume<'wren> {
-    Resume(Handle<'wren>),
-}
-
 type Task<'wren> = (
-    Option<Box<dyn 'wren + FnOnce(&mut Context<'wren>)>>,
     Pin<Box<dyn 'static + Future<Output = ()>>>,
+    Box<dyn 'wren + FnOnce(&mut Context<'wren>)>,
 );
 
 // #[derive(Debug)]
@@ -67,18 +55,15 @@ impl<'wren> Scheduler<'wren> {
         P: 'wren + FnOnce(&mut Context<'wren>),
     {
         let future = Box::pin(future);
-        let resume = Box::new(post_task);
-        self.queue.insert(0, (Some(resume), future));
-    }
-
-    fn next_item(&mut self) -> Option<Task<'wren>> {
-        self.queue.pop()
+        let post_task = Box::new(post_task);
+        self.queue.push((future, post_task));
     }
 
     pub fn await_all(&mut self) {
         self.has_waiting_fibers = true;
     }
 
+    //#region
     /// Loop as long as new tasks are still being created
     /// Loop is structured this way so that mutiple items can be
     /// added to the queue from a single Fiber and multiple asynchronous calls
@@ -118,50 +103,55 @@ impl<'wren> Scheduler<'wren> {
     /// Scheduler.awaitAll()
     /// ```
     /// Would only print "Do 1"
+    //#endregion
     pub fn run_async_loop(&mut self, runtime: &tokio::runtime::Runtime) {
         let local_set = tokio::task::LocalSet::new();
         let (tx, mut rx) = tokio::sync::mpsc::channel(128);
 
-        let mut resumes = vec![];
-        let mut next = self.next_item();
+        let mut post_tasks = vec![];
 
         runtime.block_on(local_set.run_until(async move {
             loop {
                 // Create a new task on the local set for each of the scheduled tasks
                 // So that they can be run concurrently
-                while let Some(future) = next {
-                    let i = resumes.len();
+                for (future, post_task) in self.queue.drain(..) {
+                    let i = post_tasks.len();
                     let tx = tx.clone();
-                    resumes.push(future.0);
+                    post_tasks.push(Some(post_task));
                     tokio::task::spawn_local(async move {
-                        future.1.await;
+                        future.await;
                         tx.send(i).await.expect("Channel shoudn't fail to send");
                     });
-                    next = self.next_item();
                 }
 
                 // If there are no new handles then break out of the loop
-                if resumes.is_empty() {
+                if post_tasks.is_empty() {
                     break;
                 }
 
                 // For each resume callback resume if
                 // there is a resume handler
                 // Wait for existing handlers then clear the handlers
-                for _ in 0..resumes.len() {
+                // Note that this clears the handlers in the order that they come in
+                for _ in 0..post_tasks.len() {
                     tokio::select! {
                         Some(i) = rx.recv() => {
-                            let resume = &mut resumes[i];
-                            resume.take().unwrap()(&mut self.vm);
+                            let post_task = &mut post_tasks[i];
+                            post_task.take().unwrap()(&mut self.vm);
                         }
                     }
                 }
-                resumes.clear();
-
-                // Check the queue for another handle
-                next = self.next_item();
+                post_tasks.clear();
             }
         }));
+    }
+
+    unsafe fn _resume(vm: &mut Context<'wren>, method: &Handle<'wren>) {
+        let result = vm.call(method);
+
+        if let Err(wren::InterpretResultErrorKind::Runtime) = result {
+            panic!("Fiber errored after resuming.");
+        }
     }
 
     pub unsafe fn resume(&mut self, fiber: Handle<'wren>) {
@@ -169,8 +159,8 @@ impl<'wren> Scheduler<'wren> {
         // a random one
         self.vm.set_stack(&(&self.class, &fiber));
         // this is just here to keep clippy from complaining
-        drop(fiber);
-        _resume(&mut self.vm, &self.resume1);
+        //drop(fiber);
+        Self::_resume(&mut self.vm, &self.resume1);
     }
 
     pub unsafe fn resume_with_arg<T: WrenSet<'wren>>(
@@ -181,7 +171,7 @@ impl<'wren> Scheduler<'wren> {
         self.vm
             .set_stack(&(&self.class, &fiber, &additional_argument));
         drop(fiber);
-        _resume(&mut self.vm, &self.resume2);
+        Self::_resume(&mut self.vm, &self.resume2);
     }
     pub unsafe fn resume_error<S>(&mut self, fiber: Handle<'wren>, error: S)
     where
@@ -190,27 +180,27 @@ impl<'wren> Scheduler<'wren> {
         let error = error.as_ref().to_string();
         self.vm.set_stack(&(&self.class, &fiber, &error));
         drop(fiber);
-        _resume(&mut self.vm, &self.resume_error);
+        Self::_resume(&mut self.vm, &self.resume_error);
     }
     pub unsafe fn resume_waiting(&mut self) {
         self.has_waiting_fibers = false;
         self.vm.set_stack(&self.class);
-        _resume(&mut self.vm, &self.resume_waiting);
+        Self::_resume(&mut self.vm, &self.resume_waiting);
     }
     pub unsafe fn has_next(&mut self) -> bool {
         self.vm.set_stack(&self.class);
-        _resume(&mut self.vm, &self.has_next);
+        Self::_resume(&mut self.vm, &self.has_next);
 
         self.vm.get_return_value()
     }
     pub unsafe fn run_next_scheduled(&mut self) {
         self.vm.set_stack(&self.class);
-        _resume(&mut self.vm, &self.run_next_scheduled);
+        Self::_resume(&mut self.vm, &self.run_next_scheduled);
     }
 }
 
 unsafe fn capture_methods<'wren>(mut vm: Context<'wren>) {
-    let mut user_data = vm.get_user_data().unwrap();
+    let mut user_data = vm.get_user_data_mut().unwrap();
     vm.ensure_slots(1);
     let class = vm.get_variable_unchecked("scheduler", "Scheduler", 0);
 
@@ -238,8 +228,8 @@ unsafe fn capture_methods<'wren>(mut vm: Context<'wren>) {
 }
 
 #[allow(clippy::needless_pass_by_value)]
-unsafe fn await_all(vm: Context) {
-    vm.get_user_data()
+unsafe fn await_all(mut vm: Context) {
+    vm.get_user_data_mut()
         .unwrap()
         .scheduler
         .as_mut()

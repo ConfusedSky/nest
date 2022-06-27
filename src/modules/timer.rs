@@ -19,7 +19,7 @@ pub fn init_module<'wren>() -> Module<'wren> {
 }
 
 unsafe fn start(mut vm: Context) {
-    let user_data = vm.get_user_data().unwrap();
+    let user_data = vm.get_user_data_mut().unwrap();
     let scheduler = user_data.scheduler.as_mut().unwrap();
 
     // We are guarenteed ms is positive based on usage
@@ -30,7 +30,7 @@ unsafe fn start(mut vm: Context) {
             sleep(Duration::from_secs_f64(ms / 1000.0)).await;
         },
         |vm| {
-            let user_data = vm.get_user_data().unwrap();
+            let user_data = vm.get_user_data_mut().unwrap();
             let scheduler = user_data.scheduler.as_mut().unwrap();
             scheduler.resume(fiber);
         },

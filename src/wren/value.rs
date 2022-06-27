@@ -403,10 +403,10 @@ mod test {
     fn create_test_vm<'wren>(source: &str) -> (Vm<'wren, TestUserData>, Handle<'wren>) {
         let mut vm = Vm::new(TestUserData);
 
-        vm.interpret("<test>", source)
-            .expect("Code should run successfully");
-
         let vmptr = vm.get_context();
+        vmptr
+            .interpret("<test>", source)
+            .expect("Code should run successfully");
 
         vmptr.ensure_slots(1);
         let class = unsafe { vmptr.get_variable_unchecked("<test>", "Test", 0) };

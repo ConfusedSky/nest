@@ -1,6 +1,8 @@
 #![allow(unsafe_code)]
 
+mod fiber;
 mod handle;
+mod system_methods;
 mod value;
 pub use handle::Handle;
 pub use value::{Get, GetArgs, Set, SetArgs, Value};
@@ -15,13 +17,10 @@ use std::{
     mem::{transmute_copy, MaybeUninit},
     ops::{Deref, DerefMut},
     pin::Pin,
-    ptr::{null, NonNull},
+    ptr::{null, null_mut, NonNull},
 };
 
-use wren_sys::{
-    self as ffi, WrenConfiguration, WrenErrorType, WrenInterpretResult, WrenLoadModuleResult,
-    WrenVM,
-};
+use wren_sys::{self as ffi, WrenConfiguration, WrenErrorType, WrenInterpretResult, WrenVM};
 
 pub type ForeignMethod<'wren, T> = unsafe fn(vm: VmContext<'wren, T>);
 
@@ -34,16 +33,13 @@ unsafe fn get_system_user_data<'s, V>(vm: *mut WrenVM) -> Option<&'s mut SystemU
     }
 }
 
-unsafe fn get_user_data<'s, V>(vm: *mut WrenVM) -> Option<&'s mut V> {
-    get_system_user_data(vm).map(|s| &mut s.user_data)
-}
-
-unsafe extern "C" fn resolve_module<'wren, V: VmUserData<'wren, V>>(
+unsafe extern "C" fn resolve_module<'wren, V: 'wren + VmUserData<'wren, V>>(
     vm: *mut WrenVM,
     resolver: *const i8,
     name: *const i8,
 ) -> *const i8 {
-    let user_data = get_user_data::<V>(vm);
+    let mut context: VmContext<V> = VmContext::new_unchecked(vm);
+    let user_data = context.get_user_data_mut();
 
     user_data.map_or_else(
         || std::mem::zeroed(),
@@ -61,11 +57,12 @@ unsafe extern "C" fn resolve_module<'wren, V: VmUserData<'wren, V>>(
     )
 }
 
-unsafe extern "C" fn load_module<'wren, V: VmUserData<'wren, V>>(
+unsafe extern "C" fn load_module<'wren, V: 'wren + VmUserData<'wren, V>>(
     vm: *mut WrenVM,
     name: *const i8,
 ) -> wren_sys::WrenLoadModuleResult {
-    let user_data = get_user_data::<V>(vm);
+    let mut context: VmContext<V> = VmContext::new_unchecked(vm);
+    let user_data = context.get_user_data_mut();
 
     user_data.map_or_else(
         || std::mem::zeroed(),
@@ -93,7 +90,8 @@ unsafe extern "C" fn bind_foreign_method<'wren, V: 'wren + VmUserData<'wren, V>>
     is_static: bool,
     signature: *const i8,
 ) -> wren_sys::WrenForeignMethodFn {
-    let user_data = get_user_data::<V>(vm);
+    let mut context: VmContext<V> = VmContext::new_unchecked(vm);
+    let user_data = context.get_user_data_mut();
 
     user_data.map_or_else(
         || std::mem::zeroed(),
@@ -119,7 +117,8 @@ unsafe extern "C" fn write_fn<'wren, V: 'wren + VmUserData<'wren, V>>(
     vm: *mut WrenVM,
     text: *const i8,
 ) {
-    let user_data = get_user_data::<V>(vm);
+    let mut context: VmContext<V> = VmContext::new_unchecked(vm);
+    let user_data = context.get_user_data_mut();
 
     if let Some(user_data) = user_data {
         let text = CStr::from_ptr(text).to_string_lossy();
@@ -134,7 +133,9 @@ unsafe extern "C" fn error_fn<'wren, V: 'wren + VmUserData<'wren, V>>(
     line: i32,
     msg: *const i8,
 ) {
-    let user_data = get_user_data::<V>(vm);
+    let mut context: VmContext<V> = VmContext::new_unchecked(vm);
+    let user_data = context.get_user_data_mut();
+
     if let Some(user_data) = user_data {
         let msg = CStr::from_ptr(msg).to_string_lossy();
         // This lives outside of the if statement so that it can live long enough
@@ -184,6 +185,8 @@ macro_rules! make_call_handle {
 }
 pub use make_call_handle;
 
+use self::system_methods::SystemMethods;
+
 #[repr(transparent)]
 #[derive(Debug, Clone)]
 pub struct RawVMContext<'wren>(NonNull<WrenVM>, PhantomData<&'wren mut WrenVM>);
@@ -226,9 +229,14 @@ impl<'wren, V: VmUserData<'wren, V>> VmContext<'wren, V> {
     }
 
     /// the correct type
-    pub fn get_user_data<'s>(&self) -> Option<&'s mut V> {
+    pub fn get_user_data<'s>(&self) -> Option<&'s V> {
         // SAFETY this is called from a typed context
-        unsafe { get_user_data::<V>(self.as_ptr()) }
+        unsafe { get_system_user_data(self.as_ptr()).map(|s| &s.user_data) }
+    }
+    /// the correct type
+    pub fn get_user_data_mut<'s>(&mut self) -> Option<&'s mut V> {
+        // SAFETY this is called from a typed context
+        unsafe { get_system_user_data(self.as_ptr()).map(|s| &mut s.user_data) }
     }
 }
 
@@ -295,13 +303,27 @@ impl<'wren> RawVMContext<'wren> {
         Handle::get_from_vm(self, slot)
     }
 
-    pub unsafe fn make_call_handle(&self, signature: *const i8) -> Handle<'wren> {
+    pub unsafe fn make_call_handle(&mut self, signature: *const i8) -> Handle<'wren> {
         let vm = self.0;
         let ptr = ffi::wrenMakeCallHandle(vm.as_ptr(), signature);
 
         // SAFETY: this function is always safe to call but may be unsafe to use the handle it returns
         // as that handle might not be valid
         Handle::new(self, NonNull::new_unchecked(ptr))
+    }
+
+    pub fn interpret<M, S>(&self, module: M, source: S) -> Result<(), InterpretResultErrorKind>
+    where
+        M: AsRef<str>,
+        S: AsRef<str>,
+    {
+        unsafe {
+            let module = CString::new(module.as_ref()).unwrap();
+            let source = CString::new(source.as_ref()).unwrap();
+            let result = ffi::wrenInterpret(self.as_ptr(), module.as_ptr(), source.as_ptr());
+
+            InterpretResultErrorKind::new_from_result(result)
+        }
     }
 
     /// Safety: Will segfault if used with an invalid method
@@ -410,18 +432,6 @@ pub trait VmUserData<'wren, T> {
     fn on_error(&mut self, vm: VmContext<'wren, T>, kind: ErrorKind) {}
 }
 
-struct SystemMethods<'wren> {
-    object_to_string: Handle<'wren>,
-}
-
-impl<'wren> SystemMethods<'wren> {
-    fn new(vm: &mut RawVMContext<'wren>) -> Self {
-        Self {
-            object_to_string: make_call_handle!(vm, "toString"),
-        }
-    }
-}
-
 struct SystemUserData<'wren, V: 'wren> {
     user_data: V,
     system_methods: Option<SystemMethods<'wren>>,
@@ -489,19 +499,5 @@ where
 
     pub fn get_context(&mut self) -> &mut VmContext<'wren, V> {
         &mut self.vm
-    }
-
-    pub fn interpret<M, S>(&self, module: M, source: S) -> Result<(), InterpretResultErrorKind>
-    where
-        M: AsRef<str>,
-        S: AsRef<str>,
-    {
-        unsafe {
-            let module = CString::new(module.as_ref()).unwrap();
-            let source = CString::new(source.as_ref()).unwrap();
-            let result = ffi::wrenInterpret(self.as_ptr(), module.as_ptr(), source.as_ptr());
-
-            InterpretResultErrorKind::new_from_result(result)
-        }
     }
 }

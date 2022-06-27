@@ -106,7 +106,8 @@ fn main() {
         .unwrap_or_else(|_| panic!("Ensure {} is a valid module name to continue", &module));
 
     let user_data = MyUserData::default();
-    let mut vm = wren::Vm::new(user_data);
+    let mut vm_ = wren::Vm::new(user_data);
+    let vm = vm_.get_context();
 
     let result = vm.interpret(module, source);
 
@@ -121,7 +122,7 @@ fn main() {
 
     // SAFETY: If userdata still exists it's going to be the same type that we passed in
     #[allow(unsafe_code)]
-    let user_data = vm.get_context().get_user_data();
+    let user_data = vm.get_user_data_mut();
     if let Some(user_data) = user_data {
         // We only should run the async loop if there is a loop to run
         if let Some(ref mut scheduler) = user_data.scheduler {
@@ -147,7 +148,7 @@ fn main() {
     #[cfg(feature = "leaks")]
     {
         use std::io::stdin;
-        drop(vm);
+        drop(vm_);
         let mut buf = String::new();
         stdin().read_line(&mut buf).unwrap();
     }
