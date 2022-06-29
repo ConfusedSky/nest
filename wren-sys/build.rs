@@ -30,6 +30,7 @@ fn main() {
     cc::Build::new()
         .file(wren_c_path)
         .warnings(false)
+        .define("DEBUG", None)
         .compile("wren");
 
     // The bindgen::Builder is the main entry point

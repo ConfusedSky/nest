@@ -459,7 +459,7 @@ pub struct Vm<'wren, V> {
     // This value is held here so that it is
     // disposed of properly when execution is finished
     // but it isn't actually used in the struct
-    _user_data: Pin<Box<RefCell<SystemUserData<'wren, V>>>>,
+    user_data: Pin<Box<RefCell<SystemUserData<'wren, V>>>>,
 }
 
 impl<'wren, V> Vm<'wren, V> {
@@ -470,6 +470,7 @@ impl<'wren, V> Vm<'wren, V> {
 
 impl<'wren, V> Drop for Vm<'wren, V> {
     fn drop(&mut self) {
+        self.user_data.as_mut().borrow_mut().system_methods = None;
         unsafe { ffi::wrenFreeVM(self.as_ptr()) }
     }
 }
@@ -498,10 +499,7 @@ where
             let mut vm = VmContext::new_unchecked(ffi::wrenNewVM(&mut config));
             (*user_data.as_ptr()).system_methods = Some(SystemMethods::new(&mut vm));
 
-            Self {
-                vm,
-                _user_data: user_data,
-            }
+            Self { vm, user_data }
         }
     }
 
