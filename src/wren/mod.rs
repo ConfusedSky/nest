@@ -20,7 +20,7 @@ use std::{
     mem::{transmute_copy, MaybeUninit},
     ops::{Deref, DerefMut},
     pin::Pin,
-    ptr::{null, null_mut, NonNull},
+    ptr::{null, NonNull},
 };
 
 use wren_sys::{self as ffi, WrenConfiguration, WrenErrorType, WrenInterpretResult, WrenVM};
