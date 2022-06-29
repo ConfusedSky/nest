@@ -442,6 +442,7 @@ mod test {
             call_test_case!(String, context { Test.returnValue("Test".to_string()) } == "Test");
             call_test_case!(String, context { Test.returnValue(Test) } == "Test");
             call_test_case!(String, context { Test.returnValue(vec![1.0]) } == "[1]");
+            call_test_case!(String, context { Test.returnValue(vec!["1.0", "Other"]) } == "[1.0, Other]");
             call_test_case!(String, context { Test.returnValue(1.0) } == "1");
             call_test_case!(String, context { Test.returnMap } == "{test: 1, 15: Test}");
             call_test_case!(String, context { Test.sendMulti("Test", vec![1.0]) } == "Test[1]");
