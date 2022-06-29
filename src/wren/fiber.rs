@@ -1,6 +1,6 @@
 use crate::make_call;
 
-use super::{Handle, RawVMContext};
+use super::{Get, Handle, RawVMContext, Set, Value};
 
 pub struct Methods<'wren> {
     // This method resumes a fiber that is suspended waiting on an asynchronous
@@ -66,8 +66,41 @@ pub struct Fiber<'wren> {
     handle: Handle<'wren>,
 }
 
+impl<'wren> Value for Fiber<'wren> {
+    const ADDITIONAL_SLOTS_NEEDED: super::Slot = 0;
+}
+
+impl<'wren> Get<'wren> for Fiber<'wren> {
+    unsafe fn get_from_vm(vm: &mut RawVMContext<'wren>, slot: super::Slot) -> Self {
+        let handle = Handle::get_from_vm(vm, slot);
+
+        vm.get_system_methods()
+            .fiber_methods
+            .construct_unchecked(handle)
+    }
+}
+
+impl<'wren> Set<'wren> for Fiber<'wren> {
+    unsafe fn send_to_vm(&self, vm: &mut RawVMContext<'wren>, slot: super::Slot) {
+        self.handle.send_to_vm(vm, slot);
+    }
+}
+
+impl<'wren> Value for Option<Fiber<'wren>> {
+    const ADDITIONAL_SLOTS_NEEDED: super::Slot = 0;
+}
+
+impl<'wren> Get<'wren> for Option<Fiber<'wren>> {
+    unsafe fn get_from_vm(vm: &mut RawVMContext<'wren>, slot: super::Slot) -> Self {
+        let handle = Handle::get_from_vm(vm, slot);
+
+        vm.get_system_methods().fiber_methods.construct(vm, handle)
+    }
+}
+
 #[cfg(test)]
 mod test {
+    use super::Fiber;
     use crate::make_call;
     use crate::wren::test::create_test_vm;
     use crate::wren::{make_call_handle, Handle};
@@ -100,6 +133,16 @@ mod test {
 
             let fiber_handle: Handle = make_call!(context {Test.returnFiber()}).unwrap();
             let fiber = fiber_methods.construct(context, fiber_handle);
+            assert!(fiber.is_some());
+
+            // Test getting directly from vm
+            let true_fiber: Option<Fiber> = make_call!(context {Test.returnTrue()}).unwrap();
+            assert!(true_fiber.is_none());
+
+            let test_fiber: Option<Fiber> = make_call!(context {Test.returnTest()}).unwrap();
+            assert!(test_fiber.is_none());
+
+            let fiber: Option<Fiber> = make_call!(context {Test.returnFiber()}).unwrap();
             assert!(fiber.is_some());
         }
     }

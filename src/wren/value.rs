@@ -4,7 +4,7 @@ use std::{ffi::CString, ptr::NonNull};
 
 use wren_sys as ffi;
 
-use super::{system_methods, Handle, RawVMContext, Slot};
+use super::{Handle, RawVMContext, Slot};
 
 struct SlotStorage<'wren> {
     vm: RawVMContext<'wren>,
