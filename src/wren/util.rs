@@ -1,13 +1,13 @@
-use super::{Get, Handle, RawVMContext, SetArgs};
+use super::{Get, Handle, InterpretResultErrorKind, RawVMContext, SetArgs};
 
 pub unsafe fn make_call_helper<'wren, T: Get<'wren>, Args: SetArgs<'wren>>(
     vm: &mut RawVMContext<'wren>,
     method: &Handle<'wren>,
     args: &Args,
-) -> T {
+) -> Result<T, InterpretResultErrorKind> {
     vm.set_stack(args);
-    vm.call(method).unwrap();
-    vm.get_return_value::<T>()
+    vm.call(method)?;
+    Ok(vm.get_return_value::<T>())
 }
 
 pub mod macro_helper {

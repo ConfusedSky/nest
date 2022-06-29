@@ -50,6 +50,7 @@ impl<'wren> Methods<'wren> {
         let is_fiber: bool = unsafe {
             let is = &vm.get_system_methods().object_is;
             make_call!(vm { raw_handle.is(self.fiber_class) })
+                .expect("is should never fail for a valid wren handle")
         };
 
         if is_fiber {

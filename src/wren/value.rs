@@ -4,7 +4,7 @@ use std::{ffi::CString, ptr::NonNull};
 
 use wren_sys as ffi;
 
-use super::{Handle, RawVMContext, Slot};
+use super::{system_methods, Handle, RawVMContext, Slot};
 
 struct SlotStorage<'wren> {
     vm: RawVMContext<'wren>,
@@ -189,11 +189,31 @@ impl<'wren> Set<'wren> for String {
 
 impl<'wren> Get<'wren> for String {
     unsafe fn get_from_vm(vm: &mut RawVMContext<'wren>, slot: Slot) -> Self {
-        let mut len = 0;
-        let ptr = ffi::wrenGetSlotBytes(vm.as_ptr(), slot, &mut len).cast();
-        let len = len.try_into().unwrap();
-        let slice = std::slice::from_raw_parts(ptr, len);
-        Self::from_utf8_lossy(slice).to_string()
+        let t = ffi::wrenGetSlotType(vm.as_ptr(), slot);
+        match t {
+            wren_sys::WrenType_WREN_TYPE_BOOL => {
+                ffi::wrenGetSlotBool(vm.as_ptr(), slot).to_string()
+            }
+            wren_sys::WrenType_WREN_TYPE_NULL => "null".to_string(),
+            wren_sys::WrenType_WREN_TYPE_STRING => {
+                let mut len = 0;
+                let ptr = ffi::wrenGetSlotBytes(vm.as_ptr(), slot, &mut len).cast();
+                let len = len.try_into().unwrap();
+                let slice = std::slice::from_raw_parts(ptr, len);
+                Self::from_utf8_lossy(slice).to_string()
+            }
+            _ => {
+                let system_methods = vm.get_system_methods();
+                let handle = Handle::get_from_vm(vm, slot);
+                handle.send_to_vm(vm, 0);
+
+                vm.call(&system_methods.object_to_string)
+                    .expect("toString should never fail on a valid wren handle");
+                // Note this shouldn't recurse because the second call
+                // will always be called on a string
+                vm.get_return_value::<Self>()
+            }
+        }
     }
 }
 
@@ -386,6 +406,43 @@ mod test {
             call_test_case!(bool, context { Test.returnValue(Test) } == true);
             call_test_case!(bool, context { Test.returnValue(vec![1.0]) } == true);
             call_test_case!(bool, context { Test.returnValue(1.0) } == true);
+        }
+    }
+
+    // Test that all values other than null and false are falsy
+    #[test]
+    #[allow(non_snake_case)]
+    fn test_string() {
+        let source = "class Test {
+                static returnTrue { true }
+                static returnTrue() { true }
+                static returnFalse() { false }
+                static returnNull() { null }
+                static returnValue(value) { value }
+                static returnMap {
+                    var m = {}
+                    m[\"test\"] = 1
+                    m[15] = Test
+                    return m
+                }
+            }";
+
+        let (mut vm, Test) = create_test_vm(source);
+        let context = vm.get_context();
+
+        unsafe {
+            call_test_case!(String, context { Test.returnNull() } == "null");
+            call_test_case!(String, context { Test.returnFalse() } == "false");
+            call_test_case!(String, context { Test.returnValue(false) } == "false");
+            call_test_case!(String, context { Test.returnTrue } == "true");
+            call_test_case!(String, context { Test.returnTrue() } == "true");
+            call_test_case!(String, context { Test.returnValue(true) } == "true");
+            call_test_case!(String, context { Test.returnValue("") } == "");
+            call_test_case!(String, context { Test.returnValue("Test") } == "Test");
+            call_test_case!(String, context { Test.returnValue(Test) } == "Test");
+            call_test_case!(String, context { Test.returnValue(vec![1.0]) } == "[1]");
+            call_test_case!(String, context { Test.returnValue(1.0) } == "1");
+            call_test_case!(String, context { Test.returnMap } == "{test: 1, 15: Test}");
         }
     }
 }
