@@ -37,9 +37,6 @@ pub struct Scheduler<'wren> {
     // This method resumes a fiber that is suspended waiting on an asynchronous
     // operation. The first resumes it with zero arguments, and the second passes
     // one.
-    resume1: Handle<'wren>,
-    resume2: Handle<'wren>,
-    resume_error: Handle<'wren>,
     resume_waiting: Handle<'wren>,
     has_next: Handle<'wren>,
     run_next_scheduled: Handle<'wren>,
@@ -153,35 +150,6 @@ impl<'wren> Scheduler<'wren> {
             panic!("Fiber errored after resuming.");
         }
     }
-
-    pub unsafe fn resume(&mut self, fiber: Handle<'wren>) {
-        // resume_wit_arg needs a valid WrenValue type so just set it to
-        // a random one
-        self.vm.set_stack(&(&self.class, &fiber));
-        // this is just here to keep clippy from complaining
-        //drop(fiber);
-        Self::_resume(&mut self.vm, &self.resume1);
-    }
-
-    pub unsafe fn resume_with_arg<T: WrenSet<'wren>>(
-        &mut self,
-        fiber: Handle<'wren>,
-        additional_argument: T,
-    ) {
-        self.vm
-            .set_stack(&(&self.class, &fiber, &additional_argument));
-        drop(fiber);
-        Self::_resume(&mut self.vm, &self.resume2);
-    }
-    pub unsafe fn resume_error<S>(&mut self, fiber: Handle<'wren>, error: S)
-    where
-        S: AsRef<str>,
-    {
-        let error = error.as_ref().to_string();
-        self.vm.set_stack(&(&self.class, &fiber, &error));
-        drop(fiber);
-        Self::_resume(&mut self.vm, &self.resume_error);
-    }
     pub unsafe fn resume_waiting(&mut self) {
         self.has_waiting_fibers = false;
         self.vm.set_stack(&self.class);
@@ -204,9 +172,6 @@ unsafe fn capture_methods<'wren>(mut vm: Context<'wren>) {
     vm.ensure_slots(1);
     let class = vm.get_variable_unchecked("scheduler", "Scheduler", 0);
 
-    let resume1 = wren::make_call_handle!(vm, "resume_(_)");
-    let resume2 = wren::make_call_handle!(vm, "resume_(_,_)");
-    let resume_error = wren::make_call_handle!(vm, "resumeError_(_,_)");
     let resume_waiting = wren::make_call_handle!(vm, "resumeWaitingFibers_()");
     let has_next = wren::make_call_handle!(vm, "hasNext_");
     let run_next_scheduled = wren::make_call_handle!(vm, "runNextScheduled_()");
@@ -216,9 +181,6 @@ unsafe fn capture_methods<'wren>(mut vm: Context<'wren>) {
         has_waiting_fibers: false,
         vm,
         class,
-        resume1,
-        resume2,
-        resume_error,
         resume_waiting,
         has_next,
         run_next_scheduled,

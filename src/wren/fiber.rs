@@ -1,22 +1,22 @@
 use crate::make_call;
 
-use super::{Get, Handle, RawVMContext, Set, Value};
+use super::{Get, Handle, RawVMContext, Result, Set, Value};
 
 pub struct Methods<'wren> {
     // This method resumes a fiber that is suspended waiting on an asynchronous
     // operation. The first resumes it with zero arguments, and the second passes
     // one.
-    resume1: Handle<'wren>,
-    resume2: Handle<'wren>,
-    resume_error: Handle<'wren>,
+    transfer: Handle<'wren>,
+    transfer_with_arg: Handle<'wren>,
+    transfer_error: Handle<'wren>,
     fiber_class: Handle<'wren>,
 }
 
 impl<'wren> Methods<'wren> {
     pub(crate) fn new(vm: &mut RawVMContext<'wren>) -> Self {
-        let resume1 = super::make_call_handle!(vm, "transfer()");
-        let resume2 = super::make_call_handle!(vm, "transfer(_)");
-        let resume_error = super::make_call_handle!(vm, "transferError(_)");
+        let transfer = super::make_call_handle!(vm, "transfer()");
+        let transfer_with_arg = super::make_call_handle!(vm, "transfer(_)");
+        let transfer_error = super::make_call_handle!(vm, "transferError(_)");
 
         vm.interpret("<fiber-test>", "var out = Fiber")
             .expect("Fiber class initialize failure");
@@ -25,9 +25,9 @@ impl<'wren> Methods<'wren> {
         let fiber_class = unsafe { vm.get_variable_unchecked("<fiber-test>", "out", 0) };
 
         Self {
-            resume1,
-            resume2,
-            resume_error,
+            transfer,
+            transfer_with_arg,
+            transfer_error,
             fiber_class,
         }
     }
@@ -64,6 +64,40 @@ impl<'wren> Methods<'wren> {
 pub struct Fiber<'wren> {
     methods: &'wren Methods<'wren>,
     handle: Handle<'wren>,
+}
+
+impl<'wren> Fiber<'wren> {
+    pub fn transfer<G: Get<'wren>>(self, context: &mut RawVMContext<'wren>) -> Result<G> {
+        let transfer = &self.methods.transfer;
+        unsafe {
+            let res: G = make_call!(context { self.transfer() })?;
+            Ok(res)
+        }
+    }
+    pub fn transfer_with_arg<G: Get<'wren>, S: Set<'wren>>(
+        self,
+        context: &mut RawVMContext<'wren>,
+        additional_argument: S,
+    ) -> Result<G> {
+        let transfer = &self.methods.transfer_with_arg;
+        unsafe {
+            let res: G = make_call!(context { self.transfer(additional_argument) })?;
+            Ok(res)
+        }
+    }
+
+    pub fn transfer_error<S, G>(self, context: &mut RawVMContext<'wren>, error: S) -> Result<G>
+    where
+        S: AsRef<str>,
+        G: Get<'wren>,
+    {
+        let transfer_error = &self.methods.transfer_error;
+        let error = error.as_ref();
+        unsafe {
+            let res: G = make_call!(context { self.transfer_error(error) })?;
+            Ok(res)
+        }
+    }
 }
 
 impl<'wren> Value for Fiber<'wren> {
@@ -135,7 +169,7 @@ mod test {
             let fiber = fiber_methods.construct(context, fiber_handle);
             assert!(fiber.is_some());
 
-            // Test getting directly from vm
+            // // Test getting directly from vm
             let true_fiber: Option<Fiber> = make_call!(context {Test.returnTrue()}).unwrap();
             assert!(true_fiber.is_none());
 
@@ -144,6 +178,33 @@ mod test {
 
             let fiber: Option<Fiber> = make_call!(context {Test.returnFiber()}).unwrap();
             assert!(fiber.is_some());
+        }
+    }
+
+    #[test]
+    #[allow(non_snake_case)]
+    fn test_transfer() {
+        let source = "class Test {
+            static getCurrent() { Fiber.current }
+
+            static testResume() {
+                System.print(Fiber.suspend())
+            }
+        }";
+
+        let (mut vm, Test) = create_test_vm(source);
+        let context = vm.get_context();
+        let get_current = make_call_handle!(context, "getCurrent()");
+        let test_resume = make_call_handle!(context, "testResume()");
+
+        #[allow(clippy::let_unit_value)]
+        unsafe {
+            // let fiber: Fiber = make_call!(context { Test.get_current() }).unwrap();
+            // assert!(context.get_user_data().unwrap().output.is_empty());
+            // let _: () = make_call!(context { Test.test_resume() }).unwrap();
+            // assert!(context.get_user_data().unwrap().output.is_empty());
+            // fiber.transfer::<()>(context).unwrap();
+            // assert!(!context.get_user_data().unwrap().output.is_empty());
         }
     }
 }

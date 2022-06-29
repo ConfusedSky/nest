@@ -2,9 +2,32 @@ use super::{Handle, Vm, VmUserData};
 
 #[derive(Default)]
 pub struct UserData {
-    pub output: Vec<String>,
+    pub output: String,
 }
-impl<'wren> VmUserData<'wren, Self> for UserData {}
+
+impl<'wren> VmUserData<'wren, Self> for UserData {
+    fn on_error(&mut self, _: super::VmContext<'wren, Self>, kind: super::ErrorKind) {
+        match kind {
+            super::ErrorKind::Compile(ctx) => {
+                println!("[{} line {}] [Error] {}", ctx.module, ctx.line, ctx.msg);
+            }
+            super::ErrorKind::Runtime(msg) => println!("[Runtime Error] {}", msg),
+            super::ErrorKind::Stacktrace(ctx) => {
+                println!("[{} line {}] in {}", ctx.module, ctx.line, ctx.msg);
+            }
+            super::ErrorKind::Unknown(kind, ctx) => {
+                println!(
+                    "[{} line {}] [Unkown Error {}] {}",
+                    ctx.module, ctx.line, kind, ctx.msg
+                );
+            }
+        }
+    }
+    fn on_write(&mut self, _: super::VmContext<'wren, Self>, text: &str) {
+        print!("{}", text);
+        self.output += text;
+    }
+}
 
 #[macro_export]
 macro_rules! call_test_case {

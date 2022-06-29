@@ -7,6 +7,7 @@ mod system_methods;
 mod test;
 mod util;
 mod value;
+pub use fiber::Fiber;
 pub use handle::Handle;
 pub use value::{Get, GetArgs, Set, SetArgs, Value};
 
@@ -24,6 +25,7 @@ use std::{
 use wren_sys::{self as ffi, WrenConfiguration, WrenErrorType, WrenInterpretResult, WrenVM};
 
 pub type ForeignMethod<'wren, T> = unsafe fn(vm: VmContext<'wren, T>);
+pub type Result<T> = std::result::Result<T, InterpretResultErrorKind>;
 
 unsafe fn get_system_user_data<'s, V>(vm: *mut WrenVM) -> Option<&'s mut SystemUserData<'s, V>> {
     let user_data = ffi::wrenGetUserData(vm);
@@ -270,8 +272,6 @@ impl<'wren> RawVMContext<'wren> {
         Self(NonNull::new_unchecked(vm), PhantomData)
     }
 
-    /// SAFETY: This is not guarenteed to be safe the user needs to know to input
-    /// the correct type
     fn get_system_methods<'s>(&self) -> &'s SystemMethods<'wren> {
         unsafe {
             get_system_user_data::<()>(self.as_ptr())
@@ -318,7 +318,7 @@ impl<'wren> RawVMContext<'wren> {
         Handle::new(self, NonNull::new_unchecked(ptr))
     }
 
-    pub fn interpret<M, S>(&self, module: M, source: S) -> Result<(), InterpretResultErrorKind>
+    pub fn interpret<M, S>(&self, module: M, source: S) -> Result<()>
     where
         M: AsRef<str>,
         S: AsRef<str>,
@@ -333,7 +333,7 @@ impl<'wren> RawVMContext<'wren> {
     }
 
     /// Safety: Will segfault if used with an invalid method
-    pub unsafe fn call(&mut self, method: &Handle<'wren>) -> Result<(), InterpretResultErrorKind> {
+    pub unsafe fn call(&mut self, method: &Handle<'wren>) -> Result<()> {
         let vm = self.0;
         let result = ffi::wrenCall(vm.as_ptr(), method.as_ptr());
 
@@ -399,7 +399,7 @@ pub enum InterpretResultErrorKind {
 }
 
 impl InterpretResultErrorKind {
-    const fn new_from_result(result: u32) -> Result<(), Self> {
+    const fn new_from_result(result: u32) -> Result<()> {
         match result {
             wren_sys::WrenInterpretResult_WREN_RESULT_COMPILE_ERROR => Err(Self::Compile),
             wren_sys::WrenInterpretResult_WREN_RESULT_RUNTIME_ERROR => Err(Self::Runtime),
@@ -457,20 +457,17 @@ impl<'wren, V> SystemUserData<'wren, V> {
     }
 }
 
-pub struct Vm<'wren, V> {
+pub struct Vm<'wren, V: VmUserData<'wren, V>> {
     vm: VmContext<'wren, V>,
     // The user data object is actually held and owned by the vm
     // We will handle dropping this data ourselves
     _phantom: PhantomData<SystemUserData<'wren, V>>,
 }
 
-impl<'wren, V> Vm<'wren, V> {
-    fn as_ptr(&self) -> *mut WrenVM {
-        self.vm.as_ptr()
-    }
-}
-
-impl<'wren, V> Drop for Vm<'wren, V> {
+impl<'wren, V> Drop for Vm<'wren, V>
+where
+    V: VmUserData<'wren, V>,
+{
     fn drop(&mut self) {
         // Take and drop the user data here so that all handles are
         // freed before the vm is freed
@@ -488,6 +485,14 @@ impl<'wren, V> Vm<'wren, V>
 where
     V: VmUserData<'wren, V>,
 {
+    pub fn get_context(&mut self) -> &mut VmContext<'wren, V> {
+        &mut self.vm
+    }
+
+    const fn as_ptr(&self) -> *mut WrenVM {
+        self.vm.as_ptr()
+    }
+
     pub fn new(user_data: V) -> Self {
         unsafe {
             let mut config: MaybeUninit<WrenConfiguration> = MaybeUninit::zeroed();
@@ -513,9 +518,5 @@ where
                 _phantom: PhantomData,
             }
         }
-    }
-
-    pub fn get_context(&mut self) -> &mut VmContext<'wren, V> {
-        &mut self.vm
     }
 }
