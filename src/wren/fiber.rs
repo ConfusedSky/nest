@@ -65,3 +65,42 @@ pub struct Fiber<'wren> {
     methods: &'wren Methods<'wren>,
     handle: Handle<'wren>,
 }
+
+#[cfg(test)]
+mod test {
+    use crate::make_call;
+    use crate::wren::test::create_test_vm;
+    use crate::wren::{make_call_handle, Handle};
+
+    #[test]
+    #[allow(non_snake_case)]
+    fn test_construct() {
+        let source = "class Test {
+                static returnTrue { true }
+                static returnFiber { Fiber.current }
+                static returnTest { Test }
+            }";
+
+        let (mut vm, Test) = create_test_vm(source);
+        let context = vm.get_context();
+        let fiber_methods = unsafe { &context.get_system_methods().fiber_methods };
+        let returnTrue = make_call_handle!(context, "returnTrue");
+        let returnFiber = make_call_handle!(context, "returnFiber");
+        let returnTest = make_call_handle!(context, "returnTest");
+
+        // We should not be able to convert any other value but a fiber to a fiber
+        unsafe {
+            let true_handle: Handle = make_call!(context {Test.returnTrue()}).unwrap();
+            let true_fiber = fiber_methods.construct(context, true_handle);
+            assert!(true_fiber.is_none());
+
+            let test_handle: Handle = make_call!(context {Test.returnTest()}).unwrap();
+            let test_fiber = fiber_methods.construct(context, test_handle);
+            assert!(test_fiber.is_none());
+
+            let fiber_handle: Handle = make_call!(context {Test.returnFiber()}).unwrap();
+            let fiber = fiber_methods.construct(context, fiber_handle);
+            assert!(fiber.is_some());
+        }
+    }
+}

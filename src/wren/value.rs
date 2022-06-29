@@ -409,7 +409,6 @@ mod test {
         }
     }
 
-    // Test that all values other than null and false are falsy
     #[test]
     #[allow(non_snake_case)]
     fn test_string() {
