@@ -14,7 +14,7 @@ pub mod macro_helper {
     #[macro_export]
     macro_rules! make_args {
         ($class:ident, $($args:tt),+) => {
-            &(&$class, $( &$args )+)
+            &(&$class, $( &$args ),+)
         };
         ($class:ident) => {
             &(&$class)

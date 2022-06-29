@@ -419,6 +419,7 @@ mod test {
                 static returnFalse() { false }
                 static returnNull() { null }
                 static returnValue(value) { value }
+                static sendMulti(value, value2) { value.toString + value2.toString }
                 static returnMap {
                     var m = {}
                     m[\"test\"] = 1
@@ -436,13 +437,15 @@ mod test {
             call_test_case!(String, context { Test.returnValue(false) } == "false");
             call_test_case!(String, context { Test.returnTrue } == "true");
             call_test_case!(String, context { Test.returnTrue() } == "true");
-            call_test_case!(String, context { Test.returnValue(true) } == "true");
             call_test_case!(String, context { Test.returnValue("") } == "");
             call_test_case!(String, context { Test.returnValue("Test") } == "Test");
+            call_test_case!(String, context { Test.returnValue("Test".to_string()) } == "Test");
             call_test_case!(String, context { Test.returnValue(Test) } == "Test");
             call_test_case!(String, context { Test.returnValue(vec![1.0]) } == "[1]");
             call_test_case!(String, context { Test.returnValue(1.0) } == "1");
             call_test_case!(String, context { Test.returnMap } == "{test: 1, 15: Test}");
+            call_test_case!(String, context { Test.sendMulti("Test", vec![1.0]) } == "Test[1]");
+            call_test_case!(String, context { Test.sendMulti(vec!["One Two"], "Test") } == "[One Two]Test");
         }
     }
 }
