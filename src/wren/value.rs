@@ -356,8 +356,8 @@ mod test {
     #[test]
     #[allow(non_snake_case)]
     fn test_bool() {
-        use crate::wren::make_call_handle;
         let source = "class Test {
+                static returnTrue { true }
                 static returnTrue() { true }
                 static returnFalse() { false }
                 static returnNull() { null }
@@ -367,11 +367,6 @@ mod test {
 
         let (mut vm, Test) = create_test_vm(source);
         let context = vm.get_context();
-        let returnTrue = make_call_handle!(context, "returnTrue()");
-        let returnFalse = make_call_handle!(context, "returnFalse()");
-        let returnNull = make_call_handle!(context, "returnNull()");
-        let returnValue = make_call_handle!(context, "returnValue(_)");
-        let returnNegate = make_call_handle!(context, "returnNegate(_)");
 
         unsafe {
             // False cases
@@ -382,6 +377,7 @@ mod test {
             call_test_case!(bool, context { Test.returnNegate("") } == false);
 
             // True cases
+            call_test_case!(bool, context { Test.returnTrue } == true);
             call_test_case!(bool, context { Test.returnTrue() } == true);
             call_test_case!(bool, context { Test.returnValue(true) } == true);
             call_test_case!(bool, context { Test.returnNegate(false) } == true);

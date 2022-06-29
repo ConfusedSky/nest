@@ -5,17 +5,23 @@ impl<'wren> VmUserData<'wren, Self> for UserData {}
 
 #[macro_export]
 macro_rules! call_test_case {
+        ($type:ty, $vm:ident { $class:ident.$handle:ident } == $res:expr) => {
+            let slice = wren_macros::to_signature!($handle);
+            let handle = $vm.make_call_handle_slice(slice);
+            let res: $type = crate::wren::util::make_call!($vm {$class.handle()});
+            assert_eq!( res, $res );
+        };
         ($type:ty, $vm:ident { $class:ident.$handle:ident() } == $res:expr) => {
-            assert!({
-                let res: $type = crate::wren::util::make_call!($vm {$class.$handle() });
-                res == $res
-            })
+            let slice = wren_macros::to_signature!($handle());
+            let handle = $vm.make_call_handle_slice(slice);
+            let res: $type = crate::wren::util::make_call!($vm {$class.handle()});
+            assert_eq!( res, $res );
         };
         ($type:ty, $vm:ident { $class:ident.$handle:ident($($args:expr),+ ) } == $res:expr) => {
-            assert!({
-                let res: $type = crate::wren::util::make_call!($vm { $class.$handle($($args),+ ) });
-                res == $res
-            })
+            let slice = wren_macros::to_signature!($handle($($args),+ ));
+            let handle = $vm.make_call_handle_slice(slice);
+            let res: $type = crate::wren::util::make_call!($vm { $class.handle($($args),+ ) });
+            assert_eq!( res, $res );
         };
     }
 

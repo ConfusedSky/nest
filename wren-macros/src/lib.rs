@@ -1,3 +1,6 @@
+use std::ffi::CString;
+
+use proc_macro2::Span;
 use quote::quote;
 use syn::{parenthesized, parse::Parse, parse_macro_input, punctuated::Punctuated, Token};
 
@@ -46,9 +49,9 @@ pub fn to_signature(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
             .join(",");
         ident += ")";
     }
+    let ident = CString::new(ident).unwrap();
 
-    let output = quote!(
-        #ident
-    );
+    let lit = syn::LitByteStr::new(ident.as_bytes_with_nul(), Span::call_site());
+    let output = quote!(#lit);
     output.into()
 }

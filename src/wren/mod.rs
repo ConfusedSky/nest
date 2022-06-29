@@ -176,7 +176,7 @@ pub use cstr;
 
 #[macro_export]
 macro_rules! make_call_handle {
-    ($vm:ident, $signature:literal) => {{
+    ($vm:ident, $signature:expr) => {{
         use crate::wren::cstr;
         const SIGNATURE: *const i8 = cstr!($signature);
 
@@ -304,6 +304,11 @@ impl<'wren> RawVMContext<'wren> {
         ffi::wrenGetVariable(self.as_ptr(), module.as_ptr(), name.as_ptr(), slot);
 
         Handle::get_from_vm(self, slot)
+    }
+
+    pub unsafe fn make_call_handle_slice(&mut self, signature: &[u8]) -> Handle<'wren> {
+        let ptr = signature.as_ptr().cast::<i8>() as *mut _;
+        self.make_call_handle(ptr)
     }
 
     pub unsafe fn make_call_handle(&mut self, signature: *const i8) -> Handle<'wren> {
