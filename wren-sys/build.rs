@@ -10,10 +10,10 @@ fn main() {
     let wren_dir = format!("{}/lib/wren", manifest_dir);
     let wren_h = format!("{}/src/include/wren.h", wren_dir);
     let wren_c = format!("{}/lib/wren.c", wren_dir);
-    println!("cargo:rerun-if-env-changed=WREN_DEBUG");
 
     println!("cargo:rerun-if-changed={}", wren_h);
     println!("cargo:rerun-if-changed={}", wren_c);
+    println!("cargo:rerun-if-env-changed=WREN_DEBUG");
 
     let wren_c_path = Path::new(wren_c.as_str());
 
