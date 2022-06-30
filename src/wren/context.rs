@@ -12,13 +12,15 @@ use super::{
     Set, SetArgs, Slot, SystemUserData, VmUserData,
 };
 
-#[repr(transparent)]
-#[derive(Debug, Clone)]
-pub struct Raw<'wren>(NonNull<WrenVM>, PhantomData<&'wren mut WrenVM>);
+#[derive(Clone)]
+pub struct NoTypeInfo;
+
+pub type Raw<'wren> = Context<'wren, NoTypeInfo>;
+
 #[repr(transparent)]
 #[derive(Debug, Clone)]
 pub struct Context<'wren, T>(
-    Raw<'wren>,
+    NonNull<WrenVM>,
     PhantomData<&'wren mut WrenVM>,
     PhantomData<&'wren mut SystemUserData<'wren, T>>,
 );
@@ -37,19 +39,6 @@ mod assert {
 }
 
 impl<'wren, V: VmUserData<'wren, V>> Context<'wren, V> {
-    #[allow(dead_code)]
-    unsafe fn new(vm: *mut WrenVM) -> Option<Self> {
-        Some(Self(Raw::new(vm)?, PhantomData, PhantomData))
-    }
-
-    pub(super) unsafe fn new_unchecked(vm: *mut WrenVM) -> Self {
-        Self(Raw::new_unchecked(vm), PhantomData, PhantomData)
-    }
-
-    const fn as_ptr(&self) -> *mut WrenVM {
-        self.0.as_ptr()
-    }
-
     pub fn get_user_data(&self) -> &V {
         // SAFETY this is called from a typed context
         unsafe { &foreign::get_system_user_data(self.as_ptr()).user_data }
@@ -62,43 +51,40 @@ impl<'wren, V: VmUserData<'wren, V>> Context<'wren, V> {
         unsafe {
             (
                 &mut foreign::get_system_user_data(self.0.as_ptr()).user_data,
-                &mut self.0,
+                self,
             )
         }
     }
 }
 
-impl<'wren, V> From<Context<'wren, V>> for Raw<'wren> {
-    fn from(other: Context<'wren, V>) -> Self {
-        other.0
-    }
-}
-
-impl<'wren, V> Deref for Context<'wren, V> {
+impl<'wren, V: VmUserData<'wren, V>> Deref for Context<'wren, V> {
     type Target = Raw<'wren>;
     fn deref(&self) -> &Self::Target {
-        &self.0
+        unsafe { &*((self as *const Context<V>).cast::<Context<NoTypeInfo>>()) }
     }
 }
-impl<'wren, V> DerefMut for Context<'wren, V> {
+impl<'wren, V: VmUserData<'wren, V>> DerefMut for Context<'wren, V> {
     fn deref_mut(&mut self) -> &mut Self::Target {
-        &mut self.0
+        unsafe { &mut *((self as *mut Context<V>).cast::<Context<NoTypeInfo>>()) }
     }
 }
 
-impl<'wren> Raw<'wren> {
+impl<'wren, T> Context<'wren, T> {
     pub(super) const fn as_ptr(&self) -> *mut WrenVM {
         self.0.as_ptr()
     }
 
-    unsafe fn new(vm: *mut WrenVM) -> Option<Self> {
-        Some(Self(NonNull::new(vm)?, PhantomData))
+    #[allow(dead_code)]
+    pub(super) unsafe fn new(vm: *mut WrenVM) -> Option<Self> {
+        Some(Self(NonNull::new(vm)?, PhantomData, PhantomData))
     }
 
-    unsafe fn new_unchecked(vm: *mut WrenVM) -> Self {
-        Self(NonNull::new_unchecked(vm), PhantomData)
+    pub(super) unsafe fn new_unchecked(vm: *mut WrenVM) -> Self {
+        Self(NonNull::new_unchecked(vm), PhantomData, PhantomData)
     }
+}
 
+impl<'wren> Raw<'wren> {
     pub(super) fn get_system_methods<'s>(&self) -> &'s SystemMethods<'wren> {
         unsafe {
             foreign::get_system_user_data::<()>(self.as_ptr())

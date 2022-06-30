@@ -132,7 +132,7 @@ where
         &mut self.vm
     }
 
-    fn as_ptr(&self) -> *mut WrenVM {
+    const fn as_ptr(&self) -> *mut WrenVM {
         self.vm.as_ptr()
     }
 
@@ -146,7 +146,7 @@ where
 
             config.userData = user_data_ptr.cast::<c_void>();
 
-            let mut vm = Context::new_unchecked(ffi::wrenNewVM(&mut config));
+            let mut vm: Context<V> = Context::new_unchecked(ffi::wrenNewVM(&mut config));
             (*user_data_ptr).system_methods = Some(SystemMethods::new(&mut vm));
 
             Self {
