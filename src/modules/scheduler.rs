@@ -63,6 +63,27 @@ impl<'wren> Scheduler<'wren> {
         self.has_waiting_fibers = true;
     }
 
+    pub fn run_async_loop(&mut self, context: &mut RawVMContext<'wren>) {
+        let runtime = tokio::runtime::Builder::new_current_thread()
+            .enable_all()
+            .build()
+            .unwrap();
+
+        loop {
+            self.run_inner_loop(context, &runtime);
+
+            // If there are waiting fibers or fibers that have been scheduled
+            // but never had control handed over to them make sure they get a chance to run
+            if self.has_waiting_fibers {
+                self.resume_waiting(context);
+            } else if self.has_next(context) {
+                self.run_next_scheduled(context);
+            } else {
+                break;
+            }
+        }
+    }
+
     //#region
     /// Loop as long as new tasks are still being created
     /// Loop is structured this way so that mutiple items can be
@@ -104,7 +125,7 @@ impl<'wren> Scheduler<'wren> {
     /// ```
     /// Would only print "Do 1"
     //#endregion
-    pub fn run_async_loop(&mut self, vm: &mut Context<'wren>, runtime: &tokio::runtime::Runtime) {
+    fn run_inner_loop(&mut self, vm: &mut Context<'wren>, runtime: &tokio::runtime::Runtime) {
         let local_set = tokio::task::LocalSet::new();
         let (tx, mut rx) = tokio::sync::mpsc::channel(128);
 
@@ -153,20 +174,34 @@ impl<'wren> Scheduler<'wren> {
             panic!("Fiber errored after resuming.");
         }
     }
-    pub unsafe fn resume_waiting(&mut self, vm: &mut Context<'wren>) {
+    fn resume_waiting(&mut self, vm: &mut Context<'wren>) {
         self.has_waiting_fibers = false;
         vm.set_stack(&self.class);
-        Self::_resume(vm, &self.resume_waiting);
-    }
-    pub unsafe fn has_next(&mut self, vm: &mut Context<'wren>) -> bool {
-        vm.set_stack(&self.class);
-        Self::_resume(vm, &self.has_next);
 
-        vm.get_return_value_unchecked()
+        // SAFETY: the stack has been set up properly and
+        // the method is assumed to exist on the class
+        unsafe {
+            Self::_resume(vm, &self.resume_waiting);
+        }
     }
-    pub unsafe fn run_next_scheduled(&mut self, vm: &mut Context<'wren>) {
+    fn has_next(&mut self, vm: &mut Context<'wren>) -> bool {
         vm.set_stack(&self.class);
-        Self::_resume(vm, &self.run_next_scheduled);
+
+        // SAFETY: the stack has been set up properly and
+        // the method is assumed to exist on the class
+        // return value is expected from this to be of type bool
+        unsafe {
+            Self::_resume(vm, &self.has_next);
+            vm.get_return_value_unchecked()
+        }
+    }
+    fn run_next_scheduled(&mut self, vm: &mut Context<'wren>) {
+        vm.set_stack(&self.class);
+        // SAFETY: the stack has been set up properly and
+        // the method is assumed to exist on the class
+        unsafe {
+            Self::_resume(vm, &self.run_next_scheduled);
+        }
     }
 }
 

@@ -6,7 +6,6 @@
 
 use modules::{scheduler::Scheduler, Modules};
 use std::{env, ffi::CStr, fs, path::PathBuf};
-use tokio::runtime::Builder;
 
 use wren::VmContext;
 
@@ -104,26 +103,10 @@ fn main() {
         Err(wren::InterpretResultErrorKind::Unknown(kind)) => panic!("UNKNOWN ERROR: {}", kind),
     }
 
-    let runtime = Builder::new_current_thread().enable_all().build().unwrap();
-
     let (user_data, raw_context) = context.get_user_data_mut_with_context();
     // We only should run the async loop if there is a loop to run
     if let Some(ref mut scheduler) = user_data.scheduler {
-        loop {
-            scheduler.run_async_loop(raw_context, &runtime);
-
-            // If there are waiting fibers or fibers that have been scheduled
-            // but never had control handed over to them make sure they get a chance to run
-            if scheduler.has_waiting_fibers {
-                unsafe {
-                    scheduler.resume_waiting(raw_context);
-                }
-            } else if unsafe { scheduler.has_next(raw_context) } {
-                unsafe { scheduler.run_next_scheduled(raw_context) }
-            } else {
-                break;
-            }
-        }
+        scheduler.run_async_loop(raw_context);
     }
 
     // This code is for testing with leaks
