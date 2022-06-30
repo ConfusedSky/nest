@@ -1,6 +1,9 @@
 use super::{Handle, Vm, VmUserData};
 
-pub struct UserData;
+#[derive(Default)]
+pub struct UserData {
+    pub output: Vec<String>,
+}
 impl<'wren> VmUserData<'wren, Self> for UserData {}
 
 #[macro_export]
@@ -46,7 +49,7 @@ macro_rules! call_test_case {
 pub use call_test_case;
 
 pub fn create_test_vm<'wren>(source: &str) -> (Vm<'wren, UserData>, Handle<'wren>) {
-    let mut vm = Vm::new(UserData);
+    let mut vm = Vm::new(UserData::default());
 
     let vmptr = vm.get_context();
     vmptr
