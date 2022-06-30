@@ -149,9 +149,15 @@ unsafe extern "C" fn error_fn<'wren, V: 'wren + VmUserData<'wren, V>>(
 
 #[macro_export]
 macro_rules! cstr {
-    ($s:expr) => {
-        (concat!($s, "\0") as *const str as *const [::std::os::raw::c_char]).cast::<i8>()
-    };
+    ($s:expr) => {{
+        use std::ffi::CStr;
+        const CSTR: *const i8 =
+            (concat!($s, "\0") as *const str as *const [::std::os::raw::c_char]).cast::<i8>();
+        #[allow(unused_unsafe)]
+        unsafe {
+            CStr::from_ptr(CSTR)
+        }
+    }};
 }
 pub use cstr;
 
@@ -159,14 +165,7 @@ pub use cstr;
 macro_rules! make_call_handle {
     ($vm:ident, $signature:expr) => {{
         use crate::wren::cstr;
-        use std::ffi::CStr;
-        const SIGNATURE: *const i8 = cstr!($signature);
-
-        #[allow(unused_unsafe)]
-        unsafe {
-            let cstr = CStr::from_ptr(SIGNATURE);
-            $vm.make_call_handle(cstr)
-        }
+        $vm.make_call_handle(cstr!($signature))
     }};
 }
 pub use make_call_handle;

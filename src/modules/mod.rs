@@ -14,9 +14,7 @@ mod macros {
     macro_rules! source_file {
         ($file:expr) => {{
             use crate::wren;
-            use std::ffi::CStr;
-            let source = wren::cstr!(include_str!($file));
-            unsafe { CStr::from_ptr(source) }
+            wren::cstr!(include_str!($file))
         }};
     }
     pub use source_file;
