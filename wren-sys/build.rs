@@ -10,6 +10,7 @@ fn main() {
     let wren_dir = format!("{}/lib/wren", manifest_dir);
     let wren_h = format!("{}/src/include/wren.h", wren_dir);
     let wren_c = format!("{}/lib/wren.c", wren_dir);
+    println!("cargo:rerun-if-env-changed=WREN_DEBUG");
 
     println!("cargo:rerun-if-changed={}", wren_h);
     println!("cargo:rerun-if-changed={}", wren_c);
@@ -27,11 +28,20 @@ fn main() {
         std::fs::write(wren_c_path, &result.stdout).expect("Failed writing wren.c");
     }
 
-    cc::Build::new()
-        .file(wren_c_path)
-        .warnings(false)
-        .define("DEBUG", None)
-        .compile("wren");
+    let debug = {
+        if let Ok(v) = env::var("WREN_DEBUG") {
+            v == "true"
+        } else {
+            false
+        }
+    };
+
+    let mut build = cc::Build::new();
+    build.file(wren_c_path).warnings(false);
+    if debug {
+        build.define("DEBUG", None);
+    }
+    build.compile("wren");
 
     // The bindgen::Builder is the main entry point
     // to bindgen, and lets you build up options for
