@@ -1,7 +1,7 @@
-use super::{Get, Handle, InterpretResultErrorKind, Raw, SetArgs};
+use super::{Get, Handle, InterpretResultErrorKind, RawContext, SetArgs};
 
 pub unsafe fn make_call_helper<'wren, T: Get<'wren>, Args: SetArgs<'wren>>(
-    vm: &mut Raw<'wren>,
+    vm: &mut RawContext<'wren>,
     method: &Handle<'wren>,
     args: &Args,
 ) -> Result<T, InterpretResultErrorKind> {

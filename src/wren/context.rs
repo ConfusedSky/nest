@@ -15,7 +15,6 @@ use super::{
 #[repr(transparent)]
 #[derive(Debug, Clone)]
 pub struct Raw<'wren>(NonNull<WrenVM>, PhantomData<&'wren mut WrenVM>);
-
 #[repr(transparent)]
 #[derive(Debug, Clone)]
 pub struct Context<'wren, T>(

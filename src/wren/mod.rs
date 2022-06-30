@@ -21,7 +21,7 @@ pub use wren_sys::WREN_VERSION_STRING as VERSION;
 use std::{ffi::c_void, marker::PhantomData};
 
 pub use self::{
-    context::{Context, Raw},
+    context::{Context, Raw as RawContext},
     system_methods::SystemMethods,
 };
 use wren_sys::{self as ffi, WrenErrorType, WrenInterpretResult, WrenVM};

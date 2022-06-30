@@ -1,4 +1,4 @@
-use super::{cstr, fiber, Handle, Raw};
+use super::{cstr, fiber, Handle, RawContext};
 
 pub struct SystemMethods<'wren> {
     pub object_to_string: Handle<'wren>,
@@ -7,7 +7,7 @@ pub struct SystemMethods<'wren> {
 }
 
 impl<'wren> SystemMethods<'wren> {
-    pub fn new(vm: &mut Raw<'wren>) -> Self {
+    pub fn new(vm: &mut RawContext<'wren>) -> Self {
         Self {
             object_to_string: vm.make_call_handle(cstr!("toString")),
             object_is: vm.make_call_handle(cstr!("is(_)")),
