@@ -4,7 +4,7 @@ use std::{future::Future, pin::Pin};
 
 use crate::{
     wren::{self, RawVMContext},
-    Handle,
+    Context, Handle,
 };
 
 use super::{source_file, Class, Module};
@@ -26,10 +26,9 @@ pub fn init_module<'wren>() -> Module<'wren> {
     scheduler_module
 }
 
-type Context<'wren> = RawVMContext<'wren>;
 type Task<'wren> = (
     Pin<Box<dyn 'static + Future<Output = ()>>>,
-    Box<dyn 'wren + FnOnce(&mut Context<'wren>)>,
+    Box<dyn 'wren + FnOnce(&mut RawVMContext<'wren>)>,
 );
 
 // #[derive(Debug)]
@@ -52,7 +51,7 @@ impl<'wren> Scheduler<'wren> {
     pub fn schedule_task<F, P>(&mut self, future: F, post_task: P)
     where
         F: 'static + Future<Output = ()>,
-        P: 'wren + FnOnce(&mut Context<'wren>),
+        P: 'wren + FnOnce(&mut RawVMContext<'wren>),
     {
         let future = Box::pin(future);
         let post_task = Box::new(post_task);
@@ -125,7 +124,7 @@ impl<'wren> Scheduler<'wren> {
     /// ```
     /// Would only print "Do 1"
     //#endregion
-    fn run_inner_loop(&mut self, vm: &mut Context<'wren>, runtime: &tokio::runtime::Runtime) {
+    fn run_inner_loop(&mut self, vm: &mut RawVMContext<'wren>, runtime: &tokio::runtime::Runtime) {
         let local_set = tokio::task::LocalSet::new();
         let (tx, mut rx) = tokio::sync::mpsc::channel(128);
 
@@ -167,14 +166,14 @@ impl<'wren> Scheduler<'wren> {
         }));
     }
 
-    unsafe fn _resume(vm: &mut Context<'wren>, method: &Handle<'wren>) {
+    unsafe fn _resume(vm: &mut RawVMContext<'wren>, method: &Handle<'wren>) {
         let result = vm.call(method);
 
         if let Err(wren::InterpretResultErrorKind::Runtime) = result {
             panic!("Fiber errored after resuming.");
         }
     }
-    fn resume_waiting(&mut self, vm: &mut Context<'wren>) {
+    fn resume_waiting(&mut self, vm: &mut RawVMContext<'wren>) {
         self.has_waiting_fibers = false;
         vm.set_stack(&self.class);
 
@@ -184,7 +183,7 @@ impl<'wren> Scheduler<'wren> {
             Self::_resume(vm, &self.resume_waiting);
         }
     }
-    fn has_next(&mut self, vm: &mut Context<'wren>) -> bool {
+    fn has_next(&mut self, vm: &mut RawVMContext<'wren>) -> bool {
         vm.set_stack(&self.class);
 
         // SAFETY: the stack has been set up properly and
@@ -195,7 +194,7 @@ impl<'wren> Scheduler<'wren> {
             vm.get_return_value_unchecked()
         }
     }
-    fn run_next_scheduled(&mut self, vm: &mut Context<'wren>) {
+    fn run_next_scheduled(&mut self, vm: &mut RawVMContext<'wren>) {
         vm.set_stack(&self.class);
         // SAFETY: the stack has been set up properly and
         // the method is assumed to exist on the class
@@ -205,7 +204,7 @@ impl<'wren> Scheduler<'wren> {
     }
 }
 
-fn capture_methods<'wren>(mut vm: crate::Context<'wren>) {
+fn capture_methods<'wren>(mut vm: Context<'wren>) {
     use crate::wren::cstr;
     vm.ensure_slots(1);
     let class = vm
@@ -229,7 +228,7 @@ fn capture_methods<'wren>(mut vm: crate::Context<'wren>) {
 }
 
 #[allow(clippy::needless_pass_by_value)]
-fn await_all(mut vm: crate::Context) {
+fn await_all(mut vm: Context) {
     vm.get_user_data_mut()
         .scheduler
         .as_mut()
