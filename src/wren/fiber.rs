@@ -136,7 +136,7 @@ impl<'wren> Get<'wren> for Option<Fiber<'wren>> {
 mod test {
     use super::Fiber;
     use crate::make_call;
-    use crate::wren::test::create_test_vm;
+    use crate::wren::test::{create_test_vm, Context};
     use crate::wren::{make_call_handle, Handle};
 
     #[test]
@@ -148,7 +148,7 @@ mod test {
                 static returnTest { Test }
             }";
 
-        let (mut vm, Test) = create_test_vm(source);
+        let (mut vm, Test) = create_test_vm(source, |_| {});
         let context = vm.get_context();
         let fiber_methods = &context.get_system_methods().fiber_methods;
         let returnTrue = make_call_handle!(context, "returnTrue");
@@ -181,32 +181,42 @@ mod test {
         }
     }
 
-    #[test]
-    #[allow(non_snake_case)]
-    fn test_transfer() {
-        let source = "class Test {
-            static getCurrent() { Fiber.current }
+    // #[test]
+    // #[allow(non_snake_case)]
+    // fn test_transfer() {
+    // unsafe fn test_await(mut vm: Context) {
+    // let (_, fiber) = vm.get_stack_unchecked::<((), Fiber)>();
+    // vm.get_user_data_mut().unwrap().fiber = Some(fiber);
+    // vm.set_return_value(&());
+    // }
 
-            static testResume() {
-                System.print(Fiber.suspend())
-            }
-        }";
+    // let source = "class Test {
+    // static testResume() {
+    // await(Fiber.current)
+    // System.print(Fiber.suspend())
+    // }
 
-        let (mut vm, Test) = create_test_vm(source);
-        let context = vm.get_context();
-        let get_current = make_call_handle!(context, "getCurrent()");
-        let test_resume = make_call_handle!(context, "testResume()");
+    // foreign static await(fiber)
+    // }";
 
-        #[allow(clippy::let_unit_value)]
-        unsafe {
-            let fiber: Fiber = make_call!(context { Test.get_current() }).unwrap();
-            let data = fiber.transfer::<Vec<f64>>(context).unwrap();
-            eprintln!("{:?}", data);
-            // assert!(context.get_user_data().unwrap().output.is_empty());
-            // let _: () = make_call!(context { Test.test_resume() }).unwrap();
-            // assert!(context.get_user_data().unwrap().output.is_empty());
-            // fiber.transfer::<()>(context).unwrap();
-            // assert!(!context.get_user_data().unwrap().output.is_empty());
-        }
-    }
+    // let (mut vm, Test) = create_test_vm(source, |user_data| {
+    // user_data.set_static_foreign_method("await(_)", test_await);
+    // });
+    // let context = vm.get_context();
+    // let test_resume = make_call_handle!(context, "testResume()");
+    // let user_data = context.get_user_data_mut().unwrap();
+
+    // #[allow(clippy::let_unit_value)]
+    // unsafe {
+    // let _: () = make_call!(context { Test.test_resume() }).unwrap();
+    // assert!(user_data.get_output().is_empty());
+    // let fiber = user_data
+    // .fiber
+    // .take()
+    // .expect("Fiber should have been set by await");
+
+    // fiber.transfer::<()>(context).unwrap();
+    // assert_eq!(context.get_user_data().unwrap().get_output(), "null\n");
+    // }
+    // }
 }

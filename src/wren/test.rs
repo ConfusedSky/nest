@@ -1,17 +1,49 @@
-use super::{Handle, Vm, VmUserData};
+use std::collections::HashMap;
+
+use super::{Fiber, ForeignMethod, Handle, Vm, VmUserData};
+
+pub type Context<'wren> = super::VmContext<'wren, UserData<'wren>>;
 
 #[derive(Default)]
-pub struct UserData {
-    pub output: String,
+pub struct UserData<'wren> {
+    output: String,
+    static_foreign: HashMap<&'wren str, ForeignMethod<'wren, UserData<'wren>>>,
+    pub fiber: Option<Fiber<'wren>>,
 }
 
-impl<'wren> VmUserData<'wren, Self> for UserData {
+impl<'wren> VmUserData<'wren, Self> for UserData<'wren> {
     fn on_error(&mut self, _: super::VmContext<'wren, Self>, kind: super::ErrorKind) {
         super::default::on_error(kind);
     }
     fn on_write(&mut self, _: super::VmContext<'wren, Self>, text: &str) {
         print!("{}", text);
         self.output += text;
+    }
+    fn bind_foreign_method(
+        &mut self,
+        module: &str,
+        classname: &str,
+        is_static: bool,
+        signature: &str,
+    ) -> Option<ForeignMethod<'wren, Self>> {
+        if module != "<test>" || !is_static || classname != "Test" {
+            return None;
+        }
+        return self.static_foreign.get(signature).copied();
+    }
+}
+
+impl<'wren> UserData<'wren> {
+    pub const fn get_output(&self) -> &String {
+        &self.output
+    }
+
+    pub fn set_static_foreign_method(
+        &mut self,
+        signature: &'wren str,
+        foreign: ForeignMethod<'wren, UserData<'wren>>,
+    ) {
+        self.static_foreign.insert(signature, foreign);
     }
 }
 
@@ -57,10 +89,14 @@ macro_rules! call_test_case {
 
 pub use call_test_case;
 
-pub fn create_test_vm<'wren>(source: &str) -> (Vm<'wren, UserData>, Handle<'wren>) {
+pub fn create_test_vm<'wren>(
+    source: &str,
+    fn_binding: impl FnOnce(&mut UserData<'wren>),
+) -> (Vm<'wren, UserData<'wren>>, Handle<'wren>) {
     let mut vm = Vm::new(UserData::default());
 
     let vmptr = vm.get_context();
+    fn_binding(vmptr.get_user_data_mut().unwrap());
     vmptr
         .interpret("<test>", source)
         .expect("Code should run successfully");

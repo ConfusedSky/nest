@@ -393,7 +393,7 @@ mod test {
                 static returnNegate(value) { !value }
             }";
 
-        let (mut vm, Test) = create_test_vm(source);
+        let (mut vm, Test) = create_test_vm(source, |_| {});
         let context = vm.get_context();
 
         unsafe {
@@ -435,7 +435,7 @@ mod test {
                 }
             }";
 
-        let (mut vm, Test) = create_test_vm(source);
+        let (mut vm, Test) = create_test_vm(source, |_| {});
         let context = vm.get_context();
 
         unsafe {
