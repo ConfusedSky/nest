@@ -200,7 +200,8 @@ mod test {
         #[allow(clippy::let_unit_value)]
         unsafe {
             let fiber: Fiber = make_call!(context { Test.get_current() }).unwrap();
-            fiber.transfer::<bool>(context).unwrap();
+            let data = fiber.transfer::<Vec<f64>>(context).unwrap();
+            eprintln!("{:?}", data);
             // assert!(context.get_user_data().unwrap().output.is_empty());
             // let _: () = make_call!(context { Test.test_resume() }).unwrap();
             // assert!(context.get_user_data().unwrap().output.is_empty());

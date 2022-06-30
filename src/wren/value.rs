@@ -111,18 +111,6 @@ impl<'wren, T: Set<'wren>> Set<'wren> for Vec<T> {
     }
 }
 
-impl<T: Value> Value for [T] {
-    // This needs at least one for moving values into the wren list as well as
-    // any additional slots for T's initialization
-    const ADDITIONAL_SLOTS_NEEDED: Slot = 1 + T::ADDITIONAL_SLOTS_NEEDED;
-}
-
-impl<'wren, T: Set<'wren>> Set<'wren> for [T] {
-    unsafe fn send_to_vm(&self, vm: &mut RawVMContext<'wren>, slot: Slot) {
-        send_iterator_to_vm(self.iter(), vm, slot);
-    }
-}
-
 impl<'wren, T: Get<'wren>> Get<'wren> for Vec<T> {
     unsafe fn get_from_vm(vm: &mut RawVMContext<'wren>, slot: Slot) -> Self {
         // Store the next slot so we don't overwrite it's value
@@ -135,6 +123,14 @@ impl<'wren, T: Get<'wren>> Get<'wren> for Vec<T> {
 
         let mut vec = vec![];
 
+        if cfg!(debug_assertions) {
+            let ty = ffi::wrenGetSlotType(vm.as_ptr(), slot);
+            assert!(
+                ty == ffi::WrenType_WREN_TYPE_LIST,
+                "Unable to get non list value as Vec"
+            );
+        }
+
         let count = ffi::wrenGetListCount(vm.as_ptr(), slot);
 
         for i in 0..count {
@@ -143,6 +139,18 @@ impl<'wren, T: Get<'wren>> Get<'wren> for Vec<T> {
         }
 
         vec
+    }
+}
+
+impl<T: Value> Value for [T] {
+    // This needs at least one for moving values into the wren list as well as
+    // any additional slots for T's initialization
+    const ADDITIONAL_SLOTS_NEEDED: Slot = 1 + T::ADDITIONAL_SLOTS_NEEDED;
+}
+
+impl<'wren, T: Set<'wren>> Set<'wren> for [T] {
+    unsafe fn send_to_vm(&self, vm: &mut RawVMContext<'wren>, slot: Slot) {
+        send_iterator_to_vm(self.iter(), vm, slot);
     }
 }
 
