@@ -1,6 +1,9 @@
 use crate::make_call;
 
-use super::{Get, Handle, RawForeignContext, RawNativeContext, Result, Set, Value};
+use super::{
+    context::{Location, Native, Raw},
+    Get, Handle, RawNativeContext, Result, Set, Value,
+};
 
 pub struct Methods<'wren> {
     // This method resumes a fiber that is suspended waiting on an asynchronous
@@ -70,14 +73,17 @@ pub struct Fiber<'wren> {
 }
 
 impl<'wren> Fiber<'wren> {
-    pub fn transfer<G: Get<'wren>>(self, context: &mut RawNativeContext<'wren>) -> Result<G> {
+    pub fn transfer<G: Get<'wren, Native>>(
+        self,
+        context: &mut RawNativeContext<'wren>,
+    ) -> Result<G> {
         let transfer = &self.methods.transfer;
         unsafe {
             let res: G = make_call!(context { self.transfer() })?;
             Ok(res)
         }
     }
-    pub fn transfer_with_arg<G: Get<'wren>, S: Set<'wren>>(
+    pub fn transfer_with_arg<G: Get<'wren, Native>, S: Set<'wren, Native>>(
         self,
         context: &mut RawNativeContext<'wren>,
         additional_argument: S,
@@ -92,7 +98,7 @@ impl<'wren> Fiber<'wren> {
     pub fn transfer_error<S, G>(self, context: &mut RawNativeContext<'wren>, error: S) -> Result<G>
     where
         S: AsRef<str>,
-        G: Get<'wren>,
+        G: Get<'wren, Native>,
     {
         let transfer_error = &self.methods.transfer_error;
         let error = error.as_ref();
@@ -107,8 +113,8 @@ impl<'wren> Value for Fiber<'wren> {
     const ADDITIONAL_SLOTS_NEEDED: super::Slot = 0;
 }
 
-impl<'wren> Get<'wren> for Fiber<'wren> {
-    unsafe fn get_from_vm(vm: &mut RawForeignContext<'wren>, slot: super::Slot) -> Self {
+impl<'wren, L: Location> Get<'wren, L> for Fiber<'wren> {
+    unsafe fn get_from_vm(vm: &mut Raw<'wren, L>, slot: super::Slot) -> Self {
         let handle = Handle::get_from_vm(vm, slot);
 
         vm.get_system_methods()
@@ -117,8 +123,8 @@ impl<'wren> Get<'wren> for Fiber<'wren> {
     }
 }
 
-impl<'wren> Set<'wren> for Fiber<'wren> {
-    unsafe fn send_to_vm(&self, vm: &mut RawForeignContext<'wren>, slot: super::Slot) {
+impl<'wren, L: Location> Set<'wren, L> for Fiber<'wren> {
+    unsafe fn send_to_vm(&self, vm: &mut Raw<'wren, L>, slot: super::Slot) {
         self.handle.send_to_vm(vm, slot);
     }
 }

@@ -6,7 +6,7 @@
 
 use modules::{scheduler::Scheduler, Modules};
 use std::{env, ffi::CStr, fs, path::PathBuf};
-use wren::context;
+use wren::context::{self, Location};
 
 type Context<'wren> = wren::Context<'wren, MyUserData<'wren>, context::Foreign>;
 type Handle<'wren> = crate::wren::Handle<'wren>;
@@ -14,15 +14,15 @@ type ForeignMethod<'wren> = crate::wren::ForeignMethod<'wren, MyUserData<'wren>>
 
 macro_rules! create_trait_alias {
     ($name:ident, $($bounds:tt)*) => {
-        pub trait $name<'wren>: $($bounds)* {}
-        impl <'wren, T: $($bounds)* > $name<'wren> for T {}
+        pub trait $name<'wren, L: Location>: $($bounds)* {}
+        impl <'wren, L: Location, T: $($bounds)* > $name<'wren, L> for T {}
     };
 }
 
-create_trait_alias!(WrenGet, crate::wren::Get<'wren>);
-create_trait_alias!(WrenSet, crate::wren::Set<'wren>);
-create_trait_alias!(WrenGetArgs, crate::wren::GetArgs<'wren>);
-create_trait_alias!(WrenSetArgs, crate::wren::SetArgs<'wren>);
+create_trait_alias!(WrenGet, crate::wren::Get<'wren, L>);
+create_trait_alias!(WrenSet, crate::wren::Set<'wren, L>);
+create_trait_alias!(WrenGetArgs, crate::wren::GetArgs<'wren, L>);
+create_trait_alias!(WrenSetArgs, crate::wren::SetArgs<'wren, L>);
 
 mod modules;
 mod wren;

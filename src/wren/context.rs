@@ -12,8 +12,9 @@ use super::{
     Set, SetArgs, Slot, SystemUserData, VmUserData,
 };
 
-pub type RawForeign<'wren> = Context<'wren, NoTypeInfo, Foreign>;
-pub type RawNative<'wren> = Context<'wren, NoTypeInfo, Native>;
+pub type Raw<'wren, L> = Context<'wren, NoTypeInfo, L>;
+pub type RawForeign<'wren> = Raw<'wren, Foreign>;
+pub type RawNative<'wren> = Raw<'wren, Native>;
 
 #[repr(transparent)]
 #[derive(Debug, Clone)]
@@ -207,22 +208,22 @@ impl<'wren, L: Location> Context<'wren, NoTypeInfo, L> {
         }
     }
 
-    pub fn set_stack<Args: SetArgs<'wren>>(&mut self, args: &Args) {
-        args.set_wren_stack(self.as_foreign_mut());
+    pub fn set_stack<Args: SetArgs<'wren, L>>(&mut self, args: &Args) {
+        args.set_wren_stack(self);
     }
 
-    pub fn set_return_value<Args: Set<'wren> + ?Sized>(&mut self, arg: &Args) {
-        arg.set_wren_stack(self.as_foreign_mut());
+    pub fn set_return_value<Args: Set<'wren, L> + ?Sized>(&mut self, arg: &Args) {
+        arg.set_wren_stack(self);
     }
 
     // TODO: Create safe version that returns Options depending on how many slots
     // there are
-    pub unsafe fn get_stack_unchecked<Args: GetArgs<'wren>>(&mut self) -> Args {
-        Args::get_slots(self.as_foreign_mut())
+    pub unsafe fn get_stack_unchecked<Args: GetArgs<'wren, L>>(&mut self) -> Args {
+        Args::get_slots(self)
     }
 
-    pub unsafe fn get_return_value_unchecked<Args: Get<'wren>>(&mut self) -> Args {
-        Args::get_slots(self.as_foreign_mut())
+    pub unsafe fn get_return_value_unchecked<Args: Get<'wren, L>>(&mut self) -> Args {
+        Args::get_slots(self)
     }
 
     pub fn abort_fiber<S>(&mut self, value: S)
