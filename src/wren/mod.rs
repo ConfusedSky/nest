@@ -14,12 +14,10 @@ pub use wren_sys::WREN_VERSION_STRING as VERSION;
 
 use std::{
     borrow::Cow,
-    cell::RefCell,
     ffi::{c_void, CStr, CString},
     marker::PhantomData,
     mem::{transmute_copy, MaybeUninit},
     ops::{Deref, DerefMut},
-    pin::Pin,
     ptr::{null, NonNull},
 };
 
@@ -456,10 +454,9 @@ impl<'wren, V> SystemUserData<'wren, V> {
 
 pub struct Vm<'wren, V> {
     vm: VmContext<'wren, V>,
-    // This value is held here so that it is
-    // disposed of properly when execution is finished
-    // and is dropped before the vm is so we can properly free the handles
-    user_data: Option<Pin<Box<RefCell<SystemUserData<'wren, V>>>>>,
+    // The user data object is actually held and owned by the vm
+    // We will handle dropping this data ourselves
+    _phantom: PhantomData<SystemUserData<'wren, V>>,
 }
 
 impl<'wren, V> Vm<'wren, V> {
@@ -472,8 +469,13 @@ impl<'wren, V> Drop for Vm<'wren, V> {
     fn drop(&mut self) {
         // Take and drop the user data here so that all handles are
         // freed before the vm is freed
-        self.user_data = None;
-        unsafe { ffi::wrenFreeVM(self.as_ptr()) }
+        unsafe {
+            let user_data = ffi::wrenGetUserData(self.vm.as_ptr());
+            // Create a new box object and let it free itself before the
+            // vm is freed
+            drop(Box::<SystemUserData<V>>::from_raw(user_data.cast()));
+            ffi::wrenFreeVM(self.as_ptr());
+        }
     }
 }
 
@@ -487,23 +489,23 @@ where
             ffi::wrenInitConfiguration(config.as_mut_ptr());
             let mut config = config.assume_init();
 
-            // TODO: Check if this is a zst and don't allocate space if not
             let user_data = SystemUserData::new(user_data);
-            let user_data = Box::pin(RefCell::new(user_data));
+            let user_data = Box::new(user_data);
+            let user_data_ptr = Box::into_raw(user_data);
 
             config.writeFn = Some(write_fn::<V>);
             config.errorFn = Some(error_fn::<V>);
             config.loadModuleFn = Some(load_module::<V>);
             config.resolveModuleFn = Some(resolve_module::<V>);
             config.bindForeignMethodFn = Some(bind_foreign_method::<V>);
-            config.userData = user_data.as_ptr().cast::<c_void>();
+            config.userData = user_data_ptr.cast::<c_void>();
 
             let mut vm = VmContext::new_unchecked(ffi::wrenNewVM(&mut config));
-            (*user_data.as_ptr()).system_methods = Some(SystemMethods::new(&mut vm));
+            (*user_data_ptr).system_methods = Some(SystemMethods::new(&mut vm));
 
             Self {
                 vm,
-                user_data: Some(user_data),
+                _phantom: PhantomData,
             }
         }
     }
