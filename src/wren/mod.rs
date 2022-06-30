@@ -274,12 +274,14 @@ impl<'wren> RawVMContext<'wren> {
 
     /// SAFETY: This is not guarenteed to be safe the user needs to know to input
     /// the correct type
-    unsafe fn get_system_methods<'s>(&self) -> &'s SystemMethods<'wren> {
-        get_system_user_data::<()>(self.as_ptr())
-            .expect("user_data should have been initialized at this point")
-            .system_methods
-            .as_ref()
-            .expect("SystemMethods should be initialized at this point")
+    fn get_system_methods<'s>(&self) -> &'s SystemMethods<'wren> {
+        unsafe {
+            get_system_user_data::<()>(self.as_ptr())
+                .expect("user_data should have been initialized at this point")
+                .system_methods
+                .as_ref()
+                .expect("SystemMethods should be initialized at this point")
+        }
     }
 
     /// SAFETY: this is always non null but will segfault if an invalid slot

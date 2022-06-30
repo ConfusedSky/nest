@@ -116,7 +116,7 @@ mod test {
 
         let (mut vm, Test) = create_test_vm(source);
         let context = vm.get_context();
-        let fiber_methods = unsafe { &context.get_system_methods().fiber_methods };
+        let fiber_methods = &context.get_system_methods().fiber_methods;
         let returnTrue = make_call_handle!(context, "returnTrue");
         let returnFiber = make_call_handle!(context, "returnFiber");
         let returnTest = make_call_handle!(context, "returnTest");
