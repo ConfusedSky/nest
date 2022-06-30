@@ -2,7 +2,7 @@ use std::collections::HashMap;
 
 use super::{Fiber, ForeignMethod, Handle, Vm, VmUserData};
 
-pub type Context<'wren> = super::VmContext<'wren, UserData<'wren>>;
+pub type Context<'wren> = super::Context<'wren, UserData<'wren>>;
 
 #[derive(Default)]
 pub struct UserData<'wren> {
@@ -12,10 +12,10 @@ pub struct UserData<'wren> {
 }
 
 impl<'wren> VmUserData<'wren, Self> for UserData<'wren> {
-    fn on_error(&mut self, _: super::VmContext<'wren, Self>, kind: super::ErrorKind) {
+    fn on_error(&mut self, _: super::Context<'wren, Self>, kind: super::ErrorKind) {
         super::user_data::on_error(kind);
     }
-    fn on_write(&mut self, _: super::VmContext<'wren, Self>, text: &str) {
+    fn on_write(&mut self, _: super::Context<'wren, Self>, text: &str) {
         print!("{}", text);
         self.output += text;
     }

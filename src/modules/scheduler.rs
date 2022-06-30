@@ -3,7 +3,7 @@
 use std::{future::Future, pin::Pin};
 
 use crate::{
-    wren::{self, RawVMContext},
+    wren::{self, Raw},
     Context, Handle,
 };
 
@@ -28,7 +28,7 @@ pub fn init_module<'wren>() -> Module<'wren> {
 
 type Task<'wren> = (
     Pin<Box<dyn 'static + Future<Output = ()>>>,
-    Box<dyn 'wren + FnOnce(&mut RawVMContext<'wren>)>,
+    Box<dyn 'wren + FnOnce(&mut Raw<'wren>)>,
 );
 
 // #[derive(Debug)]
@@ -51,7 +51,7 @@ impl<'wren> Scheduler<'wren> {
     pub fn schedule_task<F, P>(&mut self, future: F, post_task: P)
     where
         F: 'static + Future<Output = ()>,
-        P: 'wren + FnOnce(&mut RawVMContext<'wren>),
+        P: 'wren + FnOnce(&mut Raw<'wren>),
     {
         let future = Box::pin(future);
         let post_task = Box::new(post_task);
@@ -62,7 +62,7 @@ impl<'wren> Scheduler<'wren> {
         self.has_waiting_fibers = true;
     }
 
-    pub fn run_async_loop(&mut self, context: &mut RawVMContext<'wren>) {
+    pub fn run_async_loop(&mut self, context: &mut Raw<'wren>) {
         let runtime = tokio::runtime::Builder::new_current_thread()
             .enable_all()
             .build()
@@ -124,7 +124,7 @@ impl<'wren> Scheduler<'wren> {
     /// ```
     /// Would only print "Do 1"
     //#endregion
-    fn run_inner_loop(&mut self, vm: &mut RawVMContext<'wren>, runtime: &tokio::runtime::Runtime) {
+    fn run_inner_loop(&mut self, vm: &mut Raw<'wren>, runtime: &tokio::runtime::Runtime) {
         let local_set = tokio::task::LocalSet::new();
         let (tx, mut rx) = tokio::sync::mpsc::channel(128);
 
@@ -166,14 +166,14 @@ impl<'wren> Scheduler<'wren> {
         }));
     }
 
-    unsafe fn _resume(vm: &mut RawVMContext<'wren>, method: &Handle<'wren>) {
+    unsafe fn _resume(vm: &mut Raw<'wren>, method: &Handle<'wren>) {
         let result = vm.call(method);
 
         if let Err(wren::InterpretResultErrorKind::Runtime) = result {
             panic!("Fiber errored after resuming.");
         }
     }
-    fn resume_waiting(&mut self, vm: &mut RawVMContext<'wren>) {
+    fn resume_waiting(&mut self, vm: &mut Raw<'wren>) {
         self.has_waiting_fibers = false;
         vm.set_stack(&self.class);
 
@@ -183,7 +183,7 @@ impl<'wren> Scheduler<'wren> {
             Self::_resume(vm, &self.resume_waiting);
         }
     }
-    fn has_next(&mut self, vm: &mut RawVMContext<'wren>) -> bool {
+    fn has_next(&mut self, vm: &mut Raw<'wren>) -> bool {
         vm.set_stack(&self.class);
 
         // SAFETY: the stack has been set up properly and
@@ -194,7 +194,7 @@ impl<'wren> Scheduler<'wren> {
             vm.get_return_value_unchecked()
         }
     }
-    fn run_next_scheduled(&mut self, vm: &mut RawVMContext<'wren>) {
+    fn run_next_scheduled(&mut self, vm: &mut Raw<'wren>) {
         vm.set_stack(&self.class);
         // SAFETY: the stack has been set up properly and
         // the method is assumed to exist on the class

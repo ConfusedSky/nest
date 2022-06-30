@@ -1,6 +1,6 @@
 use crate::make_call;
 
-use super::{Get, Handle, RawVMContext, Result, Set, Value};
+use super::{Get, Handle, Raw, Result, Set, Value};
 
 pub struct Methods<'wren> {
     // This method resumes a fiber that is suspended waiting on an asynchronous
@@ -13,7 +13,7 @@ pub struct Methods<'wren> {
 }
 
 impl<'wren> Methods<'wren> {
-    pub(crate) fn new(vm: &mut RawVMContext<'wren>) -> Self {
+    pub(crate) fn new(vm: &mut Raw<'wren>) -> Self {
         use super::cstr;
         let transfer = vm.make_call_handle(cstr!("transfer()"));
         let transfer_with_arg = vm.make_call_handle(cstr!("transfer(_)"));
@@ -47,7 +47,7 @@ impl<'wren> Methods<'wren> {
 
     pub(crate) fn construct(
         &'wren self,
-        vm: &mut RawVMContext<'wren>,
+        vm: &mut Raw<'wren>,
         raw_handle: Handle<'wren>,
     ) -> Option<Fiber<'wren>> {
         let is_fiber: bool = unsafe {
@@ -70,7 +70,7 @@ pub struct Fiber<'wren> {
 }
 
 impl<'wren> Fiber<'wren> {
-    pub fn transfer<G: Get<'wren>>(self, context: &mut RawVMContext<'wren>) -> Result<G> {
+    pub fn transfer<G: Get<'wren>>(self, context: &mut Raw<'wren>) -> Result<G> {
         let transfer = &self.methods.transfer;
         unsafe {
             let res: G = make_call!(context { self.transfer() })?;
@@ -79,7 +79,7 @@ impl<'wren> Fiber<'wren> {
     }
     pub fn transfer_with_arg<G: Get<'wren>, S: Set<'wren>>(
         self,
-        context: &mut RawVMContext<'wren>,
+        context: &mut Raw<'wren>,
         additional_argument: S,
     ) -> Result<G> {
         let transfer = &self.methods.transfer_with_arg;
@@ -89,7 +89,7 @@ impl<'wren> Fiber<'wren> {
         }
     }
 
-    pub fn transfer_error<S, G>(self, context: &mut RawVMContext<'wren>, error: S) -> Result<G>
+    pub fn transfer_error<S, G>(self, context: &mut Raw<'wren>, error: S) -> Result<G>
     where
         S: AsRef<str>,
         G: Get<'wren>,
@@ -108,7 +108,7 @@ impl<'wren> Value for Fiber<'wren> {
 }
 
 impl<'wren> Get<'wren> for Fiber<'wren> {
-    unsafe fn get_from_vm(vm: &mut RawVMContext<'wren>, slot: super::Slot) -> Self {
+    unsafe fn get_from_vm(vm: &mut Raw<'wren>, slot: super::Slot) -> Self {
         let handle = Handle::get_from_vm(vm, slot);
 
         vm.get_system_methods()
@@ -118,7 +118,7 @@ impl<'wren> Get<'wren> for Fiber<'wren> {
 }
 
 impl<'wren> Set<'wren> for Fiber<'wren> {
-    unsafe fn send_to_vm(&self, vm: &mut RawVMContext<'wren>, slot: super::Slot) {
+    unsafe fn send_to_vm(&self, vm: &mut Raw<'wren>, slot: super::Slot) {
         self.handle.send_to_vm(vm, slot);
     }
 }
@@ -128,7 +128,7 @@ impl<'wren> Value for Option<Fiber<'wren>> {
 }
 
 impl<'wren> Get<'wren> for Option<Fiber<'wren>> {
-    unsafe fn get_from_vm(vm: &mut RawVMContext<'wren>, slot: super::Slot) -> Self {
+    unsafe fn get_from_vm(vm: &mut Raw<'wren>, slot: super::Slot) -> Self {
         let handle = Handle::get_from_vm(vm, slot);
 
         vm.get_system_methods().fiber_methods.construct(vm, handle)
