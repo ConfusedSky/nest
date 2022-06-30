@@ -14,3 +14,7 @@ wren_sys = { path = "./wren-sys" }
 wren_macros = { path = "./wren-macros" }
 static_assertions = "1.1.0"
 dirs = "4.0.0"
+
+[dev-dependencies]
+assert_cmd = "2.0"
+predicates = "2.1"
