@@ -8,8 +8,8 @@ use std::{
 use wren_sys::{self as ffi, WrenVM};
 
 use super::{
-    foreign, system_methods::SystemMethods, Get, GetArgs, Handle, InterpretResultErrorKind, Result,
-    Set, SetArgs, Slot, SystemUserData, VmUserData,
+    foreign, system_methods::SystemMethods, Fiber, Get, GetArgs, Handle, InterpretResultErrorKind,
+    Result, Set, SetArgs, Slot, SystemUserData, VmUserData,
 };
 
 pub type Raw<'wren, L> = Context<'wren, NoTypeInfo, L>;
@@ -38,6 +38,13 @@ impl<'wren, V, L: Location> Context<'wren, V, L> {
 
     pub fn as_foreign_mut(&mut self) -> &mut Context<'wren, V, Foreign> {
         unsafe { self.transmute_mut::<V, Foreign>() }
+    }
+
+    pub const fn as_raw(&self) -> &Context<'wren, NoTypeInfo, L> {
+        unsafe { self.transmute::<NoTypeInfo, L>() }
+    }
+    pub fn as_raw_mut(&mut self) -> &mut Context<'wren, NoTypeInfo, L> {
+        unsafe { self.transmute_mut::<NoTypeInfo, L>() }
     }
 
     pub(super) const fn as_ptr(&self) -> *mut WrenVM {
@@ -74,13 +81,6 @@ impl<'wren, V: VmUserData<'wren, V>, L: Location> Context<'wren, V, L> {
             )
         }
     }
-
-    pub const fn as_raw(&self) -> &Context<'wren, NoTypeInfo, L> {
-        unsafe { self.transmute::<NoTypeInfo, L>() }
-    }
-    pub fn as_raw_mut(&mut self) -> &mut Context<'wren, NoTypeInfo, L> {
-        unsafe { self.transmute_mut::<NoTypeInfo, L>() }
-    }
 }
 
 impl<'wren, V: VmUserData<'wren, V>> Deref for Context<'wren, V, Native> {
@@ -114,6 +114,8 @@ impl<'wren, T> Context<'wren, T, Native> {
         M: AsRef<str>,
         S: AsRef<str>,
     {
+        // SAFETY this will segfault if it is called within a foreign function
+        // so it's safe because it must be used in a native context
         unsafe {
             let module = CString::new(module.as_ref()).unwrap();
             let source = CString::new(source.as_ref()).unwrap();
@@ -124,11 +126,17 @@ impl<'wren, T> Context<'wren, T, Native> {
     }
 
     /// Safety: Will segfault if used with an invalid method
+    /// or if it's called from withing a foreign function
     pub unsafe fn call(&mut self, method: &Handle<'wren>) -> Result<()> {
         let vm = self.0;
         let result = ffi::wrenCall(vm.as_ptr(), method.as_ptr());
 
         InterpretResultErrorKind::new_from_result(result)
+    }
+
+    pub fn check_fiber(&mut self, handle: Handle<'wren>) -> Option<Fiber<'wren>> {
+        let vm = self.as_raw_mut();
+        vm.get_system_methods().fiber_methods.construct(vm, handle)
     }
 }
 
