@@ -13,7 +13,7 @@ pub struct UserData<'wren> {
 
 impl<'wren> VmUserData<'wren, Self> for UserData<'wren> {
     fn on_error(&mut self, _: super::VmContext<'wren, Self>, kind: super::ErrorKind) {
-        super::default::on_error(kind);
+        super::user_data::on_error(kind);
     }
     fn on_write(&mut self, _: super::VmContext<'wren, Self>, text: &str) {
         print!("{}", text);

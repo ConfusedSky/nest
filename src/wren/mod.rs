@@ -1,18 +1,19 @@
 #![allow(unsafe_code)]
 
 mod context;
-pub mod default;
 mod fiber;
 mod foreign;
 mod handle;
 mod system_methods;
 #[cfg(test)]
 mod test;
+pub mod user_data;
 mod util;
 mod value;
 
 pub use fiber::Fiber;
 pub use handle::Handle;
+pub use user_data::UserData as VmUserData;
 pub use value::{Get, GetArgs, Set, SetArgs, Value};
 
 pub use wren_sys::WREN_VERSION_STRING as VERSION;
@@ -292,37 +293,6 @@ impl InterpretResultErrorKind {
             kind => Err(Self::Unknown(kind)),
         }
     }
-}
-
-#[allow(unused_variables)]
-// We define empty defaults here so that the user can define what they want
-pub trait VmUserData<'wren, T> {
-    fn resolve_module(&mut self, resolver: &str, name: &str) -> Option<CString> {
-        CString::new(name.to_string()).ok()
-    }
-    fn load_module(&mut self, name: &str) -> Option<&'wren CStr> {
-        None
-    }
-    fn bind_foreign_method(
-        &mut self,
-        module: &str,
-        classname: &str,
-        is_static: bool,
-        signature: &str,
-    ) -> Option<ForeignMethod<'wren, T>> {
-        unsafe { std::mem::zeroed() }
-    }
-    // Default behavior is to return a struct with fields nulled out
-    // so this is fine
-    fn bind_foreign_class(
-        &mut self,
-        module: &str,
-        classname: &str,
-    ) -> wren_sys::WrenForeignClassMethods {
-        unsafe { std::mem::zeroed() }
-    }
-    fn on_write(&mut self, vm: VmContext<'wren, T>, text: &str) {}
-    fn on_error(&mut self, vm: VmContext<'wren, T>, kind: ErrorKind) {}
 }
 
 // The values contained in here are boxed because for some reason

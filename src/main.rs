@@ -44,7 +44,7 @@ impl<'wren> Default for MyUserData<'wren> {
 
 impl<'wren> wren::VmUserData<'wren, MyUserData<'wren>> for MyUserData<'wren> {
     fn on_error(&mut self, _: Context<'wren>, kind: wren::ErrorKind) {
-        wren::default::on_error(kind);
+        wren::user_data::on_error(kind);
     }
     fn on_write(&mut self, _: Context<'wren>, text: &str) {
         print!("{}", text);
