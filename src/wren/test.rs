@@ -51,7 +51,7 @@ impl<'wren> UserData<'wren> {
 macro_rules! call_test_case {
         ($type:ty, $vm:ident { $class:ident.$handle:ident } == $res:expr) => {
             let slice = wren_macros::to_signature!($handle);
-            let handle = $vm.make_call_handle_slice(slice);
+            let handle = $vm.make_call_handle_slice(slice).unwrap();
             let res: $type = crate::wren::util::make_call!($vm {$class.handle()}).expect(
                 &format!(
                     "{}.{} is not a valid invocation",
@@ -63,7 +63,7 @@ macro_rules! call_test_case {
         };
         ($type:ty, $vm:ident { $class:ident.$handle:ident() } == $res:expr) => {
             let slice = wren_macros::to_signature!($handle());
-            let handle = $vm.make_call_handle_slice(slice);
+            let handle = $vm.make_call_handle_slice(slice).unwrap();
             let res: $type = crate::wren::util::make_call!($vm {$class.handle()}).expect(
                 &format!(
                     "{}.{} is not a valid invocation",
@@ -75,7 +75,7 @@ macro_rules! call_test_case {
         };
         ($type:ty, $vm:ident { $class:ident.$handle:ident($($args:expr),+ ) } == $res:expr) => {
             let slice = wren_macros::to_signature!($handle($($args),+ ));
-            let handle = $vm.make_call_handle_slice(slice);
+            let handle = $vm.make_call_handle_slice(slice).unwrap();
             let res: $type = crate::wren::util::make_call!($vm { $class.handle($($args),+ ) }).expect(
                 &format!(
                     "{}.{} is not a valid invocation",
@@ -102,7 +102,9 @@ pub fn create_test_vm<'wren>(
         .expect("Code should run successfully");
 
     vmptr.ensure_slots(1);
-    let class = unsafe { vmptr.get_variable_unchecked("<test>", "Test", 0) };
+    let class = vmptr
+        .get_variable("<test>", "Test", 0)
+        .expect("Test class should be defined in source");
 
     (vm, class)
 }

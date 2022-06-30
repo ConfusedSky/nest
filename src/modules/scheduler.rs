@@ -170,9 +170,11 @@ impl<'wren> Scheduler<'wren> {
     }
 }
 
-unsafe fn capture_methods<'wren>(mut vm: crate::Context<'wren>) {
+fn capture_methods<'wren>(mut vm: crate::Context<'wren>) {
     vm.ensure_slots(1);
-    let class = vm.get_variable_unchecked("scheduler", "Scheduler", 0);
+    let class = vm
+        .get_variable("scheduler", "Scheduler", 0)
+        .expect("Scheduler variable hasn't been defined");
 
     let resume_waiting = wren::make_call_handle!(vm, "resumeWaitingFibers_()");
     let has_next = wren::make_call_handle!(vm, "hasNext_");
@@ -191,7 +193,7 @@ unsafe fn capture_methods<'wren>(mut vm: crate::Context<'wren>) {
 }
 
 #[allow(clippy::needless_pass_by_value)]
-unsafe fn await_all(mut vm: crate::Context) {
+fn await_all(mut vm: crate::Context) {
     vm.get_user_data_mut()
         .scheduler
         .as_mut()

@@ -22,7 +22,9 @@ impl<'wren> Methods<'wren> {
             .expect("Fiber class initialize failure");
 
         vm.ensure_slots(1);
-        let fiber_class = unsafe { vm.get_variable_unchecked("<fiber-test>", "out", 0) };
+        let fiber_class = vm
+            .get_variable("<fiber-test>", "out", 0)
+            .expect("Should be able to extract Fiber class");
 
         Self {
             transfer,
@@ -164,6 +166,13 @@ mod test {
             let test_handle: Handle = make_call!(context {Test.returnTest()}).unwrap();
             let test_fiber = fiber_methods.construct(context, test_handle);
             assert!(test_fiber.is_none());
+
+            let test_fiber = fiber_methods.construct(context, returnTest);
+            assert!(test_fiber.is_none());
+            let returnTest = make_call_handle!(context, "");
+            let test_fiber = fiber_methods.construct(context, returnTest);
+            assert!(test_fiber.is_none());
+            let returnTest = make_call_handle!(context, "returnTest");
 
             let fiber_handle: Handle = make_call!(context {Test.returnFiber()}).unwrap();
             let fiber = fiber_methods.construct(context, fiber_handle);

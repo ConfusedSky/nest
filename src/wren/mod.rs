@@ -17,7 +17,7 @@ pub use wren_sys::WREN_VERSION_STRING as VERSION;
 
 use std::{
     borrow::Cow,
-    ffi::{c_void, CStr, CString},
+    ffi::{c_void, CStr, CString, FromBytesWithNulError},
     marker::PhantomData,
     mem::{transmute_copy, MaybeUninit},
     ops::{Deref, DerefMut},
@@ -159,11 +159,13 @@ pub use cstr;
 macro_rules! make_call_handle {
     ($vm:ident, $signature:expr) => {{
         use crate::wren::cstr;
+        use std::ffi::CStr;
         const SIGNATURE: *const i8 = cstr!($signature);
 
         #[allow(unused_unsafe)]
         unsafe {
-            $vm.make_call_handle(SIGNATURE)
+            let cstr = CStr::from_ptr(SIGNATURE);
+            $vm.make_call_handle(cstr)
         }
     }};
 }
@@ -270,6 +272,34 @@ impl<'wren> RawVMContext<'wren> {
         }
     }
 
+    pub fn get_variable<Module, Name>(
+        &mut self,
+        module: Module,
+        name: Name,
+        slot: Slot,
+    ) -> Option<Handle<'wren>>
+    where
+        Module: AsRef<str>,
+        Name: AsRef<str>,
+    {
+        let module = CString::new(module.as_ref()).unwrap();
+        let name = CString::new(name.as_ref()).unwrap();
+        // SAFETY wrenGetVariable is definitely safe if wrenHasModule and wrenHasVariable
+        // are called beforehand
+        // wrenHasVariable is safe if wrenHasModule has been called
+        // and wrenHasModule is always safe to call
+        unsafe {
+            if !ffi::wrenHasModule(self.as_ptr(), module.as_ptr())
+                || !ffi::wrenHasVariable(self.as_ptr(), module.as_ptr(), name.as_ptr())
+            {
+                None
+            } else {
+                ffi::wrenGetVariable(self.as_ptr(), module.as_ptr(), name.as_ptr(), slot);
+                Some(Handle::get_from_vm(self, slot))
+            }
+        }
+    }
+
     /// SAFETY: this is always non null but will segfault if an invalid slot
     /// is asked for
     /// MAYBE: Will seg fault if the variable does not exist?
@@ -292,18 +322,22 @@ impl<'wren> RawVMContext<'wren> {
         Handle::get_from_vm(self, slot)
     }
 
-    pub unsafe fn make_call_handle_slice(&mut self, signature: &[u8]) -> Handle<'wren> {
-        let ptr = signature.as_ptr().cast::<i8>() as *mut _;
-        self.make_call_handle(ptr)
+    pub fn make_call_handle_slice(
+        &mut self,
+        signature: &[u8],
+    ) -> std::result::Result<Handle<'wren>, FromBytesWithNulError> {
+        let cstr = CStr::from_bytes_with_nul(signature)?;
+        Ok(self.make_call_handle(cstr))
     }
 
-    pub unsafe fn make_call_handle(&mut self, signature: *const i8) -> Handle<'wren> {
+    pub fn make_call_handle(&mut self, signature: &CStr) -> Handle<'wren> {
         let vm = self.0;
-        let ptr = ffi::wrenMakeCallHandle(vm.as_ptr(), signature);
-
-        // SAFETY: this function is always safe to call but may be unsafe to use the handle it returns
-        // as that handle might not be valid
-        Handle::new(self, NonNull::new_unchecked(ptr))
+        unsafe {
+            // SAFETY: this function is always safe to call but may be unsafe to use the handle it returns
+            // as that handle might not be valid and safe to use
+            let ptr = ffi::wrenMakeCallHandle(vm.as_ptr(), signature.as_ptr());
+            Handle::new(self, NonNull::new_unchecked(ptr))
+        }
     }
 
     pub fn interpret<M, S>(&self, module: M, source: S) -> Result<()>
