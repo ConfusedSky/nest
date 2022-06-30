@@ -199,7 +199,8 @@ mod test {
 
         #[allow(clippy::let_unit_value)]
         unsafe {
-            // let fiber: Fiber = make_call!(context { Test.get_current() }).unwrap();
+            let fiber: Fiber = make_call!(context { Test.get_current() }).unwrap();
+            fiber.transfer::<bool>(context).unwrap();
             // assert!(context.get_user_data().unwrap().output.is_empty());
             // let _: () = make_call!(context { Test.test_resume() }).unwrap();
             // assert!(context.get_user_data().unwrap().output.is_empty());

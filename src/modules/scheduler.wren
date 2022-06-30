@@ -25,9 +25,6 @@ class Scheduler {
   }
 
   // Called by native code.
-  static resume_(fiber) { fiber.transfer() }
-  static resume_(fiber, arg) { fiber.transfer(arg) }
-  static resumeError_(fiber, error) { fiber.transferError(error) }
   static resumeWaitingFibers_() {
     if (__waiting != null) {
       // Reschedule all waiting fibers

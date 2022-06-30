@@ -2,7 +2,7 @@
 
 use std::{future::Future, pin::Pin};
 
-use crate::{wren, Context, Handle, WrenSet};
+use crate::{wren, Context, Handle};
 
 use super::{source_file, Class, Module};
 

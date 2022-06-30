@@ -235,11 +235,11 @@ impl<'wren, V: VmUserData<'wren, V>> VmContext<'wren, V> {
 
     pub fn get_user_data<'s>(&self) -> Option<&'s V> {
         // SAFETY this is called from a typed context
-        unsafe { get_system_user_data(self.as_ptr()).map(|s| *s.user_data) }
+        unsafe { get_system_user_data(self.as_ptr()).map(|s| s.user_data) }
     }
     pub fn get_user_data_mut<'s>(&mut self) -> Option<&'s mut V> {
         // SAFETY this is called from a typed context
-        unsafe { get_system_user_data(self.as_ptr()).map(|s| &mut *s.user_data) }
+        unsafe { get_system_user_data(self.as_ptr()).map(|s| &mut s.user_data) }
     }
 }
 
@@ -445,15 +445,20 @@ pub trait VmUserData<'wren, T> {
 // The values contained in here are boxed because for some reason
 // we see failures otherwise
 // There is probably a more efficient way to implement this
+#[repr(C)]
 struct SystemUserData<'wren, V: 'wren> {
-    user_data: Box<V>,
-    system_methods: Option<Box<SystemMethods<'wren>>>,
+    system_methods: Option<SystemMethods<'wren>>,
+    // User data must always be the last item in the struct because it is variable
+    // size and sometimes we need to access other system user data items from an untyped
+    // context so we want to make sure that while this can grow and shrink that it doesn't
+    // affect the offsets to other items in the system data
+    user_data: V,
 }
 
 impl<'wren, V> SystemUserData<'wren, V> {
-    fn new(user_data: V) -> Self {
+    const fn new(user_data: V) -> Self {
         Self {
-            user_data: Box::new(user_data),
+            user_data,
             system_methods: None,
         }
     }
@@ -513,7 +518,7 @@ where
             config.userData = user_data_ptr.cast::<c_void>();
 
             let mut vm = VmContext::new_unchecked(ffi::wrenNewVM(&mut config));
-            (*user_data_ptr).system_methods = Some(Box::new(SystemMethods::new(&mut vm)));
+            (*user_data_ptr).system_methods = Some(SystemMethods::new(&mut vm));
 
             Self {
                 vm,
