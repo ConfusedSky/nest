@@ -12,64 +12,33 @@ use super::{
     Set, SetArgs, Slot, SystemUserData, VmUserData,
 };
 
-#[derive(Clone)]
-pub struct NoTypeInfo;
-
-pub type Raw<'wren> = Context<'wren, NoTypeInfo>;
+pub type RawForeign<'wren> = Context<'wren, NoTypeInfo, Foreign>;
+pub type RawNative<'wren> = Context<'wren, NoTypeInfo, Native>;
 
 #[repr(transparent)]
 #[derive(Debug, Clone)]
-pub struct Context<'wren, T>(
+pub struct Context<'wren, T, L: Location>(
     NonNull<WrenVM>,
-    PhantomData<&'wren mut WrenVM>,
     PhantomData<&'wren mut SystemUserData<'wren, T>>,
+    PhantomData<L>,
 );
 
-mod assert {
-    use super::{Context, VmUserData, WrenVM};
+impl<'wren, V, L: Location> Context<'wren, V, L> {
+    const unsafe fn transmute<V2, L2: Location>(&self) -> &Context<'wren, V2, L2> {
+        &*((self as *const Context<V, L>).cast::<Context<V2, L2>>())
+    }
+    unsafe fn transmute_mut<V2, L2: Location>(&mut self) -> &mut Context<'wren, V2, L2> {
+        &mut *((self as *mut Context<V, L>).cast::<Context<V2, L2>>())
+    }
 
-    struct T;
-    impl<'wren> VmUserData<'wren, Self> for T {}
-    // Ensure that VMPtr is the same Size as `*mut WrenVM`
-    // the whole purpose of it is to make it easier to access
-    // the wren api, without having to sacrifice size, performance or ergonomics
-    // So they should be directly castable
-    static_assertions::assert_eq_align!(Context<T>, *mut WrenVM);
-    static_assertions::assert_eq_size!(Context<T>, *mut WrenVM);
-}
+    pub const fn as_foreign(&self) -> &Context<'wren, V, Foreign> {
+        unsafe { self.transmute::<V, Foreign>() }
+    }
 
-impl<'wren, V: VmUserData<'wren, V>> Context<'wren, V> {
-    pub fn get_user_data(&self) -> &V {
-        // SAFETY this is called from a typed context
-        unsafe { &foreign::get_system_user_data(self.as_ptr()).user_data }
+    pub fn as_foreign_mut(&mut self) -> &mut Context<'wren, V, Foreign> {
+        unsafe { self.transmute_mut::<V, Foreign>() }
     }
-    pub fn get_user_data_mut(&mut self) -> &mut V {
-        // SAFETY this is called from a typed context
-        unsafe { &mut foreign::get_system_user_data(self.as_ptr()).user_data }
-    }
-    pub fn get_user_data_mut_with_context(&mut self) -> (&mut V, &mut Raw<'wren>) {
-        unsafe {
-            (
-                &mut foreign::get_system_user_data(self.0.as_ptr()).user_data,
-                self,
-            )
-        }
-    }
-}
 
-impl<'wren, V: VmUserData<'wren, V>> Deref for Context<'wren, V> {
-    type Target = Raw<'wren>;
-    fn deref(&self) -> &Self::Target {
-        unsafe { &*((self as *const Context<V>).cast::<Context<NoTypeInfo>>()) }
-    }
-}
-impl<'wren, V: VmUserData<'wren, V>> DerefMut for Context<'wren, V> {
-    fn deref_mut(&mut self) -> &mut Self::Target {
-        unsafe { &mut *((self as *mut Context<V>).cast::<Context<NoTypeInfo>>()) }
-    }
-}
-
-impl<'wren, T> Context<'wren, T> {
     pub(super) const fn as_ptr(&self) -> *mut WrenVM {
         self.0.as_ptr()
     }
@@ -84,7 +53,85 @@ impl<'wren, T> Context<'wren, T> {
     }
 }
 
-impl<'wren> Raw<'wren> {
+// Type information is needed to get user data
+impl<'wren, V: VmUserData<'wren, V>, L: Location> Context<'wren, V, L> {
+    pub fn get_user_data(&self) -> &V {
+        // SAFETY this is called from a typed context
+        unsafe { &foreign::get_system_user_data(self.as_ptr()).user_data }
+    }
+    pub fn get_user_data_mut(&mut self) -> &mut V {
+        // SAFETY this is called from a typed context
+        unsafe { &mut foreign::get_system_user_data(self.as_ptr()).user_data }
+    }
+    pub fn get_user_data_mut_with_context(
+        &mut self,
+    ) -> (&mut V, &mut Context<'wren, NoTypeInfo, L>) {
+        unsafe {
+            (
+                &mut foreign::get_system_user_data(self.0.as_ptr()).user_data,
+                self.as_raw_mut(),
+            )
+        }
+    }
+
+    pub const fn as_raw(&self) -> &Context<'wren, NoTypeInfo, L> {
+        unsafe { self.transmute::<NoTypeInfo, L>() }
+    }
+    pub fn as_raw_mut(&mut self) -> &mut Context<'wren, NoTypeInfo, L> {
+        unsafe { self.transmute_mut::<NoTypeInfo, L>() }
+    }
+}
+
+impl<'wren, V: VmUserData<'wren, V>> Deref for Context<'wren, V, Native> {
+    type Target = RawNative<'wren>;
+    fn deref(&self) -> &Self::Target {
+        self.as_raw()
+    }
+}
+impl<'wren, V: VmUserData<'wren, V>> DerefMut for Context<'wren, V, Native> {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        self.as_raw_mut()
+    }
+}
+
+impl<'wren, V: VmUserData<'wren, V>> Deref for Context<'wren, V, Foreign> {
+    type Target = RawForeign<'wren>;
+    fn deref(&self) -> &Self::Target {
+        self.as_raw()
+    }
+}
+impl<'wren, V: VmUserData<'wren, V>> DerefMut for Context<'wren, V, Foreign> {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        self.as_raw_mut()
+    }
+}
+
+// Calling can only happen from a native context
+impl<'wren, T> Context<'wren, T, Native> {
+    pub fn interpret<M, S>(&self, module: M, source: S) -> Result<()>
+    where
+        M: AsRef<str>,
+        S: AsRef<str>,
+    {
+        unsafe {
+            let module = CString::new(module.as_ref()).unwrap();
+            let source = CString::new(source.as_ref()).unwrap();
+            let result = ffi::wrenInterpret(self.as_ptr(), module.as_ptr(), source.as_ptr());
+
+            InterpretResultErrorKind::new_from_result(result)
+        }
+    }
+
+    /// Safety: Will segfault if used with an invalid method
+    pub unsafe fn call(&mut self, method: &Handle<'wren>) -> Result<()> {
+        let vm = self.0;
+        let result = ffi::wrenCall(vm.as_ptr(), method.as_ptr());
+
+        InterpretResultErrorKind::new_from_result(result)
+    }
+}
+
+impl<'wren, L: Location> Context<'wren, NoTypeInfo, L> {
     pub(super) fn get_system_methods<'s>(&self) -> &'s SystemMethods<'wren> {
         unsafe {
             foreign::get_system_user_data::<()>(self.as_ptr())
@@ -132,7 +179,7 @@ impl<'wren> Raw<'wren> {
         slot: Slot,
     ) -> Handle<'wren> {
         ffi::wrenGetVariable(self.as_ptr(), module.as_ptr(), name.as_ptr(), slot);
-        Handle::get_from_vm(self, slot)
+        Handle::get_from_vm(self.as_foreign_mut(), slot)
     }
 
     pub fn make_call_handle_slice(
@@ -149,30 +196,8 @@ impl<'wren> Raw<'wren> {
             // SAFETY: this function is always safe to call but may be unsafe to use the handle it returns
             // as that handle might not be valid and safe to use
             let ptr = ffi::wrenMakeCallHandle(vm.as_ptr(), signature.as_ptr());
-            Handle::new(self, NonNull::new_unchecked(ptr))
+            Handle::new(self.as_foreign_mut(), NonNull::new_unchecked(ptr))
         }
-    }
-
-    pub fn interpret<M, S>(&self, module: M, source: S) -> Result<()>
-    where
-        M: AsRef<str>,
-        S: AsRef<str>,
-    {
-        unsafe {
-            let module = CString::new(module.as_ref()).unwrap();
-            let source = CString::new(source.as_ref()).unwrap();
-            let result = ffi::wrenInterpret(self.as_ptr(), module.as_ptr(), source.as_ptr());
-
-            InterpretResultErrorKind::new_from_result(result)
-        }
-    }
-
-    /// Safety: Will segfault if used with an invalid method
-    pub unsafe fn call(&mut self, method: &Handle<'wren>) -> Result<()> {
-        let vm = self.0;
-        let result = ffi::wrenCall(vm.as_ptr(), method.as_ptr());
-
-        InterpretResultErrorKind::new_from_result(result)
     }
 
     pub fn ensure_slots(&mut self, num_slots: Slot) {
@@ -183,21 +208,21 @@ impl<'wren> Raw<'wren> {
     }
 
     pub fn set_stack<Args: SetArgs<'wren>>(&mut self, args: &Args) {
-        args.set_wren_stack(self);
+        args.set_wren_stack(self.as_foreign_mut());
     }
 
     pub fn set_return_value<Args: Set<'wren> + ?Sized>(&mut self, arg: &Args) {
-        arg.set_wren_stack(self);
+        arg.set_wren_stack(self.as_foreign_mut());
     }
 
     // TODO: Create safe version that returns Options depending on how many slots
     // there are
     pub unsafe fn get_stack_unchecked<Args: GetArgs<'wren>>(&mut self) -> Args {
-        Args::get_slots(self)
+        Args::get_slots(self.as_foreign_mut())
     }
 
     pub unsafe fn get_return_value_unchecked<Args: Get<'wren>>(&mut self) -> Args {
-        Args::get_slots(self)
+        Args::get_slots(self.as_foreign_mut())
     }
 
     pub fn abort_fiber<S>(&mut self, value: S)
@@ -209,4 +234,36 @@ impl<'wren> Raw<'wren> {
             ffi::wrenAbortFiber(self.as_ptr(), 0);
         }
     }
+}
+
+#[derive(Clone)]
+pub struct NoTypeInfo;
+
+mod sealed {
+    use super::{Foreign, Native};
+
+    pub trait Location {}
+    impl Location for Foreign {}
+    impl Location for Native {}
+}
+
+pub trait Location: sealed::Location {}
+#[derive(Clone)]
+pub struct Foreign;
+impl Location for Foreign {}
+#[derive(Clone)]
+pub struct Native;
+impl Location for Native {}
+
+mod assert {
+    use super::{Context, Native, VmUserData, WrenVM};
+
+    struct T;
+    impl<'wren> VmUserData<'wren, Self> for T {}
+    // Ensure that VMPtr is the same Size as `*mut WrenVM`
+    // the whole purpose of it is to make it easier to access
+    // the wren api, without having to sacrifice size, performance or ergonomics
+    // So they should be directly castable
+    static_assertions::assert_eq_align!(Context<T, Native>, *mut WrenVM);
+    static_assertions::assert_eq_size!(Context<T, Native>, *mut WrenVM);
 }

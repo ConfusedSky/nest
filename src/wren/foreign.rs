@@ -7,7 +7,7 @@ use ffi::WrenErrorType;
 use wren_sys as ffi;
 use wren_sys::WrenVM;
 
-use super::{Context, ErrorContext, ErrorKind, SystemUserData, VmUserData};
+use super::{context, Context, ErrorContext, ErrorKind, SystemUserData, VmUserData};
 
 pub(super) unsafe fn get_system_user_data<'s, V>(vm: *mut WrenVM) -> &'s mut SystemUserData<'s, V> {
     let user_data = ffi::wrenGetUserData(vm);
@@ -23,7 +23,7 @@ unsafe extern "C" fn resolve_module<'wren, V: 'wren + VmUserData<'wren, V>>(
     resolver: *const i8,
     name: *const i8,
 ) -> *const i8 {
-    let mut context: Context<V> = Context::new_unchecked(vm);
+    let mut context: Context<V, context::Foreign> = Context::new_unchecked(vm);
     let user_data = context.get_user_data_mut();
 
     let name = CStr::from_ptr(name).to_string_lossy();
@@ -41,7 +41,7 @@ unsafe extern "C" fn load_module<'wren, V: 'wren + VmUserData<'wren, V>>(
     vm: *mut WrenVM,
     name: *const i8,
 ) -> wren_sys::WrenLoadModuleResult {
-    let mut context: Context<V> = Context::new_unchecked(vm);
+    let mut context: Context<V, context::Foreign> = Context::new_unchecked(vm);
     let user_data = context.get_user_data_mut();
 
     let name = CStr::from_ptr(name).to_string_lossy();
@@ -63,7 +63,7 @@ unsafe extern "C" fn bind_foreign_method<'wren, V: 'wren + VmUserData<'wren, V>>
     is_static: bool,
     signature: *const i8,
 ) -> wren_sys::WrenForeignMethodFn {
-    let mut context: Context<V> = Context::new_unchecked(vm);
+    let mut context: Context<V, context::Foreign> = Context::new_unchecked(vm);
     let user_data = context.get_user_data_mut();
 
     let module = CStr::from_ptr(module).to_string_lossy();
@@ -85,7 +85,7 @@ unsafe extern "C" fn write_fn<'wren, V: 'wren + VmUserData<'wren, V>>(
     vm: *mut WrenVM,
     text: *const i8,
 ) {
-    let mut context: Context<V> = Context::new_unchecked(vm);
+    let mut context: Context<V, context::Foreign> = Context::new_unchecked(vm);
     let user_data = context.get_user_data_mut();
 
     let text = CStr::from_ptr(text).to_string_lossy();
@@ -99,7 +99,7 @@ unsafe extern "C" fn error_fn<'wren, V: 'wren + VmUserData<'wren, V>>(
     line: i32,
     msg: *const i8,
 ) {
-    let mut context: Context<V> = Context::new_unchecked(vm);
+    let mut context: Context<V, context::Foreign> = Context::new_unchecked(vm);
     let user_data = context.get_user_data_mut();
 
     let msg = CStr::from_ptr(msg).to_string_lossy();

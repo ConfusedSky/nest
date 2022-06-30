@@ -6,8 +6,9 @@
 
 use modules::{scheduler::Scheduler, Modules};
 use std::{env, ffi::CStr, fs, path::PathBuf};
+use wren::context;
 
-type Context<'wren> = wren::Context<'wren, MyUserData<'wren>>;
+type Context<'wren> = wren::Context<'wren, MyUserData<'wren>, context::Foreign>;
 type Handle<'wren> = crate::wren::Handle<'wren>;
 type ForeignMethod<'wren> = crate::wren::ForeignMethod<'wren, MyUserData<'wren>>;
 

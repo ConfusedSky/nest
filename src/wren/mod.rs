@@ -1,6 +1,6 @@
 #![allow(unsafe_code)]
 
-mod context;
+pub mod context;
 mod fiber;
 mod foreign;
 mod handle;
@@ -21,12 +21,12 @@ pub use wren_sys::WREN_VERSION_STRING as VERSION;
 use std::{ffi::c_void, marker::PhantomData};
 
 pub use self::{
-    context::{Context, Raw as RawContext},
+    context::{Context, RawForeign as RawForeignContext, RawNative as RawNativeContext},
     system_methods::SystemMethods,
 };
 use wren_sys::{self as ffi, WrenErrorType, WrenInterpretResult, WrenVM};
 
-pub type ForeignMethod<'wren, T> = unsafe fn(vm: Context<'wren, T>);
+pub type ForeignMethod<'wren, T> = unsafe fn(vm: Context<'wren, T, context::Foreign>);
 pub type Result<T> = std::result::Result<T, InterpretResultErrorKind>;
 
 #[macro_export]
@@ -101,7 +101,7 @@ impl<'wren, V> SystemUserData<'wren, V> {
 }
 
 pub struct Vm<'wren, V: VmUserData<'wren, V>> {
-    vm: Context<'wren, V>,
+    vm: Context<'wren, V, context::Native>,
     // The user data object is actually held and owned by the vm
     // We will handle dropping this data ourselves
     _phantom: PhantomData<SystemUserData<'wren, V>>,
@@ -128,7 +128,7 @@ impl<'wren, V> Vm<'wren, V>
 where
     V: VmUserData<'wren, V>,
 {
-    pub fn get_context(&mut self) -> &mut Context<'wren, V> {
+    pub fn get_context(&mut self) -> &mut Context<'wren, V, context::Native> {
         &mut self.vm
     }
 
@@ -146,7 +146,8 @@ where
 
             config.userData = user_data_ptr.cast::<c_void>();
 
-            let mut vm: Context<V> = Context::new_unchecked(ffi::wrenNewVM(&mut config));
+            let mut vm: Context<V, context::Native> =
+                Context::new_unchecked(ffi::wrenNewVM(&mut config));
             (*user_data_ptr).system_methods = Some(SystemMethods::new(&mut vm));
 
             Self {

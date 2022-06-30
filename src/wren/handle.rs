@@ -2,16 +2,16 @@ use std::{marker::PhantomData, ptr::NonNull};
 
 use wren_sys::{wrenReleaseHandle, WrenHandle};
 
-use super::RawContext;
+use super::RawForeignContext;
 
 pub struct Handle<'wren> {
-    vm: RawContext<'wren>,
+    vm: RawForeignContext<'wren>,
     pointer: NonNull<WrenHandle>,
     phantom: PhantomData<WrenHandle>,
 }
 
 impl<'wren> Handle<'wren> {
-    pub(crate) fn new(vm: &RawContext<'wren>, pointer: NonNull<WrenHandle>) -> Self {
+    pub(crate) fn new(vm: &RawForeignContext<'wren>, pointer: NonNull<WrenHandle>) -> Self {
         Self {
             vm: vm.clone(),
             pointer,

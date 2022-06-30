@@ -3,7 +3,7 @@
 use std::{future::Future, pin::Pin};
 
 use crate::{
-    wren::{self, RawContext},
+    wren::{self, RawNativeContext as RawContext},
     Context, Handle,
 };
 

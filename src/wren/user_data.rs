@@ -1,6 +1,6 @@
 use std::ffi::{CStr, CString};
 
-use super::{Context, ErrorKind, ForeignMethod};
+use super::{context, Context, ErrorKind, ForeignMethod};
 
 #[allow(unused_variables)]
 // We define empty defaults here so that the user can define what they want
@@ -29,8 +29,8 @@ pub trait UserData<'wren, T> {
     ) -> wren_sys::WrenForeignClassMethods {
         unsafe { std::mem::zeroed() }
     }
-    fn on_write(&mut self, vm: Context<'wren, T>, text: &str) {}
-    fn on_error(&mut self, vm: Context<'wren, T>, kind: ErrorKind) {}
+    fn on_write(&mut self, vm: Context<'wren, T, context::Foreign>, text: &str) {}
+    fn on_error(&mut self, vm: Context<'wren, T, context::Foreign>, kind: ErrorKind) {}
 }
 
 pub fn on_error(kind: super::ErrorKind) {

@@ -1,6 +1,6 @@
 use crate::make_call;
 
-use super::{Get, Handle, RawContext, Result, Set, Value};
+use super::{Get, Handle, RawForeignContext, RawNativeContext, Result, Set, Value};
 
 pub struct Methods<'wren> {
     // This method resumes a fiber that is suspended waiting on an asynchronous
@@ -13,7 +13,7 @@ pub struct Methods<'wren> {
 }
 
 impl<'wren> Methods<'wren> {
-    pub(crate) fn new(vm: &mut RawContext<'wren>) -> Self {
+    pub(crate) fn new(vm: &mut RawNativeContext<'wren>) -> Self {
         use super::cstr;
         let transfer = vm.make_call_handle(cstr!("transfer()"));
         let transfer_with_arg = vm.make_call_handle(cstr!("transfer(_)"));
@@ -47,7 +47,7 @@ impl<'wren> Methods<'wren> {
 
     pub(crate) fn construct(
         &'wren self,
-        vm: &mut RawContext<'wren>,
+        vm: &mut RawNativeContext<'wren>,
         raw_handle: Handle<'wren>,
     ) -> Option<Fiber<'wren>> {
         let is_fiber: bool = unsafe {
@@ -70,7 +70,7 @@ pub struct Fiber<'wren> {
 }
 
 impl<'wren> Fiber<'wren> {
-    pub fn transfer<G: Get<'wren>>(self, context: &mut RawContext<'wren>) -> Result<G> {
+    pub fn transfer<G: Get<'wren>>(self, context: &mut RawNativeContext<'wren>) -> Result<G> {
         let transfer = &self.methods.transfer;
         unsafe {
             let res: G = make_call!(context { self.transfer() })?;
@@ -79,7 +79,7 @@ impl<'wren> Fiber<'wren> {
     }
     pub fn transfer_with_arg<G: Get<'wren>, S: Set<'wren>>(
         self,
-        context: &mut RawContext<'wren>,
+        context: &mut RawNativeContext<'wren>,
         additional_argument: S,
     ) -> Result<G> {
         let transfer = &self.methods.transfer_with_arg;
@@ -89,7 +89,7 @@ impl<'wren> Fiber<'wren> {
         }
     }
 
-    pub fn transfer_error<S, G>(self, context: &mut RawContext<'wren>, error: S) -> Result<G>
+    pub fn transfer_error<S, G>(self, context: &mut RawNativeContext<'wren>, error: S) -> Result<G>
     where
         S: AsRef<str>,
         G: Get<'wren>,
@@ -108,7 +108,7 @@ impl<'wren> Value for Fiber<'wren> {
 }
 
 impl<'wren> Get<'wren> for Fiber<'wren> {
-    unsafe fn get_from_vm(vm: &mut RawContext<'wren>, slot: super::Slot) -> Self {
+    unsafe fn get_from_vm(vm: &mut RawForeignContext<'wren>, slot: super::Slot) -> Self {
         let handle = Handle::get_from_vm(vm, slot);
 
         vm.get_system_methods()
@@ -118,29 +118,29 @@ impl<'wren> Get<'wren> for Fiber<'wren> {
 }
 
 impl<'wren> Set<'wren> for Fiber<'wren> {
-    unsafe fn send_to_vm(&self, vm: &mut RawContext<'wren>, slot: super::Slot) {
+    unsafe fn send_to_vm(&self, vm: &mut RawForeignContext<'wren>, slot: super::Slot) {
         self.handle.send_to_vm(vm, slot);
     }
 }
 
-impl<'wren> Value for Option<Fiber<'wren>> {
-    const ADDITIONAL_SLOTS_NEEDED: super::Slot = 0;
-}
+// impl<'wren> Value for Option<Fiber<'wren>> {
+// const ADDITIONAL_SLOTS_NEEDED: super::Slot = 0;
+// }
 
-impl<'wren> Get<'wren> for Option<Fiber<'wren>> {
-    unsafe fn get_from_vm(vm: &mut RawContext<'wren>, slot: super::Slot) -> Self {
-        let handle = Handle::get_from_vm(vm, slot);
+// impl<'wren> Get<'wren> for Option<Fiber<'wren>> {
+// unsafe fn get_from_vm(vm: &mut RawForeignContext<'wren>, slot: super::Slot) -> Self {
+// let handle = Handle::get_from_vm(vm, slot);
 
-        vm.get_system_methods().fiber_methods.construct(vm, handle)
-    }
-}
+// vm.get_system_methods().fiber_methods.construct(vm, handle)
+// }
+// }
 
 #[cfg(test)]
 mod test {
     use super::Fiber;
     use crate::make_call;
     use crate::wren::test::{create_test_vm, Context};
-    use crate::wren::{cstr, Handle};
+    use crate::wren::{context, cstr, Handle};
 
     #[test]
     #[allow(non_snake_case)]
@@ -168,33 +168,28 @@ mod test {
             let test_fiber = fiber_methods.construct(context, test_handle);
             assert!(test_fiber.is_none());
 
-            let test_fiber = fiber_methods.construct(context, returnTest);
-            assert!(test_fiber.is_none());
-            let returnTest = context.make_call_handle(cstr!(""));
-            let test_fiber = fiber_methods.construct(context, returnTest);
-            assert!(test_fiber.is_none());
-            let returnTest = context.make_call_handle(cstr!("returnTest"));
-
             let fiber_handle: Handle = make_call!(context {Test.returnFiber()}).unwrap();
             let fiber = fiber_methods.construct(context, fiber_handle);
             assert!(fiber.is_some());
 
+            // We can't get directly from the vm anymore
+            // Value wil need to be updated
             // // Test getting directly from vm
-            let true_fiber: Option<Fiber> = make_call!(context {Test.returnTrue()}).unwrap();
-            assert!(true_fiber.is_none());
+            // let true_fiber: Option<Fiber> = make_call!(context {Test.returnTrue()}).unwrap();
+            // assert!(true_fiber.is_none());
 
-            let test_fiber: Option<Fiber> = make_call!(context {Test.returnTest()}).unwrap();
-            assert!(test_fiber.is_none());
+            // let test_fiber: Option<Fiber> = make_call!(context {Test.returnTest()}).unwrap();
+            // assert!(test_fiber.is_none());
 
-            let fiber: Option<Fiber> = make_call!(context {Test.returnFiber()}).unwrap();
-            assert!(fiber.is_some());
+            // let fiber: Option<Fiber> = make_call!(context {Test.returnFiber()}).unwrap();
+            // assert!(fiber.is_some());
         }
     }
 
     #[test]
     #[allow(non_snake_case)]
     fn test_transfer() {
-        unsafe fn test_await(mut vm: Context) {
+        unsafe fn test_await(mut vm: Context<context::Foreign>) {
             let (_, fiber) = vm.get_stack_unchecked::<((), Fiber)>();
             vm.get_user_data_mut().fiber = Some(fiber);
         }
