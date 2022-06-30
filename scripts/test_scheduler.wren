@@ -8,15 +8,15 @@ Scheduler.add {
 }
 
 Scheduler.add {
-    Timer.sleep(1000)
+    Timer.sleep(10)
     System.print("In Task 1")
-    Timer.sleep(500)
+    Timer.sleep(5)
     System.print("End Task 1")
 }
 
 Scheduler.add {
     System.print("In Task 2")
-    Timer.sleep(50)
+    Timer.sleep(2)
     System.print("End Task 2")
 
     Scheduler.add {
@@ -26,7 +26,7 @@ Scheduler.add {
 
 Scheduler.add {
     System.print("In Task 3")
-    Timer.sleep(1000)
+    Timer.sleep(10)
     System.print("End Task 3")
 
     Scheduler.awaitAll()
