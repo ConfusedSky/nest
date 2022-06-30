@@ -171,14 +171,15 @@ impl<'wren> Scheduler<'wren> {
 }
 
 fn capture_methods<'wren>(mut vm: crate::Context<'wren>) {
+    use crate::wren::cstr;
     vm.ensure_slots(1);
     let class = vm
         .get_variable("scheduler", "Scheduler", 0)
         .expect("Scheduler variable hasn't been defined");
 
-    let resume_waiting = wren::make_call_handle!(vm, "resumeWaitingFibers_()");
-    let has_next = wren::make_call_handle!(vm, "hasNext_");
-    let run_next_scheduled = wren::make_call_handle!(vm, "runNextScheduled_()");
+    let resume_waiting = vm.make_call_handle(cstr!("resumeWaitingFibers_()"));
+    let has_next = vm.make_call_handle(cstr!("hasNext_"));
+    let run_next_scheduled = vm.make_call_handle(cstr!("runNextScheduled_()"));
 
     let scheduler: Scheduler<'wren> = Scheduler {
         queue: Vec::default(),

@@ -161,15 +161,6 @@ macro_rules! cstr {
 }
 pub use cstr;
 
-#[macro_export]
-macro_rules! make_call_handle {
-    ($vm:ident, $signature:expr) => {{
-        use crate::wren::cstr;
-        $vm.make_call_handle(cstr!($signature))
-    }};
-}
-pub use make_call_handle;
-
 use self::system_methods::SystemMethods;
 
 #[repr(transparent)]
@@ -293,8 +284,7 @@ impl<'wren> RawVMContext<'wren> {
             {
                 None
             } else {
-                ffi::wrenGetVariable(self.as_ptr(), module.as_ptr(), name.as_ptr(), slot);
-                Some(Handle::get_from_vm(self, slot))
+                Some(self.get_variable_unchecked(module.as_c_str(), name.as_c_str(), slot))
             }
         }
     }
@@ -303,21 +293,13 @@ impl<'wren> RawVMContext<'wren> {
     /// is asked for
     /// MAYBE: Will seg fault if the variable does not exist?
     /// Still need to set up module resolution
-    pub unsafe fn get_variable_unchecked<Module, Name>(
+    pub unsafe fn get_variable_unchecked(
         &mut self,
-        module: Module,
-        name: Name,
+        module: &CStr,
+        name: &CStr,
         slot: Slot,
-    ) -> Handle<'wren>
-    where
-        Module: AsRef<str>,
-        Name: AsRef<str>,
-    {
-        let module = CString::new(module.as_ref()).unwrap();
-        let name = CString::new(name.as_ref()).unwrap();
-
+    ) -> Handle<'wren> {
         ffi::wrenGetVariable(self.as_ptr(), module.as_ptr(), name.as_ptr(), slot);
-
         Handle::get_from_vm(self, slot)
     }
 

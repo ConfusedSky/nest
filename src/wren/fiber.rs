@@ -14,9 +14,10 @@ pub struct Methods<'wren> {
 
 impl<'wren> Methods<'wren> {
     pub(crate) fn new(vm: &mut RawVMContext<'wren>) -> Self {
-        let transfer = super::make_call_handle!(vm, "transfer()");
-        let transfer_with_arg = super::make_call_handle!(vm, "transfer(_)");
-        let transfer_error = super::make_call_handle!(vm, "transferError(_)");
+        use super::cstr;
+        let transfer = vm.make_call_handle(cstr!("transfer()"));
+        let transfer_with_arg = vm.make_call_handle(cstr!("transfer(_)"));
+        let transfer_error = vm.make_call_handle(cstr!("transferError(_)"));
 
         vm.interpret("<fiber-test>", "var out = Fiber")
             .expect("Fiber class initialize failure");
@@ -139,7 +140,7 @@ mod test {
     use super::Fiber;
     use crate::make_call;
     use crate::wren::test::{create_test_vm, Context};
-    use crate::wren::{make_call_handle, Handle};
+    use crate::wren::{cstr, Handle};
 
     #[test]
     #[allow(non_snake_case)]
@@ -153,9 +154,9 @@ mod test {
         let (mut vm, Test) = create_test_vm(source, |_| {});
         let context = vm.get_context();
         let fiber_methods = &context.get_system_methods().fiber_methods;
-        let returnTrue = make_call_handle!(context, "returnTrue");
-        let returnFiber = make_call_handle!(context, "returnFiber");
-        let returnTest = make_call_handle!(context, "returnTest");
+        let returnTrue = context.make_call_handle(cstr!("returnTrue"));
+        let returnFiber = context.make_call_handle(cstr!("returnFiber"));
+        let returnTest = context.make_call_handle(cstr!("returnTest"));
 
         // We should not be able to convert any other value but a fiber to a fiber
         unsafe {
@@ -169,10 +170,10 @@ mod test {
 
             let test_fiber = fiber_methods.construct(context, returnTest);
             assert!(test_fiber.is_none());
-            let returnTest = make_call_handle!(context, "");
+            let returnTest = context.make_call_handle(cstr!(""));
             let test_fiber = fiber_methods.construct(context, returnTest);
             assert!(test_fiber.is_none());
-            let returnTest = make_call_handle!(context, "returnTest");
+            let returnTest = context.make_call_handle(cstr!("returnTest"));
 
             let fiber_handle: Handle = make_call!(context {Test.returnFiber()}).unwrap();
             let fiber = fiber_methods.construct(context, fiber_handle);
@@ -214,7 +215,7 @@ mod test {
             user_data.set_static_foreign_method("await(_)", test_await);
         });
         let context = vm.get_context();
-        let test_resume = make_call_handle!(context, "testResume()");
+        let test_resume = context.make_call_handle(cstr!("testResume()"));
 
         #[allow(clippy::let_unit_value)]
         unsafe {
