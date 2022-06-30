@@ -92,10 +92,10 @@ fn main() {
         .unwrap_or_else(|_| panic!("Ensure {} is a valid module name to continue", &module));
 
     let user_data = MyUserData::default();
-    let mut vm_ = wren::Vm::new(user_data);
-    let vm = vm_.get_context();
+    let mut vm = wren::Vm::new(user_data);
+    let context = vm.get_context();
 
-    let result = vm.interpret(module, source);
+    let result = context.interpret(module, source);
 
     match result {
         Ok(()) => (),
@@ -106,26 +106,22 @@ fn main() {
 
     let runtime = Builder::new_current_thread().enable_all().build().unwrap();
 
-    // SAFETY: If userdata still exists it's going to be the same type that we passed in
-    #[allow(unsafe_code)]
-    let user_data = vm.get_user_data_mut();
-    if let Some(user_data) = user_data {
-        // We only should run the async loop if there is a loop to run
-        if let Some(ref mut scheduler) = user_data.scheduler {
-            loop {
-                scheduler.run_async_loop(&runtime);
+    let (user_data, raw_context) = context.get_user_data_mut_with_context();
+    // We only should run the async loop if there is a loop to run
+    if let Some(ref mut scheduler) = user_data.scheduler {
+        loop {
+            scheduler.run_async_loop(raw_context, &runtime);
 
-                // If there are waiting fibers or fibers that have been scheduled
-                // but never had control handed over to them make sure they get a chance to run
-                if scheduler.has_waiting_fibers {
-                    unsafe {
-                        scheduler.resume_waiting();
-                    }
-                } else if unsafe { scheduler.has_next() } {
-                    unsafe { scheduler.run_next_scheduled() }
-                } else {
-                    break;
+            // If there are waiting fibers or fibers that have been scheduled
+            // but never had control handed over to them make sure they get a chance to run
+            if scheduler.has_waiting_fibers {
+                unsafe {
+                    scheduler.resume_waiting(raw_context);
                 }
+            } else if unsafe { scheduler.has_next(raw_context) } {
+                unsafe { scheduler.run_next_scheduled(raw_context) }
+            } else {
+                break;
             }
         }
     }
@@ -134,7 +130,7 @@ fn main() {
     #[cfg(feature = "leaks")]
     {
         use std::io::stdin;
-        drop(vm_);
+        drop(vm);
         let mut buf = String::new();
         stdin().read_line(&mut buf).unwrap();
     }

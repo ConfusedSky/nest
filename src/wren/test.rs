@@ -96,7 +96,7 @@ pub fn create_test_vm<'wren>(
     let mut vm = Vm::new(UserData::default());
 
     let vmptr = vm.get_context();
-    fn_binding(vmptr.get_user_data_mut().unwrap());
+    fn_binding(vmptr.get_user_data_mut());
     vmptr
         .interpret("<test>", source)
         .expect("Code should run successfully");

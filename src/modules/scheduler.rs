@@ -2,7 +2,10 @@
 
 use std::{future::Future, pin::Pin};
 
-use crate::{wren, Context, Handle};
+use crate::{
+    wren::{self, RawVMContext},
+    Handle,
+};
 
 use super::{source_file, Class, Module};
 
@@ -23,6 +26,7 @@ pub fn init_module<'wren>() -> Module<'wren> {
     scheduler_module
 }
 
+type Context<'wren> = RawVMContext<'wren>;
 type Task<'wren> = (
     Pin<Box<dyn 'static + Future<Output = ()>>>,
     Box<dyn 'wren + FnOnce(&mut Context<'wren>)>,
@@ -30,7 +34,6 @@ type Task<'wren> = (
 
 // #[derive(Debug)]
 pub struct Scheduler<'wren> {
-    vm: Context<'wren>,
     // A handle to the "Scheduler" class object. Used to call static methods on it.
     class: Handle<'wren>,
 
@@ -101,7 +104,7 @@ impl<'wren> Scheduler<'wren> {
     /// ```
     /// Would only print "Do 1"
     //#endregion
-    pub fn run_async_loop(&mut self, runtime: &tokio::runtime::Runtime) {
+    pub fn run_async_loop(&mut self, vm: &mut Context<'wren>, runtime: &tokio::runtime::Runtime) {
         let local_set = tokio::task::LocalSet::new();
         let (tx, mut rx) = tokio::sync::mpsc::channel(128);
 
@@ -134,7 +137,7 @@ impl<'wren> Scheduler<'wren> {
                     tokio::select! {
                         Some(i) = rx.recv() => {
                             let post_task = &mut post_tasks[i];
-                            post_task.take().unwrap()(&mut self.vm);
+                            post_task.take().unwrap()(vm);
                         }
                     }
                 }
@@ -150,25 +153,24 @@ impl<'wren> Scheduler<'wren> {
             panic!("Fiber errored after resuming.");
         }
     }
-    pub unsafe fn resume_waiting(&mut self) {
+    pub unsafe fn resume_waiting(&mut self, vm: &mut Context<'wren>) {
         self.has_waiting_fibers = false;
-        self.vm.set_stack(&self.class);
-        Self::_resume(&mut self.vm, &self.resume_waiting);
+        vm.set_stack(&self.class);
+        Self::_resume(vm, &self.resume_waiting);
     }
-    pub unsafe fn has_next(&mut self) -> bool {
-        self.vm.set_stack(&self.class);
-        Self::_resume(&mut self.vm, &self.has_next);
+    pub unsafe fn has_next(&mut self, vm: &mut Context<'wren>) -> bool {
+        vm.set_stack(&self.class);
+        Self::_resume(vm, &self.has_next);
 
-        self.vm.get_return_value_unchecked()
+        vm.get_return_value_unchecked()
     }
-    pub unsafe fn run_next_scheduled(&mut self) {
-        self.vm.set_stack(&self.class);
-        Self::_resume(&mut self.vm, &self.run_next_scheduled);
+    pub unsafe fn run_next_scheduled(&mut self, vm: &mut Context<'wren>) {
+        vm.set_stack(&self.class);
+        Self::_resume(vm, &self.run_next_scheduled);
     }
 }
 
-unsafe fn capture_methods<'wren>(mut vm: Context<'wren>) {
-    let mut user_data = vm.get_user_data_mut().unwrap();
+unsafe fn capture_methods<'wren>(mut vm: crate::Context<'wren>) {
     vm.ensure_slots(1);
     let class = vm.get_variable_unchecked("scheduler", "Scheduler", 0);
 
@@ -176,23 +178,21 @@ unsafe fn capture_methods<'wren>(mut vm: Context<'wren>) {
     let has_next = wren::make_call_handle!(vm, "hasNext_");
     let run_next_scheduled = wren::make_call_handle!(vm, "runNextScheduled_()");
 
-    let scheduler: Option<Scheduler<'wren>> = Some(Scheduler {
+    let scheduler: Scheduler<'wren> = Scheduler {
         queue: Vec::default(),
         has_waiting_fibers: false,
-        vm,
         class,
         resume_waiting,
         has_next,
         run_next_scheduled,
-    });
+    };
 
-    user_data.scheduler = scheduler;
+    vm.get_user_data_mut().scheduler = Some(scheduler);
 }
 
 #[allow(clippy::needless_pass_by_value)]
-unsafe fn await_all(mut vm: Context) {
+unsafe fn await_all(mut vm: crate::Context) {
     vm.get_user_data_mut()
-        .unwrap()
         .scheduler
         .as_mut()
         .unwrap()

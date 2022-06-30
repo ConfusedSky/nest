@@ -19,14 +19,12 @@ pub fn init_module<'wren>() -> Module<'wren> {
 }
 
 fn start(mut vm: Context) {
-    let user_data = vm.get_user_data_mut().unwrap();
-    let scheduler = user_data.scheduler.as_mut().unwrap();
-
     // SAFETY: We are guarenteed to have two arguments passed back,
     // ms is positive and Fiber is a genuine fiber because start isn't
     // in the public interface and these are cheked in the wren side
     let (_, ms, fiber) = unsafe { vm.get_stack_unchecked::<((), f64, Fiber)>() };
 
+    let scheduler = vm.get_user_data_mut().scheduler.as_mut().unwrap();
     scheduler.schedule_task(
         async move {
             sleep(Duration::from_secs_f64(ms / 1000.0)).await;

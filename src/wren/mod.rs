@@ -29,12 +29,12 @@ use wren_sys::{self as ffi, WrenConfiguration, WrenErrorType, WrenInterpretResul
 pub type ForeignMethod<'wren, T> = unsafe fn(vm: VmContext<'wren, T>);
 pub type Result<T> = std::result::Result<T, InterpretResultErrorKind>;
 
-unsafe fn get_system_user_data<'s, V>(vm: *mut WrenVM) -> Option<&'s mut SystemUserData<'s, V>> {
+unsafe fn get_system_user_data<'s, V>(vm: *mut WrenVM) -> &'s mut SystemUserData<'s, V> {
     let user_data = ffi::wrenGetUserData(vm);
     if user_data.is_null() {
-        None
+        panic!("User data should never be null!");
     } else {
-        Some(user_data.cast::<SystemUserData<V>>().as_mut().unwrap())
+        user_data.cast::<SystemUserData<V>>().as_mut().unwrap()
     }
 }
 
@@ -46,20 +46,15 @@ unsafe extern "C" fn resolve_module<'wren, V: 'wren + VmUserData<'wren, V>>(
     let mut context: VmContext<V> = VmContext::new_unchecked(vm);
     let user_data = context.get_user_data_mut();
 
-    user_data.map_or_else(
-        || std::mem::zeroed(),
-        |user_data| {
-            let name = CStr::from_ptr(name).to_string_lossy();
-            let resolver = CStr::from_ptr(resolver).to_string_lossy();
+    let name = CStr::from_ptr(name).to_string_lossy();
+    let resolver = CStr::from_ptr(resolver).to_string_lossy();
 
-            let name = user_data.resolve_module(resolver.as_ref(), name.as_ref());
+    let name = user_data.resolve_module(resolver.as_ref(), name.as_ref());
 
-            match name {
-                Some(name) => name.into_raw(),
-                None => null(),
-            }
-        },
-    )
+    match name {
+        Some(name) => name.into_raw(),
+        None => null(),
+    }
 }
 
 unsafe extern "C" fn load_module<'wren, V: 'wren + VmUserData<'wren, V>>(
@@ -69,23 +64,16 @@ unsafe extern "C" fn load_module<'wren, V: 'wren + VmUserData<'wren, V>>(
     let mut context: VmContext<V> = VmContext::new_unchecked(vm);
     let user_data = context.get_user_data_mut();
 
-    user_data.map_or_else(
-        || std::mem::zeroed(),
-        |user_data| {
-            let name = CStr::from_ptr(name).to_string_lossy();
+    let name = CStr::from_ptr(name).to_string_lossy();
+    let source = user_data.load_module(name.as_ref());
+    let mut result: wren_sys::WrenLoadModuleResult = std::mem::zeroed();
 
-            let source = user_data.load_module(name.as_ref());
+    if let Some(source) = source {
+        // SAFETY: we use into raw here and pass in a function that frees the memory
+        result.source = source.as_ptr();
+    }
 
-            let mut result: wren_sys::WrenLoadModuleResult = std::mem::zeroed();
-
-            if let Some(source) = source {
-                // SAFETY: we use into raw here and pass in a function that frees the memory
-                result.source = source.as_ptr();
-            }
-
-            result
-        },
-    )
+    result
 }
 
 unsafe extern "C" fn bind_foreign_method<'wren, V: 'wren + VmUserData<'wren, V>>(
@@ -98,24 +86,19 @@ unsafe extern "C" fn bind_foreign_method<'wren, V: 'wren + VmUserData<'wren, V>>
     let mut context: VmContext<V> = VmContext::new_unchecked(vm);
     let user_data = context.get_user_data_mut();
 
-    user_data.map_or_else(
-        || std::mem::zeroed(),
-        |user_data| {
-            let module = CStr::from_ptr(module).to_string_lossy();
-            let class_name = CStr::from_ptr(class_name).to_string_lossy();
-            let signature = CStr::from_ptr(signature).to_string_lossy();
+    let module = CStr::from_ptr(module).to_string_lossy();
+    let class_name = CStr::from_ptr(class_name).to_string_lossy();
+    let signature = CStr::from_ptr(signature).to_string_lossy();
 
-            let method = user_data.bind_foreign_method(
-                module.as_ref(),
-                class_name.as_ref(),
-                is_static,
-                signature.as_ref(),
-            )?;
+    let method = user_data.bind_foreign_method(
+        module.as_ref(),
+        class_name.as_ref(),
+        is_static,
+        signature.as_ref(),
+    )?;
 
-            // Safety: VMPtr is a transparent wrapper over a *mut WrenVM
-            transmute_copy(&method)
-        },
-    )
+    // Safety: VMPtr is a transparent wrapper over a *mut WrenVM
+    transmute_copy(&method)
 }
 
 unsafe extern "C" fn write_fn<'wren, V: 'wren + VmUserData<'wren, V>>(
@@ -125,10 +108,8 @@ unsafe extern "C" fn write_fn<'wren, V: 'wren + VmUserData<'wren, V>>(
     let mut context: VmContext<V> = VmContext::new_unchecked(vm);
     let user_data = context.get_user_data_mut();
 
-    if let Some(user_data) = user_data {
-        let text = CStr::from_ptr(text).to_string_lossy();
-        user_data.on_write(VmContext::new_unchecked(vm), text.as_ref());
-    }
+    let text = CStr::from_ptr(text).to_string_lossy();
+    user_data.on_write(VmContext::new_unchecked(vm), text.as_ref());
 }
 
 unsafe extern "C" fn error_fn<'wren, V: 'wren + VmUserData<'wren, V>>(
@@ -141,31 +122,29 @@ unsafe extern "C" fn error_fn<'wren, V: 'wren + VmUserData<'wren, V>>(
     let mut context: VmContext<V> = VmContext::new_unchecked(vm);
     let user_data = context.get_user_data_mut();
 
-    if let Some(user_data) = user_data {
-        let msg = CStr::from_ptr(msg).to_string_lossy();
-        // This lives outside of the if statement so that it can live long enough
-        // to be passed to user_data on error
-        let c_module: Cow<str>;
-        // Runtime doesn't have a valid module so it will crash if it goes any further
-        let kind = if error_type == wren_sys::WrenErrorType_WREN_ERROR_RUNTIME {
-            ErrorKind::Runtime(msg.as_ref())
-        } else {
-            c_module = CStr::from_ptr(module).to_string_lossy();
-            let context = ErrorContext {
-                module: c_module.as_ref(),
-                line,
-                msg: msg.as_ref(),
-            };
-            match error_type {
-                wren_sys::WrenErrorType_WREN_ERROR_COMPILE => ErrorKind::Compile(context),
-                wren_sys::WrenErrorType_WREN_ERROR_RUNTIME => ErrorKind::Runtime(msg.as_ref()),
-                wren_sys::WrenErrorType_WREN_ERROR_STACK_TRACE => ErrorKind::Stacktrace(context),
-                kind => ErrorKind::Unknown(kind, context),
-            }
+    let msg = CStr::from_ptr(msg).to_string_lossy();
+    // This lives outside of the if statement so that it can live long enough
+    // to be passed to user_data on error
+    let c_module: Cow<str>;
+    // Runtime doesn't have a valid module so it will crash if it goes any further
+    let kind = if error_type == wren_sys::WrenErrorType_WREN_ERROR_RUNTIME {
+        ErrorKind::Runtime(msg.as_ref())
+    } else {
+        c_module = CStr::from_ptr(module).to_string_lossy();
+        let context = ErrorContext {
+            module: c_module.as_ref(),
+            line,
+            msg: msg.as_ref(),
         };
+        match error_type {
+            wren_sys::WrenErrorType_WREN_ERROR_COMPILE => ErrorKind::Compile(context),
+            wren_sys::WrenErrorType_WREN_ERROR_RUNTIME => ErrorKind::Runtime(msg.as_ref()),
+            wren_sys::WrenErrorType_WREN_ERROR_STACK_TRACE => ErrorKind::Stacktrace(context),
+            kind => ErrorKind::Unknown(kind, context),
+        }
+    };
 
-        user_data.on_error(VmContext::new_unchecked(vm), kind);
-    }
+    user_data.on_error(VmContext::new_unchecked(vm), kind);
 }
 
 #[macro_export]
@@ -233,13 +212,21 @@ impl<'wren, V: VmUserData<'wren, V>> VmContext<'wren, V> {
         self.0.as_ptr()
     }
 
-    pub fn get_user_data<'s>(&self) -> Option<&'s V> {
+    pub fn get_user_data(&self) -> &V {
         // SAFETY this is called from a typed context
-        unsafe { get_system_user_data(self.as_ptr()).map(|s| s.user_data) }
+        unsafe { &get_system_user_data(self.as_ptr()).user_data }
     }
-    pub fn get_user_data_mut<'s>(&mut self) -> Option<&'s mut V> {
+    pub fn get_user_data_mut(&mut self) -> &mut V {
         // SAFETY this is called from a typed context
-        unsafe { get_system_user_data(self.as_ptr()).map(|s| &mut s.user_data) }
+        unsafe { &mut get_system_user_data(self.as_ptr()).user_data }
+    }
+    pub fn get_user_data_mut_with_context(&mut self) -> (&mut V, &mut RawVMContext<'wren>) {
+        unsafe {
+            (
+                &mut get_system_user_data(self.0.as_ptr()).user_data,
+                &mut self.0,
+            )
+        }
     }
 }
 
@@ -277,7 +264,6 @@ impl<'wren> RawVMContext<'wren> {
     fn get_system_methods<'s>(&self) -> &'s SystemMethods<'wren> {
         unsafe {
             get_system_user_data::<()>(self.as_ptr())
-                .expect("user_data should have been initialized at this point")
                 .system_methods
                 .as_ref()
                 .expect("SystemMethods should be initialized at this point")

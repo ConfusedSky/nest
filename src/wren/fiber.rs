@@ -181,42 +181,51 @@ mod test {
         }
     }
 
-    // #[test]
-    // #[allow(non_snake_case)]
-    // fn test_transfer() {
-    // unsafe fn test_await(mut vm: Context) {
-    // let (_, fiber) = vm.get_stack_unchecked::<((), Fiber)>();
-    // vm.get_user_data_mut().unwrap().fiber = Some(fiber);
-    // vm.set_return_value(&());
-    // }
+    #[test]
+    #[allow(non_snake_case)]
+    fn test_transfer() {
+        unsafe fn test_await(mut vm: Context) {
+            let (_, fiber) = vm.get_stack_unchecked::<((), Fiber)>();
+            vm.get_user_data_mut().fiber = Some(fiber);
+        }
 
-    // let source = "class Test {
-    // static testResume() {
-    // await(Fiber.current)
-    // System.print(Fiber.suspend())
-    // }
+        let source = "class Test {
+            static testResume() {
+                await(Fiber.current)
+                System.print(\"Test\")
+                System.print(Fiber.suspend())
+                System.print(\"Test\")
 
-    // foreign static await(fiber)
-    // }";
+                return \"From wren\"
+            }
+            foreign static await(fiber)
+        }";
 
-    // let (mut vm, Test) = create_test_vm(source, |user_data| {
-    // user_data.set_static_foreign_method("await(_)", test_await);
-    // });
-    // let context = vm.get_context();
-    // let test_resume = make_call_handle!(context, "testResume()");
-    // let user_data = context.get_user_data_mut().unwrap();
+        let (mut vm, Test) = create_test_vm(source, |user_data| {
+            user_data.set_static_foreign_method("await(_)", test_await);
+        });
+        let context = vm.get_context();
+        let test_resume = make_call_handle!(context, "testResume()");
 
-    // #[allow(clippy::let_unit_value)]
-    // unsafe {
-    // let _: () = make_call!(context { Test.test_resume() }).unwrap();
-    // assert!(user_data.get_output().is_empty());
-    // let fiber = user_data
-    // .fiber
-    // .take()
-    // .expect("Fiber should have been set by await");
+        #[allow(clippy::let_unit_value)]
+        unsafe {
+            assert!(context.get_user_data().get_output().is_empty());
+            let _: () = make_call!(context { Test.test_resume() }).unwrap();
+            assert_eq!(context.get_user_data().get_output(), "Test\n");
+            let fiber = context
+                .get_user_data_mut()
+                .fiber
+                .take()
+                .expect("Fiber should have been set by await");
 
-    // fiber.transfer::<()>(context).unwrap();
-    // assert_eq!(context.get_user_data().unwrap().get_output(), "null\n");
-    // }
-    // }
+            let ret = fiber
+                .transfer_with_arg::<String, _>(context, "From Rust")
+                .unwrap();
+            assert_eq!(
+                context.get_user_data().get_output(),
+                "Test\nFrom Rust\nTest\n"
+            );
+            assert_eq!(ret, "From wren");
+        }
+    }
 }
