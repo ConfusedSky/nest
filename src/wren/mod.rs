@@ -357,11 +357,13 @@ impl<'wren> RawVMContext<'wren> {
         arg.set_wren_stack(self);
     }
 
-    pub unsafe fn get_stack<Args: GetArgs<'wren>>(&mut self) -> Args {
+    // TODO: Create safe version that returns Options depending on how many slots
+    // there are
+    pub unsafe fn get_stack_unchecked<Args: GetArgs<'wren>>(&mut self) -> Args {
         Args::get_slots(self)
     }
 
-    pub unsafe fn get_return_value<Args: Get<'wren>>(&mut self) -> Args {
+    pub unsafe fn get_return_value_unchecked<Args: Get<'wren>>(&mut self) -> Args {
         Args::get_slots(self)
     }
 

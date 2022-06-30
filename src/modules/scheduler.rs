@@ -191,7 +191,7 @@ impl<'wren> Scheduler<'wren> {
         self.vm.set_stack(&self.class);
         Self::_resume(&mut self.vm, &self.has_next);
 
-        self.vm.get_return_value()
+        self.vm.get_return_value_unchecked()
     }
     pub unsafe fn run_next_scheduled(&mut self) {
         self.vm.set_stack(&self.class);

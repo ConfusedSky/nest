@@ -211,7 +211,7 @@ impl<'wren> Get<'wren> for String {
                     .expect("toString should never fail on a valid wren handle");
                 // Note this shouldn't recurse because the second call
                 // will always be called on a string
-                vm.get_return_value::<Self>()
+                vm.get_return_value_unchecked::<Self>()
             }
         }
     }

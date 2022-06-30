@@ -23,7 +23,7 @@ unsafe fn start(mut vm: Context) {
     let scheduler = user_data.scheduler.as_mut().unwrap();
 
     // We are guarenteed ms is positive based on usage
-    let (_, ms, fiber) = vm.get_stack::<((), f64, Handle)>();
+    let (_, ms, fiber) = vm.get_stack_unchecked::<((), f64, Handle)>();
 
     scheduler.schedule_task(
         async move {

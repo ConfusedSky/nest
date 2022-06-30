@@ -7,7 +7,7 @@ pub unsafe fn make_call_helper<'wren, T: Get<'wren>, Args: SetArgs<'wren>>(
 ) -> Result<T, InterpretResultErrorKind> {
     vm.set_stack(args);
     vm.call(method)?;
-    Ok(vm.get_return_value::<T>())
+    Ok(vm.get_return_value_unchecked::<T>())
 }
 
 pub mod macro_helper {
