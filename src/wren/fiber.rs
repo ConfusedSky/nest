@@ -129,17 +129,17 @@ impl<'wren, L: Location> Set<'wren, L> for Fiber<'wren> {
     }
 }
 
-// impl<'wren> Value for Option<Fiber<'wren>> {
-// const ADDITIONAL_SLOTS_NEEDED: super::Slot = 0;
-// }
+impl<'wren> Value for Option<Fiber<'wren>> {
+    const ADDITIONAL_SLOTS_NEEDED: super::Slot = 0;
+}
 
-// impl<'wren> Get<'wren> for Option<Fiber<'wren>> {
-// unsafe fn get_from_vm(vm: &mut RawForeignContext<'wren>, slot: super::Slot) -> Self {
-// let handle = Handle::get_from_vm(vm, slot);
+impl<'wren> Get<'wren, Native> for Option<Fiber<'wren>> {
+    unsafe fn get_from_vm(vm: &mut Raw<'wren, Native>, slot: super::Slot) -> Self {
+        let handle = Handle::get_from_vm(vm, slot);
 
-// vm.get_system_methods().fiber_methods.construct(vm, handle)
-// }
-// }
+        vm.get_system_methods().fiber_methods.construct(vm, handle)
+    }
+}
 
 #[cfg(test)]
 mod test {
@@ -178,17 +178,15 @@ mod test {
             let fiber = fiber_methods.construct(context, fiber_handle);
             assert!(fiber.is_some());
 
-            // We can't get directly from the vm anymore
-            // Value wil need to be updated
-            // // Test getting directly from vm
-            // let true_fiber: Option<Fiber> = make_call!(context {Test.returnTrue()}).unwrap();
-            // assert!(true_fiber.is_none());
+            // Test getting directly from vm
+            let true_fiber: Option<Fiber> = make_call!(context {Test.returnTrue()}).unwrap();
+            assert!(true_fiber.is_none());
 
-            // let test_fiber: Option<Fiber> = make_call!(context {Test.returnTest()}).unwrap();
-            // assert!(test_fiber.is_none());
+            let test_fiber: Option<Fiber> = make_call!(context {Test.returnTest()}).unwrap();
+            assert!(test_fiber.is_none());
 
-            // let fiber: Option<Fiber> = make_call!(context {Test.returnFiber()}).unwrap();
-            // assert!(fiber.is_some());
+            let fiber: Option<Fiber> = make_call!(context {Test.returnFiber()}).unwrap();
+            assert!(fiber.is_some());
         }
     }
 
