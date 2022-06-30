@@ -1,5 +1,6 @@
 #![allow(unsafe_code)]
 
+pub mod default;
 mod fiber;
 mod handle;
 mod system_methods;
@@ -7,6 +8,7 @@ mod system_methods;
 mod test;
 mod util;
 mod value;
+
 pub use fiber::Fiber;
 pub use handle::Handle;
 pub use value::{Get, GetArgs, Set, SetArgs, Value};

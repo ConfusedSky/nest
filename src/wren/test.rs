@@ -7,21 +7,7 @@ pub struct UserData {
 
 impl<'wren> VmUserData<'wren, Self> for UserData {
     fn on_error(&mut self, _: super::VmContext<'wren, Self>, kind: super::ErrorKind) {
-        match kind {
-            super::ErrorKind::Compile(ctx) => {
-                println!("[{} line {}] [Error] {}", ctx.module, ctx.line, ctx.msg);
-            }
-            super::ErrorKind::Runtime(msg) => println!("[Runtime Error] {}", msg),
-            super::ErrorKind::Stacktrace(ctx) => {
-                println!("[{} line {}] in {}", ctx.module, ctx.line, ctx.msg);
-            }
-            super::ErrorKind::Unknown(kind, ctx) => {
-                println!(
-                    "[{} line {}] [Unkown Error {}] {}",
-                    ctx.module, ctx.line, kind, ctx.msg
-                );
-            }
-        }
+        super::default::on_error(kind);
     }
     fn on_write(&mut self, _: super::VmContext<'wren, Self>, text: &str) {
         print!("{}", text);

@@ -45,21 +45,7 @@ impl<'wren> Default for MyUserData<'wren> {
 
 impl<'wren> wren::VmUserData<'wren, MyUserData<'wren>> for MyUserData<'wren> {
     fn on_error(&mut self, _: Context<'wren>, kind: wren::ErrorKind) {
-        match kind {
-            wren::ErrorKind::Compile(ctx) => {
-                println!("[{} line {}] [Error] {}", ctx.module, ctx.line, ctx.msg);
-            }
-            wren::ErrorKind::Runtime(msg) => println!("[Runtime Error] {}", msg),
-            wren::ErrorKind::Stacktrace(ctx) => {
-                println!("[{} line {}] in {}", ctx.module, ctx.line, ctx.msg);
-            }
-            wren::ErrorKind::Unknown(kind, ctx) => {
-                println!(
-                    "[{} line {}] [Unkown Error {}] {}",
-                    ctx.module, ctx.line, kind, ctx.msg
-                );
-            }
-        }
+        wren::default::on_error(kind);
     }
     fn on_write(&mut self, _: Context<'wren>, text: &str) {
         print!("{}", text);
