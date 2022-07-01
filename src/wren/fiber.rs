@@ -125,7 +125,7 @@ impl<'wren> Deref for Fiber<'wren> {
 }
 
 impl<'wren> Value for Fiber<'wren> {
-    const ADDITIONAL_SLOTS_NEEDED: super::Slot = 0;
+    const REQUIRED_SLOTS: super::Slot = 1;
 }
 
 // Getting unchecked fibers will always be unsafe
@@ -146,7 +146,7 @@ impl<'wren, L: Location> Set<'wren, L> for Fiber<'wren> {
 }
 
 impl<'wren> Value for TryGetResult<'wren, Fiber<'wren>> {
-    const ADDITIONAL_SLOTS_NEEDED: super::Slot = 0;
+    const REQUIRED_SLOTS: super::Slot = 1;
 }
 
 impl<'wren> Get<'wren, Native> for TryGetResult<'wren, Fiber<'wren>> {

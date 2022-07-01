@@ -69,7 +69,7 @@ unsafe fn store_slot<'wren, L: Location>(
 /// slot: The slot being saved to
 pub trait Value {
     /// Number of additional slots that need to be allocated to use this
-    const ADDITIONAL_SLOTS_NEEDED: Slot;
+    const REQUIRED_SLOTS: Slot;
 }
 
 pub trait Set<'wren, L: Location>: Value {
@@ -79,7 +79,7 @@ pub trait Set<'wren, L: Location>: Value {
 pub trait Get<'wren, L: Location>: Value {
     /// NOTE THE IMPLEMENTATION OF GET FROM VM SHOULD BE SAFE REGARDLESS
     /// OF WHAT IS IN THE SLOT
-    /// get_from_vm is unsafe because it's not guarenteed that
+    /// `get_from_vm` is unsafe because it's not guarenteed that
     /// the slot is a valid slot
     unsafe fn get_from_vm(vm: &mut RawContext<'wren, L>, slot: Slot) -> Self;
 }
@@ -87,7 +87,7 @@ pub trait Get<'wren, L: Location>: Value {
 // () is implemented to allow skipping slots
 // and to set send null to the vm
 impl Value for () {
-    const ADDITIONAL_SLOTS_NEEDED: Slot = 0;
+    const REQUIRED_SLOTS: Slot = 1;
 }
 
 impl<'wren, L: Location> Set<'wren, L> for () {
@@ -101,7 +101,7 @@ impl<'wren, L: Location> Get<'wren, L> for () {
 }
 
 impl<T: Value> Value for &T {
-    const ADDITIONAL_SLOTS_NEEDED: Slot = T::ADDITIONAL_SLOTS_NEEDED;
+    const REQUIRED_SLOTS: Slot = T::REQUIRED_SLOTS;
 }
 
 impl<'wren, L: Location, T: Set<'wren, L>> Set<'wren, L> for &T {
@@ -111,7 +111,7 @@ impl<'wren, L: Location, T: Set<'wren, L>> Set<'wren, L> for &T {
 }
 
 impl<'wren> Value for Handle<'wren> {
-    const ADDITIONAL_SLOTS_NEEDED: Slot = 0;
+    const REQUIRED_SLOTS: Slot = 1;
 }
 impl<'wren, L: Location> Set<'wren, L> for Handle<'wren> {
     unsafe fn send_to_vm(&self, vm: &mut RawContext<'wren, L>, slot: Slot) {
@@ -142,7 +142,7 @@ unsafe fn send_iterator_to_vm<'wren, L: Location, T: Set<'wren, L>, I: Iterator<
 impl<T: Value> Value for Vec<T> {
     // This needs at least one for moving values into the wren list as well as
     // any additional slots for T's initialization
-    const ADDITIONAL_SLOTS_NEEDED: Slot = 1 + T::ADDITIONAL_SLOTS_NEEDED;
+    const REQUIRED_SLOTS: Slot = 1 + T::REQUIRED_SLOTS;
 }
 
 impl<'wren, L: Location, T: Set<'wren, L>> Set<'wren, L> for Vec<T> {
@@ -187,7 +187,7 @@ impl<'wren, L: Location, T: Get<'wren, L>> Get<'wren, L> for Vec<T> {
 impl<T: Value> Value for [T] {
     // This needs at least one for moving values into the wren list as well as
     // any additional slots for T's initialization
-    const ADDITIONAL_SLOTS_NEEDED: Slot = 1 + T::ADDITIONAL_SLOTS_NEEDED;
+    const REQUIRED_SLOTS: Slot = 1 + T::REQUIRED_SLOTS;
 }
 
 impl<'wren, L: Location, T: Set<'wren, L>> Set<'wren, L> for [T] {
@@ -197,7 +197,7 @@ impl<'wren, L: Location, T: Set<'wren, L>> Set<'wren, L> for [T] {
 }
 
 impl Value for CString {
-    const ADDITIONAL_SLOTS_NEEDED: Slot = 0;
+    const REQUIRED_SLOTS: Slot = 1;
 }
 
 impl<'wren, L: Location> Set<'wren, L> for CString {
@@ -222,7 +222,7 @@ unsafe fn send_string_to_vm<S: AsRef<str>, L: Location>(
 }
 
 impl Value for &str {
-    const ADDITIONAL_SLOTS_NEEDED: Slot = 0;
+    const REQUIRED_SLOTS: Slot = 1;
 }
 
 impl<'wren, L: Location> Set<'wren, L> for &str {
@@ -248,7 +248,7 @@ unsafe fn generic_get_string<L: Location>(vm: &mut RawContext<L>, slot: Slot) ->
 }
 
 impl Value for String {
-    const ADDITIONAL_SLOTS_NEEDED: Slot = 0;
+    const REQUIRED_SLOTS: Slot = 1;
 }
 
 impl<'wren, L: Location> Set<'wren, L> for String {
@@ -277,7 +277,7 @@ impl<'wren> Get<'wren, Native> for String {
 }
 
 impl<'wren> Value for TryGetResult<'wren, String> {
-    const ADDITIONAL_SLOTS_NEEDED: Slot = 0;
+    const REQUIRED_SLOTS: Slot = 1;
 }
 
 impl<'wren> Get<'wren, Foreign> for TryGetResult<'wren, String> {
@@ -287,7 +287,7 @@ impl<'wren> Get<'wren, Foreign> for TryGetResult<'wren, String> {
 }
 
 impl Value for f64 {
-    const ADDITIONAL_SLOTS_NEEDED: Slot = 0;
+    const REQUIRED_SLOTS: Slot = 1;
 }
 
 impl<'wren, L: Location> Set<'wren, L> for f64 {
@@ -307,7 +307,7 @@ impl<'wren, L: Location> Get<'wren, L> for f64 {
 }
 
 impl Value for bool {
-    const ADDITIONAL_SLOTS_NEEDED: Slot = 0;
+    const REQUIRED_SLOTS: Slot = 1;
 }
 
 impl<'wren, L: Location> Set<'wren, L> for bool {
@@ -329,7 +329,7 @@ impl<'wren, L: Location> Get<'wren, L> for bool {
 
 pub trait SetArgs<'wren, L: Location> {
     const COUNT: usize;
-    const REQUIRED_SLOTS: Slot;
+    const TOTAL_REQUIRED_SLOTS: Slot;
     unsafe fn set_slots(&self, vm: &mut RawContext<'wren, L>, offset: u16);
     /// This fn should probably never be used directly since it only existed
     /// before required slots was a constant
@@ -347,16 +347,16 @@ pub trait SetArgs<'wren, L: Location> {
     /// to allow other items to be passed beforehand
     fn set_wren_stack(&self, vm: &mut RawContext<'wren, L>, offset: u16) {
         // This is guarenteed to be safe because we ensured that we had enough
-        // slots for T using REQUIRED_SLOTS
+        // slots for T using TOTAL_REQUIRED_SLOTS
         unsafe {
-            self.set_wren_stack_unchecked(vm, Self::REQUIRED_SLOTS, offset);
+            self.set_wren_stack_unchecked(vm, Self::TOTAL_REQUIRED_SLOTS, offset);
         }
     }
 }
 
 impl<'wren, L: Location> SetArgs<'wren, L> for () {
     const COUNT: usize = 0;
-    const REQUIRED_SLOTS: Slot = 1;
+    const TOTAL_REQUIRED_SLOTS: Slot = 1;
     unsafe fn set_slots(&self, vm: &mut RawContext<'wren, L>, offset: u16) {
         ().send_to_vm(vm, Slot::from(offset));
     }
@@ -364,7 +364,7 @@ impl<'wren, L: Location> SetArgs<'wren, L> for () {
 
 impl<'wren, L: Location, T: Set<'wren, L> + ?Sized> SetArgs<'wren, L> for &T {
     const COUNT: usize = 1;
-    const REQUIRED_SLOTS: Slot = 1 + T::ADDITIONAL_SLOTS_NEEDED;
+    const TOTAL_REQUIRED_SLOTS: Slot = T::REQUIRED_SLOTS;
     unsafe fn set_slots(&self, vm: &mut RawContext<'wren, L>, offset: u16) {
         self.send_to_vm(vm, Slot::from(offset));
     }
@@ -374,16 +374,16 @@ const fn _const_max_helper(a: Slot, b: Slot) -> Slot {
     [a, b][(a < b) as usize]
 }
 
-macro_rules! expand_required_slots {
-    (@step $i:expr, $x:ty) => (<$x>::ADDITIONAL_SLOTS_NEEDED+ $i);
+macro_rules! expand_TOTAL_REQUIRED_SLOTS {
+    (@step $i:expr, $x:ty) => (<$x>::REQUIRED_SLOTS+ $i);
     (@step $i:expr, $x:ty, $($y:ty),+ $(,)?) => (
         _const_max_helper(
-            <$x>::ADDITIONAL_SLOTS_NEEDED+ $i,
-            expand_required_slots!(@step $i + 1, $($y),+),
+            <$x>::REQUIRED_SLOTS+ $i,
+            expand_TOTAL_REQUIRED_SLOTS!(@step $i + 1, $($y),+),
         )
     );
     ($x:ty, $($y:ty),+ $(,)?) => (
-        expand_required_slots!(@step 1i32, $x, $($y),+)
+        expand_TOTAL_REQUIRED_SLOTS!(@step 0i32, $x, $($y),+)
     )
 }
 
@@ -406,8 +406,8 @@ macro_rules! impl_set_args_meta {
     ($location:ty, $( $xs:ident = $i:tt ), *) => {
         impl<'wren, $( $xs: Set<'wren, $location>, )*> SetArgs<'wren, $location> for ($( &$xs, )*) {
             const COUNT: usize = count!( $( $xs ) * );
-            const REQUIRED_SLOTS: Slot =
-                expand_required_slots!($( $xs ), *);
+            const TOTAL_REQUIRED_SLOTS: Slot =
+                expand_TOTAL_REQUIRED_SLOTS!($( $xs ), *);
 
 
             unsafe fn set_slots(&self, vm: &mut RawContext<'wren, $location>, offset: u16) {
@@ -484,12 +484,21 @@ mod test {
         macro_rules! meta_test {
             ($location:ty) => {{
                 type L = $location;
-                assert_eq!(<&f64 as SetArgs<L>>::REQUIRED_SLOTS, 1);
-                assert_eq!(<(&f64, &f64) as SetArgs<L>>::REQUIRED_SLOTS, 2);
-                assert_eq!(<(&Vec<Vec<f64>>, &f64) as SetArgs<L>>::REQUIRED_SLOTS, 3);
-                assert_eq!(<(&f64, &Vec<Vec<f64>>) as SetArgs<L>>::REQUIRED_SLOTS, 4);
-                assert_eq!(<(&f64, &f64, &f64) as SetArgs<L>>::REQUIRED_SLOTS, 3);
-                assert_eq!(<(&f64, &f64, &f64, &f64) as SetArgs<L>>::REQUIRED_SLOTS, 4);
+                assert_eq!(<&f64 as SetArgs<L>>::TOTAL_REQUIRED_SLOTS, 1);
+                assert_eq!(<(&f64, &f64) as SetArgs<L>>::TOTAL_REQUIRED_SLOTS, 2);
+                assert_eq!(
+                    <(&Vec<Vec<f64>>, &f64) as SetArgs<L>>::TOTAL_REQUIRED_SLOTS,
+                    3
+                );
+                assert_eq!(
+                    <(&f64, &Vec<Vec<f64>>) as SetArgs<L>>::TOTAL_REQUIRED_SLOTS,
+                    4
+                );
+                assert_eq!(<(&f64, &f64, &f64) as SetArgs<L>>::TOTAL_REQUIRED_SLOTS, 3);
+                assert_eq!(
+                    <(&f64, &f64, &f64, &f64) as SetArgs<L>>::TOTAL_REQUIRED_SLOTS,
+                    4
+                );
             }};
         }
         meta_test!(Foreign);

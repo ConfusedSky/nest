@@ -159,7 +159,7 @@ impl<'wren, T> Context<'wren, T, Native> {
         // make sure there enough slots to send over the subject
         // and all it's args
         let vm = self.as_raw_mut();
-        vm.ensure_slots(1 + Handle::ADDITIONAL_SLOTS_NEEDED + Args::REQUIRED_SLOTS);
+        vm.ensure_slots(Handle::REQUIRED_SLOTS + Args::TOTAL_REQUIRED_SLOTS);
 
         // Send over the subject and all of it's args
         subject.send_to_vm(vm, 0);
@@ -258,7 +258,7 @@ impl<'wren, L: Location> Context<'wren, NoTypeInfo, L> {
         args.set_wren_stack(self, 0);
     }
 
-    pub fn set_return_value<Args: Set<'wren, L> + ?Sized>(&mut self, arg: &Args) {
+    pub fn set_return_value<Args: Set<'wren, L>>(&mut self, arg: &Args) {
         arg.set_wren_stack(self, 0);
     }
 
