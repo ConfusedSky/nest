@@ -2,7 +2,9 @@ use std::ffi::CString;
 
 use proc_macro2::Span;
 use quote::quote;
-use syn::{parenthesized, parse::Parse, parse_macro_input, punctuated::Punctuated, Token};
+use syn::{
+    parenthesized, parse::Parse, parse_macro_input, punctuated::Punctuated, token, LitInt, Token,
+};
 
 #[derive(Debug)]
 struct ToSignatureInput {
@@ -21,13 +23,13 @@ impl Parse for ToSignatureInput {
             let content;
             parenthesized!(content in input);
             let fields = Fields::parse_terminated(&content)?;
-            Ok(ToSignatureInput {
+            Ok(Self {
                 ident,
                 has_params: true,
                 param_count: fields.len(),
             })
         } else {
-            Ok(ToSignatureInput {
+            Ok(Self {
                 ident,
                 has_params: false,
                 param_count: 0,
@@ -36,11 +38,31 @@ impl Parse for ToSignatureInput {
     }
 }
 
-#[proc_macro]
-pub fn to_signature(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
-    let data = parse_macro_input!(input as ToSignatureInput);
-    let mut ident = data.ident.to_string();
+impl ToSignatureInput {
+    fn parse_call_signature(input: syn::parse::ParseStream) -> syn::Result<Self> {
+        let ident: syn::Ident = input.parse()?;
+        let lookahead = input.lookahead1();
+        if lookahead.peek(token::Comma) {
+            input.parse::<token::Comma>()?;
+            let param_count = input.parse::<LitInt>()?.base10_parse::<usize>()?;
 
+            Ok(Self {
+                ident,
+                has_params: true,
+                param_count,
+            })
+        } else {
+            Ok(Self {
+                ident,
+                has_params: false,
+                param_count: 0,
+            })
+        }
+    }
+}
+
+fn create_signature(data: ToSignatureInput) -> proc_macro::TokenStream {
+    let mut ident = data.ident.to_string();
     if data.has_params {
         ident += "(";
         ident += &(0..data.param_count)
@@ -54,4 +76,16 @@ pub fn to_signature(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
     let lit = syn::LitByteStr::new(ident.as_bytes_with_nul(), Span::call_site());
     let output = quote!(#lit);
     output.into()
+}
+
+#[proc_macro]
+pub fn to_signature(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
+    let data = parse_macro_input!(input as ToSignatureInput);
+    create_signature(data)
+}
+
+#[proc_macro]
+pub fn call_signature(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
+    let data = parse_macro_input!(input with ToSignatureInput::parse_call_signature);
+    create_signature(data)
 }
