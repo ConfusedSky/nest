@@ -8,7 +8,6 @@ mod system_methods;
 #[cfg(test)]
 mod test;
 pub mod user_data;
-mod util;
 mod value;
 
 pub use fiber::Fiber;

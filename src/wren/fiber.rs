@@ -1,7 +1,5 @@
 use std::ops::Deref;
 
-use crate::make_call;
-
 use super::{
     context::{Location, Native, Raw},
     handle::CallHandle,
@@ -61,7 +59,7 @@ impl<'wren> Methods<'wren> {
     ) -> TryGetResult<'wren, Fiber<'wren>> {
         let is_fiber: bool = unsafe {
             let is = &vm.get_system_methods().object_is;
-            make_call!(vm { raw_handle.is(self.fiber_class) })
+            vm.call_unchecked(&raw_handle, is, &(&self.fiber_class))
                 .expect("is should never fail for a valid wren handle")
         };
 
@@ -84,7 +82,7 @@ impl<'wren> Fiber<'wren> {
         context: &mut RawNativeContext<'wren>,
     ) -> Result<G> {
         let transfer = &self.methods.transfer;
-        let res: G = unsafe { make_call!(context { self.transfer() })? };
+        let res: G = unsafe { context.call_unchecked(&self, transfer, &())? };
         Ok(res)
     }
     pub fn transfer_with_arg<G: Get<'wren, Native>, S: Set<'wren, Native>>(
@@ -93,7 +91,7 @@ impl<'wren> Fiber<'wren> {
         additional_argument: S,
     ) -> Result<G> {
         let transfer = &self.methods.transfer_with_arg;
-        let res: G = unsafe { make_call!(context { self.transfer(additional_argument) })? };
+        let res: G = unsafe { context.call_unchecked(&self, transfer, &(&additional_argument))? };
         Ok(res)
     }
 
@@ -104,7 +102,7 @@ impl<'wren> Fiber<'wren> {
     {
         let transfer_error = &self.methods.transfer_error;
         let error = error.as_ref();
-        let res: G = unsafe { make_call!(context { self.transfer_error(error) })? };
+        let res: G = unsafe { context.call_unchecked(&self, transfer_error, &(&error))? };
         Ok(res)
     }
 }
@@ -152,7 +150,6 @@ impl<'wren> Get<'wren, Native> for TryGetResult<'wren, Fiber<'wren>> {
 #[cfg(test)]
 mod test {
     use super::Fiber;
-    use crate::make_call;
     use crate::wren::test::{create_test_vm, Context};
     use crate::wren::value::TryGetResult;
     use crate::wren::{context, cstr, Handle};
@@ -175,26 +172,29 @@ mod test {
 
         unsafe {
             // We should not be able to convert any other value but a fiber to a fiber
-            let true_handle: Handle = make_call!(context {Test.returnTrue()}).unwrap();
+            let true_handle: Handle = context.call_unchecked(&Test, &returnTrue, &()).unwrap();
             let true_fiber = fiber_methods.construct(context, true_handle);
             assert!(true_fiber.is_err());
 
-            let test_handle: Handle = make_call!(context {Test.returnTest()}).unwrap();
+            let test_handle: Handle = context.call_unchecked(&Test, &returnTest, &()).unwrap();
             let test_fiber = fiber_methods.construct(context, test_handle);
             assert!(test_fiber.is_err());
 
-            let fiber_handle: Handle = make_call!(context {Test.returnFiber()}).unwrap();
+            let fiber_handle: Handle = context.call_unchecked(&Test, &returnFiber, &()).unwrap();
             let fiber = fiber_methods.construct(context, fiber_handle);
             assert!(fiber.is_ok());
 
             // Test getting directly from vm
-            let true_fiber: TryGetResult<Fiber> = make_call!(context {Test.returnTrue()}).unwrap();
+            let true_fiber: TryGetResult<Fiber> =
+                context.call_unchecked(&Test, &returnTrue, &()).unwrap();
             assert!(true_fiber.is_err());
 
-            let test_fiber: TryGetResult<Fiber> = make_call!(context {Test.returnTest()}).unwrap();
+            let test_fiber: TryGetResult<Fiber> =
+                context.call_unchecked(&Test, &returnTest, &()).unwrap();
             assert!(test_fiber.is_err());
 
-            let fiber: TryGetResult<Fiber> = make_call!(context {Test.returnFiber()}).unwrap();
+            let fiber: TryGetResult<Fiber> =
+                context.call_unchecked(&Test, &returnFiber, &()).unwrap();
             assert!(fiber.is_ok());
         }
     }
@@ -228,7 +228,7 @@ mod test {
         assert!(context.get_user_data().get_output().is_empty());
         #[allow(clippy::let_unit_value)]
         unsafe {
-            let _: () = make_call!(context { Test.test_resume() }).unwrap();
+            let _: () = context.call_unchecked(&Test, &test_resume, &()).unwrap();
         }
         assert_eq!(context.get_user_data().get_output(), "Test\n");
         let fiber = context
