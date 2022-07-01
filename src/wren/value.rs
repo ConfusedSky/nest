@@ -11,6 +11,32 @@ use super::{
 
 pub type TryGetResult<'wren, T> = Result<T, Handle<'wren>>;
 
+pub enum WrenType {
+    Bool,
+    Num,
+    Foreign,
+    List,
+    Map,
+    Null,
+    String,
+    Unknown,
+}
+
+impl From<ffi::WrenType> for WrenType {
+    fn from(other: ffi::WrenType) -> Self {
+        match other {
+            ffi::WrenType_WREN_TYPE_BOOL => Self::Bool,
+            ffi::WrenType_WREN_TYPE_NUM => Self::Num,
+            ffi::WrenType_WREN_TYPE_FOREIGN => Self::Foreign,
+            ffi::WrenType_WREN_TYPE_LIST => Self::List,
+            ffi::WrenType_WREN_TYPE_MAP => Self::Map,
+            ffi::WrenType_WREN_TYPE_NULL => Self::Null,
+            ffi::WrenType_WREN_TYPE_STRING => Self::String,
+            _ => Self::Unknown,
+        }
+    }
+}
+
 struct SlotStorage<'wren> {
     vm: RawContext<'wren, Foreign>,
     slot: Slot,
@@ -199,13 +225,11 @@ impl<'wren, L: Location> Set<'wren, L> for &str {
 }
 
 unsafe fn generic_get_string<L: Location>(vm: &mut RawContext<L>, slot: Slot) -> Option<String> {
-    let t = ffi::wrenGetSlotType(vm.as_ptr(), slot);
-    match t {
-        wren_sys::WrenType_WREN_TYPE_BOOL => {
-            Some(ffi::wrenGetSlotBool(vm.as_ptr(), slot).to_string())
-        }
-        wren_sys::WrenType_WREN_TYPE_NULL => Some("null".to_string()),
-        wren_sys::WrenType_WREN_TYPE_STRING => {
+    let ty = vm.get_slot_type(slot);
+    match ty {
+        WrenType::Bool => Some(ffi::wrenGetSlotBool(vm.as_ptr(), slot).to_string()),
+        WrenType::Null => Some("null".to_string()),
+        WrenType::String => {
             let mut len = 0;
             let ptr = ffi::wrenGetSlotBytes(vm.as_ptr(), slot, &mut len).cast();
             let len = len.try_into().unwrap();
@@ -283,10 +307,10 @@ impl<'wren, L: Location> Set<'wren, L> for bool {
 
 impl<'wren, L: Location> Get<'wren, L> for bool {
     unsafe fn get_from_vm(vm: &mut RawContext<'wren, L>, slot: Slot) -> Self {
-        let t = ffi::wrenGetSlotType(vm.as_ptr(), slot);
-        match t {
-            wren_sys::WrenType_WREN_TYPE_BOOL => ffi::wrenGetSlotBool(vm.as_ptr(), slot),
-            wren_sys::WrenType_WREN_TYPE_NULL => false,
+        let ty = vm.get_slot_type(slot);
+        match ty {
+            WrenType::Bool => ffi::wrenGetSlotBool(vm.as_ptr(), slot),
+            WrenType::Null => false,
             _ => true,
         }
     }

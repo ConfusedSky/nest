@@ -8,9 +8,12 @@ use std::{
 use wren_sys::{self as ffi, WrenVM};
 
 use super::{
-    foreign, handle::CallHandle, system_methods::SystemMethods, value::TryGetResult, Fiber, Get,
-    GetArgs, Handle, InterpretResultErrorKind, Result, Set, SetArgs, Slot, SystemUserData, Value,
-    VmUserData,
+    foreign,
+    handle::CallHandle,
+    system_methods::SystemMethods,
+    value::{TryGetResult, WrenType},
+    Fiber, Get, GetArgs, Handle, InterpretResultErrorKind, Result, Set, SetArgs, Slot,
+    SystemUserData, Value, VmUserData,
 };
 
 pub type Raw<'wren, L> = Context<'wren, NoTypeInfo, L>;
@@ -230,6 +233,11 @@ impl<'wren, L: Location> Context<'wren, NoTypeInfo, L> {
         unsafe {
             wren_sys::wrenEnsureSlots(self.as_ptr(), num_slots);
         }
+    }
+
+    pub(super) unsafe fn get_slot_type(&mut self, slot: Slot) -> WrenType {
+        let t = ffi::wrenGetSlotType(self.as_ptr(), slot);
+        WrenType::from(t)
     }
 
     pub fn set_stack<Args: SetArgs<'wren, L>>(&mut self, args: &Args) {
