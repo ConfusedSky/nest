@@ -295,26 +295,34 @@ impl<'wren, L: Location> Get<'wren, L> for bool {
 
 pub trait SetArgs<'wren, L: Location> {
     const REQUIRED_SLOTS: Slot;
-    unsafe fn set_slots(&self, vm: &mut RawContext<'wren, L>);
+    unsafe fn set_slots(&self, vm: &mut RawContext<'wren, L>, offset: u16);
     /// This fn should probably never be used directly since it only existed
     /// before required slots was a constant
-    unsafe fn set_wren_stack_unchecked(&self, vm: &mut RawContext<'wren, L>, num_slots: Slot) {
-        vm.ensure_slots(num_slots);
-        self.set_slots(vm);
+    unsafe fn set_wren_stack_unchecked(
+        &self,
+        vm: &mut RawContext<'wren, L>,
+        num_slots: Slot,
+        offset: u16,
+    ) {
+        vm.ensure_slots(num_slots + Slot::from(offset));
+        self.set_slots(vm, offset);
     }
-    fn set_wren_stack(&self, vm: &mut RawContext<'wren, L>) {
+    /// Sets the values on the [vm]'s stack
+    /// also accepts a [offset] parameter that allows the items to be shifted up
+    /// to allow other items to be passed beforehand
+    fn set_wren_stack(&self, vm: &mut RawContext<'wren, L>, offset: u16) {
         // This is guarenteed to be safe because we ensured that we had enough
         // slots for T using REQUIRED_SLOTS
         unsafe {
-            self.set_wren_stack_unchecked(vm, Self::REQUIRED_SLOTS);
+            self.set_wren_stack_unchecked(vm, Self::REQUIRED_SLOTS, offset);
         }
     }
 }
 
 impl<'wren, L: Location, T: Set<'wren, L> + ?Sized> SetArgs<'wren, L> for T {
     const REQUIRED_SLOTS: Slot = 1 + T::ADDITIONAL_SLOTS_NEEDED;
-    unsafe fn set_slots(&self, vm: &mut RawContext<'wren, L>) {
-        self.send_to_vm(vm, 0);
+    unsafe fn set_slots(&self, vm: &mut RawContext<'wren, L>, offset: u16) {
+        self.send_to_vm(vm, Slot::from(offset));
     }
 }
 
@@ -336,12 +344,12 @@ macro_rules! expand_required_slots {
 }
 
 macro_rules! expand_set_slots {
-    ($self:ident, $vm:ident, $method:ident, $i:tt) => {
-        $self.$i.$method($vm, $i);
+    ($self:ident, $vm:ident, $method:ident, $offset:expr, $i:tt) => {
+        $self.$i.$method($vm, $i + $offset as Slot);
     };
-    ($self:ident, $vm:ident, $method:ident, $i:tt, $($xs:tt),+ $(,)?) => {
-        expand_set_slots!($self, $vm, $method, $i);
-        expand_set_slots!($self, $vm, $method, $( $xs ), *);
+    ($self:ident, $vm:ident, $method:ident, $offset:expr, $i:tt, $($xs:tt),+ $(,)?) => {
+        expand_set_slots!($self, $vm, $method, $offset, $i);
+        expand_set_slots!($self, $vm, $method, $offset, $( $xs ), *);
     };
 }
 
@@ -352,8 +360,8 @@ macro_rules! impl_set_args_meta {
                 expand_required_slots!($( $xs ), *);
 
 
-            unsafe fn set_slots(&self, vm: &mut RawContext<'wren, $location>) {
-                expand_set_slots!(self, vm, send_to_vm, $( $i ), *);
+            unsafe fn set_slots(&self, vm: &mut RawContext<'wren, $location>, offset: u16) {
+                expand_set_slots!(self, vm, send_to_vm, offset, $( $i ), *);
             }
         }
     };

@@ -219,11 +219,11 @@ impl<'wren, L: Location> Context<'wren, NoTypeInfo, L> {
     }
 
     pub fn set_stack<Args: SetArgs<'wren, L>>(&mut self, args: &Args) {
-        args.set_wren_stack(self);
+        args.set_wren_stack(self, 0);
     }
 
     pub fn set_return_value<Args: Set<'wren, L> + ?Sized>(&mut self, arg: &Args) {
-        arg.set_wren_stack(self);
+        arg.set_wren_stack(self, 0);
     }
 
     // TODO: Create safe version that returns Options depending on how many slots
