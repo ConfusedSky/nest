@@ -8,12 +8,9 @@ use std::{
 use wren_sys::{self as ffi, WrenVM};
 
 use super::{
-    foreign,
-    handle::{make_call_handle, CallHandle},
-    system_methods::SystemMethods,
-    value::TryGetResult,
-    Fiber, Get, GetArgs, Handle, InterpretResultErrorKind, Result, Set, SetArgs, Slot,
-    SystemUserData, Value, VmUserData,
+    foreign, handle::CallHandle, system_methods::SystemMethods, value::TryGetResult, Fiber, Get,
+    GetArgs, Handle, InterpretResultErrorKind, Result, Set, SetArgs, Slot, SystemUserData, Value,
+    VmUserData,
 };
 
 pub type Raw<'wren, L> = Context<'wren, NoTypeInfo, L>;
@@ -222,12 +219,11 @@ impl<'wren, L: Location> Context<'wren, NoTypeInfo, L> {
         &mut self,
         signature: &[u8],
     ) -> std::result::Result<CallHandle<'wren>, FromBytesWithNulError> {
-        let cstr = CStr::from_bytes_with_nul(signature)?;
-        Ok(self.make_call_handle(cstr))
+        CallHandle::new_from_slice(self.as_foreign_mut(), signature)
     }
 
     pub fn make_call_handle(&mut self, signature: &CStr) -> CallHandle<'wren> {
-        make_call_handle(self.as_foreign_mut(), signature)
+        CallHandle::new_from_signature(self.as_foreign_mut(), signature)
     }
 
     pub fn ensure_slots(&mut self, num_slots: Slot) {

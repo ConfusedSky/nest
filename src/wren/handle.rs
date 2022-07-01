@@ -1,10 +1,18 @@
 #![allow(clippy::module_name_repetitions)]
 
-use std::{ffi::CStr, marker::PhantomData, ops::Deref, ptr::NonNull};
+use std::{
+    ffi::{CStr, FromBytesWithNulError},
+    marker::PhantomData,
+    ops::Deref,
+    ptr::NonNull,
+};
 
 use wren_sys::{self as ffi, wrenReleaseHandle, WrenHandle};
 
-use super::RawForeignContext;
+use super::{
+    context::{Context, Location},
+    RawForeignContext,
+};
 
 pub struct Handle<'wren> {
     vm: RawForeignContext<'wren>,
@@ -33,23 +41,106 @@ impl<'wren> Drop for Handle<'wren> {
 }
 
 /// This is just a thin wrapper around a handle so we can guarente it's a call handle
-pub struct CallHandle<'wren>(Handle<'wren>);
+pub struct CallHandle<'wren> {
+    handle: Handle<'wren>,
+    argument_count: usize,
+}
 
 impl<'wren> Deref for CallHandle<'wren> {
     type Target = Handle<'wren>;
     fn deref(&self) -> &Self::Target {
-        &self.0
+        &self.handle
     }
 }
 
-pub fn make_call_handle<'wren>(
-    vm: &mut RawForeignContext<'wren>,
-    signature: &CStr,
-) -> CallHandle<'wren> {
-    unsafe {
+impl<'wren> CallHandle<'wren> {
+    pub unsafe fn new_unchecked<L: Location, V>(
+        vm: &mut Context<'wren, V, L>,
+        signature: &CStr,
+        argument_count: usize,
+    ) -> Self {
         // SAFETY: this function is always safe to call but may be unsafe to use the handle it returns
         // as that handle might not be valid and safe to use
         let ptr = ffi::wrenMakeCallHandle(vm.as_ptr(), signature.as_ptr());
-        CallHandle(Handle::new(vm, NonNull::new_unchecked(ptr)))
+        let handle = Handle::new(
+            vm.as_foreign_mut().as_raw_mut(),
+            NonNull::new_unchecked(ptr),
+        );
+        CallHandle {
+            handle,
+            argument_count,
+        }
+    }
+
+    pub fn new_from_signature<L: Location, V>(
+        vm: &mut Context<'wren, V, L>,
+        signature: &CStr,
+    ) -> Self {
+        let mut argument_count = 0;
+
+        signature
+            .to_bytes()
+            .iter()
+            .skip_while(|byte| **byte != b'(')
+            .filter(|byte| **byte == b'_')
+            .for_each(|_| argument_count += 1);
+
+        unsafe { Self::new_unchecked(vm, signature, argument_count) }
+    }
+
+    pub fn new_from_slice<L: Location, V>(
+        vm: &mut Context<'wren, V, L>,
+        signature: &[u8],
+    ) -> std::result::Result<Self, FromBytesWithNulError> {
+        let cstr = CStr::from_bytes_with_nul(signature)?;
+        Ok(Self::new_from_signature(vm, cstr))
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use crate::wren::test::create_test_vm;
+
+    use super::CallHandle;
+    use wren_macros::call_signature;
+
+    #[test]
+    fn test_new_from_slice() {
+        let source = "class Test {
+        }";
+
+        let (mut vm, _) = create_test_vm(source, |_| {});
+        let context = vm.get_context();
+
+        assert!(
+            CallHandle::new_from_slice(context, call_signature!(Test))
+                .unwrap()
+                .argument_count
+                == 0
+        );
+        assert!(
+            CallHandle::new_from_slice(context, call_signature!(Test, 0))
+                .unwrap()
+                .argument_count
+                == 0
+        );
+        assert!(
+            CallHandle::new_from_slice(context, call_signature!(Test, 1))
+                .unwrap()
+                .argument_count
+                == 1
+        );
+        assert!(
+            CallHandle::new_from_slice(context, call_signature!(Test, 2))
+                .unwrap()
+                .argument_count
+                == 2
+        );
+        assert!(
+            CallHandle::new_from_slice(context, call_signature!(Test, 3))
+                .unwrap()
+                .argument_count
+                == 3
+        );
     }
 }
