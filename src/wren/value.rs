@@ -11,6 +11,7 @@ use super::{
 
 pub type TryGetResult<'wren, T> = Result<T, Handle<'wren>>;
 
+#[derive(PartialEq, Eq, Debug)]
 pub enum WrenType {
     Bool,
     Num,
@@ -85,14 +86,14 @@ impl Value for () {
     const ADDITIONAL_SLOTS_NEEDED: Slot = 0;
 }
 
-impl<'wren, L: Location> Get<'wren, L> for () {
-    unsafe fn get_from_vm(_vm: &mut RawContext<'wren, L>, _slot: Slot) -> Self {}
-}
-
 impl<'wren, L: Location> Set<'wren, L> for () {
     unsafe fn send_to_vm(&self, vm: &mut RawContext<'wren, L>, slot: Slot) {
         ffi::wrenSetSlotNull(vm.as_ptr(), slot);
     }
+}
+
+impl<'wren, L: Location> Get<'wren, L> for () {
+    unsafe fn get_from_vm(_vm: &mut RawContext<'wren, L>, _slot: Slot) -> Self {}
 }
 
 impl<T: Value> Value for &T {
@@ -158,19 +159,19 @@ impl<'wren, L: Location, T: Get<'wren, L>> Get<'wren, L> for Vec<T> {
 
         let mut vec = vec![];
 
+        // TODO: Handle this better than just returning an empty vec
+        let ty = vm.get_slot_type(slot);
         if cfg!(debug_assertions) {
-            let ty = ffi::wrenGetSlotType(vm.as_ptr(), slot);
-            assert!(
-                ty == ffi::WrenType_WREN_TYPE_LIST,
-                "Unable to get non list value as Vec"
-            );
+            assert!(ty == WrenType::List, "Unable to get non list value as Vec");
         }
 
-        let count = ffi::wrenGetListCount(vm.as_ptr(), slot);
+        if ty == WrenType::List {
+            let count = ffi::wrenGetListCount(vm.as_ptr(), slot);
 
-        for i in 0..count {
-            ffi::wrenGetListElement(vm.as_ptr(), slot, i, item_slot);
-            vec.push(T::get_from_vm(vm, item_slot));
+            for i in 0..count {
+                ffi::wrenGetListElement(vm.as_ptr(), slot, i, item_slot);
+                vec.push(T::get_from_vm(vm, item_slot));
+            }
         }
 
         vec
@@ -291,7 +292,11 @@ impl<'wren, L: Location> Set<'wren, L> for f64 {
 
 impl<'wren, L: Location> Get<'wren, L> for f64 {
     unsafe fn get_from_vm(vm: &mut RawContext<'wren, L>, slot: Slot) -> Self {
-        ffi::wrenGetSlotDouble(vm.as_ptr(), slot)
+        if WrenType::Num == vm.get_slot_type(slot) {
+            ffi::wrenGetSlotDouble(vm.as_ptr(), slot)
+        } else {
+            Self::NAN
+        }
     }
 }
 
