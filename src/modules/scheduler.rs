@@ -3,7 +3,7 @@
 use std::{future::Future, pin::Pin};
 
 use crate::{
-    wren::{self, RawNativeContext as RawContext},
+    wren::{self, CallHandle, RawNativeContext as RawContext},
     Context, Handle,
 };
 
@@ -39,9 +39,9 @@ pub struct Scheduler<'wren> {
     // This method resumes a fiber that is suspended waiting on an asynchronous
     // operation. The first resumes it with zero arguments, and the second passes
     // one.
-    resume_waiting: Handle<'wren>,
-    has_next: Handle<'wren>,
-    run_next_scheduled: Handle<'wren>,
+    resume_waiting: CallHandle<'wren>,
+    has_next: CallHandle<'wren>,
+    run_next_scheduled: CallHandle<'wren>,
 
     pub has_waiting_fibers: bool,
     queue: Vec<Task<'wren>>,

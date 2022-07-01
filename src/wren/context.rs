@@ -8,8 +8,12 @@ use std::{
 use wren_sys::{self as ffi, WrenVM};
 
 use super::{
-    foreign, system_methods::SystemMethods, value::TryGetResult, Fiber, Get, GetArgs, Handle,
-    InterpretResultErrorKind, Result, Set, SetArgs, Slot, SystemUserData, VmUserData,
+    foreign,
+    handle::{make_call_handle, CallHandle},
+    system_methods::SystemMethods,
+    value::TryGetResult,
+    Fiber, Get, GetArgs, Handle, InterpretResultErrorKind, Result, Set, SetArgs, Slot,
+    SystemUserData, VmUserData,
 };
 
 pub type Raw<'wren, L> = Context<'wren, NoTypeInfo, L>;
@@ -196,19 +200,13 @@ impl<'wren, L: Location> Context<'wren, NoTypeInfo, L> {
     pub fn make_call_handle_slice(
         &mut self,
         signature: &[u8],
-    ) -> std::result::Result<Handle<'wren>, FromBytesWithNulError> {
+    ) -> std::result::Result<CallHandle<'wren>, FromBytesWithNulError> {
         let cstr = CStr::from_bytes_with_nul(signature)?;
         Ok(self.make_call_handle(cstr))
     }
 
-    pub fn make_call_handle(&mut self, signature: &CStr) -> Handle<'wren> {
-        let vm = self.0;
-        unsafe {
-            // SAFETY: this function is always safe to call but may be unsafe to use the handle it returns
-            // as that handle might not be valid and safe to use
-            let ptr = ffi::wrenMakeCallHandle(vm.as_ptr(), signature.as_ptr());
-            Handle::new(self.as_foreign_mut(), NonNull::new_unchecked(ptr))
-        }
+    pub fn make_call_handle(&mut self, signature: &CStr) -> CallHandle<'wren> {
+        make_call_handle(self.as_foreign_mut(), signature)
     }
 
     pub fn ensure_slots(&mut self, num_slots: Slot) {

@@ -2,6 +2,7 @@ use crate::make_call;
 
 use super::{
     context::{Location, Native, Raw},
+    handle::CallHandle,
     value::TryGetResult,
     Get, Handle, RawNativeContext, Result, Set, Value,
 };
@@ -10,9 +11,9 @@ pub struct Methods<'wren> {
     // This method resumes a fiber that is suspended waiting on an asynchronous
     // operation. The first resumes it with zero arguments, and the second passes
     // one.
-    transfer: Handle<'wren>,
-    transfer_with_arg: Handle<'wren>,
-    transfer_error: Handle<'wren>,
+    transfer: CallHandle<'wren>,
+    transfer_with_arg: CallHandle<'wren>,
+    transfer_error: CallHandle<'wren>,
     fiber_class: Handle<'wren>,
 }
 

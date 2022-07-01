@@ -12,7 +12,7 @@ mod util;
 mod value;
 
 pub use fiber::Fiber;
-pub use handle::Handle;
+pub use handle::{CallHandle, Handle};
 pub use user_data::UserData as VmUserData;
 pub use value::{Get, GetArgs, Set, SetArgs, Value};
 

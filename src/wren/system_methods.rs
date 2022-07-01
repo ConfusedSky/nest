@@ -1,8 +1,8 @@
-use super::{cstr, fiber, Handle, RawNativeContext};
+use super::{cstr, fiber, handle::CallHandle, RawNativeContext};
 
 pub struct SystemMethods<'wren> {
-    pub object_to_string: Handle<'wren>,
-    pub object_is: Handle<'wren>,
+    pub object_to_string: CallHandle<'wren>,
+    pub object_is: CallHandle<'wren>,
     pub fiber_methods: fiber::Methods<'wren>,
 }
 
