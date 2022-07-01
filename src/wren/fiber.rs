@@ -1,3 +1,5 @@
+use std::ops::Deref;
+
 use crate::make_call;
 
 use super::{
@@ -82,10 +84,8 @@ impl<'wren> Fiber<'wren> {
         context: &mut RawNativeContext<'wren>,
     ) -> Result<G> {
         let transfer = &self.methods.transfer;
-        unsafe {
-            let res: G = make_call!(context { self.transfer() })?;
-            Ok(res)
-        }
+        let res: G = unsafe { make_call!(context { self.transfer() })? };
+        Ok(res)
     }
     pub fn transfer_with_arg<G: Get<'wren, Native>, S: Set<'wren, Native>>(
         self,
@@ -93,10 +93,8 @@ impl<'wren> Fiber<'wren> {
         additional_argument: S,
     ) -> Result<G> {
         let transfer = &self.methods.transfer_with_arg;
-        unsafe {
-            let res: G = make_call!(context { self.transfer(additional_argument) })?;
-            Ok(res)
-        }
+        let res: G = unsafe { make_call!(context { self.transfer(additional_argument) })? };
+        Ok(res)
     }
 
     pub fn transfer_error<S, G>(self, context: &mut RawNativeContext<'wren>, error: S) -> Result<G>
@@ -106,10 +104,15 @@ impl<'wren> Fiber<'wren> {
     {
         let transfer_error = &self.methods.transfer_error;
         let error = error.as_ref();
-        unsafe {
-            let res: G = make_call!(context { self.transfer_error(error) })?;
-            Ok(res)
-        }
+        let res: G = unsafe { make_call!(context { self.transfer_error(error) })? };
+        Ok(res)
+    }
+}
+
+impl<'wren> Deref for Fiber<'wren> {
+    type Target = Handle<'wren>;
+    fn deref(&self) -> &Self::Target {
+        &self.handle
     }
 }
 
@@ -170,8 +173,8 @@ mod test {
         let returnFiber = context.make_call_handle(cstr!("returnFiber"));
         let returnTest = context.make_call_handle(cstr!("returnTest"));
 
-        // We should not be able to convert any other value but a fiber to a fiber
         unsafe {
+            // We should not be able to convert any other value but a fiber to a fiber
             let true_handle: Handle = make_call!(context {Test.returnTrue()}).unwrap();
             let true_fiber = fiber_methods.construct(context, true_handle);
             assert!(true_fiber.is_err());
@@ -222,25 +225,25 @@ mod test {
         let context = vm.get_context();
         let test_resume = context.make_call_handle(cstr!("testResume()"));
 
+        assert!(context.get_user_data().get_output().is_empty());
         #[allow(clippy::let_unit_value)]
         unsafe {
-            assert!(context.get_user_data().get_output().is_empty());
             let _: () = make_call!(context { Test.test_resume() }).unwrap();
-            assert_eq!(context.get_user_data().get_output(), "Test\n");
-            let fiber = context
-                .get_user_data_mut()
-                .fiber
-                .take()
-                .expect("Fiber should have been set by await");
-
-            let ret = fiber
-                .transfer_with_arg::<String, _>(context, "From Rust")
-                .unwrap();
-            assert_eq!(
-                context.get_user_data().get_output(),
-                "Test\nFrom Rust\nTest\n"
-            );
-            assert_eq!(ret, "From wren");
         }
+        assert_eq!(context.get_user_data().get_output(), "Test\n");
+        let fiber = context
+            .get_user_data_mut()
+            .fiber
+            .take()
+            .expect("Fiber should have been set by await");
+
+        let ret = fiber
+            .transfer_with_arg::<String, _>(context, "From Rust")
+            .unwrap();
+        assert_eq!(
+            context.get_user_data().get_output(),
+            "Test\nFrom Rust\nTest\n"
+        );
+        assert_eq!(ret, "From wren");
     }
 }

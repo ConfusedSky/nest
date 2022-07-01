@@ -233,15 +233,14 @@ impl<'wren> Get<'wren, Native> for String {
             // ONLY WORKS IN NATIVE CODE
             let system_methods = vm.get_system_methods();
             let handle = Handle::get_from_vm(vm, slot);
-            handle.send_to_vm(vm, 0);
+            let to_string = &system_methods.object_to_string;
 
             // NOTE: this might break the native stack so it might need to be
             // saved off first
-            vm.call(&system_methods.object_to_string)
-                .expect("toString should never fail on a valid wren handle");
             // Note this shouldn't recurse because the second call
             // will always be called on a "real" string
-            vm.get_return_value_unchecked::<Self>()
+            vm.call_unchecked(&handle, to_string, &())
+                .expect("toString should never fail on a valid wren handle")
         })
     }
 }

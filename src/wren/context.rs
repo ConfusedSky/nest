@@ -13,7 +13,7 @@ use super::{
     system_methods::SystemMethods,
     value::TryGetResult,
     Fiber, Get, GetArgs, Handle, InterpretResultErrorKind, Result, Set, SetArgs, Slot,
-    SystemUserData, VmUserData,
+    SystemUserData, Value, VmUserData,
 };
 
 pub type Raw<'wren, L> = Context<'wren, NoTypeInfo, L>;
@@ -35,6 +35,8 @@ impl<'wren, V, L: Location> Context<'wren, V, L> {
     unsafe fn transmute_mut<V2, L2: Location>(&mut self) -> &mut Context<'wren, V2, L2> {
         &mut *((self as *mut Context<V, L>).cast::<Context<V2, L2>>())
     }
+
+    // NOTE THESE ARE ALL DOWNCASTS SO THIS IS SAFE
 
     pub const fn as_foreign(&self) -> &Context<'wren, V, Foreign> {
         unsafe { self.transmute::<V, Foreign>() }
@@ -129,13 +131,32 @@ impl<'wren, T> Context<'wren, T, Native> {
         }
     }
 
-    /// Safety: Will segfault if used with an invalid method
-    /// or if it's called from withing a foreign function
-    pub unsafe fn call(&mut self, method: &Handle<'wren>) -> Result<()> {
-        let vm = self.0;
-        let result = ffi::wrenCall(vm.as_ptr(), method.as_ptr());
+    /// Call [method] on a [subject] with [args] on the vm
+    /// subject is usually a class or an object, but all calls require a subject
+    /// this is safe as long as the return type specified is correct
+    /// otherwise it's UB
+    /// Arguments must be set up correctly as well
+    pub unsafe fn call_unchecked<G: Get<'wren, Native>, Args: SetArgs<'wren, Native>>(
+        &mut self,
+        subject: &Handle<'wren>,
+        method: &CallHandle<'wren>,
+        args: &Args,
+    ) -> Result<G> {
+        // make sure there enough slots to send over the subject
+        // and all it's args
+        let vm = self.as_raw_mut();
+        vm.ensure_slots(1 + Handle::ADDITIONAL_SLOTS_NEEDED + Args::REQUIRED_SLOTS);
 
-        InterpretResultErrorKind::new_from_result(result)
+        // Send over the subject and all of it's args
+        subject.send_to_vm(vm, 0);
+        args.set_slots(vm, 1);
+
+        let result = ffi::wrenCall(vm.as_ptr(), method.as_ptr());
+        InterpretResultErrorKind::new_from_result(result)?;
+
+        // This should be safe as long as the type is set correctly
+        // TODO: Make this safer probably use a try_get
+        Ok(vm.get_return_value_unchecked::<G>())
     }
 
     /// Checks a handle to see if it is a valid fiber, if it is return the handle as a fiber
@@ -234,6 +255,8 @@ impl<'wren, L: Location> Context<'wren, NoTypeInfo, L> {
         Args::get_slots(self)
     }
 
+    // TODO: Make sure this can only be run in a foreign context
+    // since it requires a fiber to be active in the vm
     pub fn abort_fiber<S>(&mut self, value: S)
     where
         S: AsRef<str>,

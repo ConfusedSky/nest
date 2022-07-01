@@ -1,40 +1,10 @@
-use super::{
-    context::{Context, Native, NoTypeInfo},
-    Get, Handle, InterpretResultErrorKind, SetArgs,
-};
-
-pub unsafe fn make_call_helper<'wren, T: Get<'wren, Native>, Args: SetArgs<'wren, Native>>(
-    vm: &mut Context<'wren, NoTypeInfo, Native>,
-    method: &Handle<'wren>,
-    args: &Args,
-) -> Result<T, InterpretResultErrorKind> {
-    vm.set_stack(args);
-    vm.call(method)?;
-    Ok(vm.get_return_value_unchecked::<T>())
-}
-
-pub mod macro_helper {
-    #[macro_export]
-    macro_rules! make_args {
-        ($class:ident, $($args:tt),+) => {
-            &(&$class, $( &$args ),+)
-        };
-        ($class:ident) => {
-            &(&$class)
-        };
-    }
-    pub use make_args;
-}
-
 #[macro_export]
 macro_rules! make_call {
-        ($vm:ident { $class:ident.$handle:ident() }) => {{
-            use crate::wren::util::{make_call_helper, macro_helper};
-            make_call_helper($vm, &$handle, (macro_helper::make_args!($class)))
-        }};
-        ($vm:ident { $class:ident.$handle:ident($($args:expr),+ ) }) => {{
-            use crate::wren::util::{make_call_helper, macro_helper};
-            make_call_helper($vm, &$handle, (macro_helper::make_args!($class, $($args),+)))
-        }};
+        ($vm:ident { $class:ident.$handle:ident() }) => {
+            $vm.call_unchecked(&$class, &$handle, &())
+        };
+        ($vm:ident { $class:ident.$handle:ident($($args:expr),+ ) }) => {
+            $vm.call_unchecked(&$class, &$handle, &($(&$args),+))
+        };
     }
 pub use make_call;

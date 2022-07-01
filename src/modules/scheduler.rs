@@ -166,40 +166,20 @@ impl<'wren> Scheduler<'wren> {
         }));
     }
 
-    unsafe fn _resume(vm: &mut RawContext<'wren>, method: &Handle<'wren>) {
-        let result = vm.call(method);
-
-        if let Err(wren::InterpretResultErrorKind::Runtime) = result {
-            panic!("Fiber errored after resuming.");
-        }
-    }
     fn resume_waiting(&mut self, vm: &mut RawContext<'wren>) {
         self.has_waiting_fibers = false;
-        vm.set_stack(&self.class);
-
-        // SAFETY: the stack has been set up properly and
-        // the method is assumed to exist on the class
         unsafe {
-            Self::_resume(vm, &self.resume_waiting);
+            vm.call_unchecked::<(), _>(&self.class, &self.resume_waiting, &())
+                .unwrap();
         }
     }
     fn has_next(&mut self, vm: &mut RawContext<'wren>) -> bool {
-        vm.set_stack(&self.class);
-
-        // SAFETY: the stack has been set up properly and
-        // the method is assumed to exist on the class
-        // return value is expected from this to be of type bool
-        unsafe {
-            Self::_resume(vm, &self.has_next);
-            vm.get_return_value_unchecked()
-        }
+        unsafe { vm.call_unchecked(&self.class, &self.has_next, &()).unwrap() }
     }
     fn run_next_scheduled(&mut self, vm: &mut RawContext<'wren>) {
-        vm.set_stack(&self.class);
-        // SAFETY: the stack has been set up properly and
-        // the method is assumed to exist on the class
         unsafe {
-            Self::_resume(vm, &self.run_next_scheduled);
+            vm.call_unchecked::<(), _>(&self.class, &self.run_next_scheduled, &())
+                .unwrap();
         }
     }
 }
