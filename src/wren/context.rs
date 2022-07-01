@@ -8,8 +8,8 @@ use std::{
 use wren_sys::{self as ffi, WrenVM};
 
 use super::{
-    foreign, system_methods::SystemMethods, Fiber, Get, GetArgs, Handle, InterpretResultErrorKind,
-    Result, Set, SetArgs, Slot, SystemUserData, VmUserData,
+    foreign, system_methods::SystemMethods, value::TryGetResult, Fiber, Get, GetArgs, Handle,
+    InterpretResultErrorKind, Result, Set, SetArgs, Slot, SystemUserData, VmUserData,
 };
 
 pub type Raw<'wren, L> = Context<'wren, NoTypeInfo, L>;
@@ -134,7 +134,9 @@ impl<'wren, T> Context<'wren, T, Native> {
         InterpretResultErrorKind::new_from_result(result)
     }
 
-    pub fn check_fiber(&mut self, handle: Handle<'wren>) -> Option<Fiber<'wren>> {
+    /// Checks a handle to see if it is a valid fiber, if it is return the handle as a fiber
+    /// in the ok varient, otherwise returns the original handle
+    pub fn check_fiber(&mut self, handle: Handle<'wren>) -> TryGetResult<'wren, Fiber<'wren>> {
         let vm = self.as_raw_mut();
         vm.get_system_methods().fiber_methods.construct(vm, handle)
     }

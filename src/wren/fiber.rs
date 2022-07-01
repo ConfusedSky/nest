@@ -2,6 +2,7 @@ use crate::make_call;
 
 use super::{
     context::{Location, Native, Raw},
+    value::TryGetResult,
     Get, Handle, RawNativeContext, Result, Set, Value,
 };
 
@@ -48,11 +49,13 @@ impl<'wren> Methods<'wren> {
         }
     }
 
+    /// Try to construct a fiber from a handle, if it's not a valid fiber
+    /// then return the original handle as an error
     pub(crate) fn construct(
         &'wren self,
         vm: &mut RawNativeContext<'wren>,
         raw_handle: Handle<'wren>,
-    ) -> Option<Fiber<'wren>> {
+    ) -> TryGetResult<'wren, Fiber<'wren>> {
         let is_fiber: bool = unsafe {
             let is = &vm.get_system_methods().object_is;
             make_call!(vm { raw_handle.is(self.fiber_class) })
@@ -60,9 +63,9 @@ impl<'wren> Methods<'wren> {
         };
 
         if is_fiber {
-            Some(unsafe { self.construct_unchecked(raw_handle) })
+            Ok(unsafe { self.construct_unchecked(raw_handle) })
         } else {
-            None
+            Err(raw_handle)
         }
     }
 }
@@ -113,6 +116,7 @@ impl<'wren> Value for Fiber<'wren> {
     const ADDITIONAL_SLOTS_NEEDED: super::Slot = 0;
 }
 
+// Getting unchecked fibers will always be unsafe
 impl<'wren, L: Location> Get<'wren, L> for Fiber<'wren> {
     unsafe fn get_from_vm(vm: &mut Raw<'wren, L>, slot: super::Slot) -> Self {
         let handle = Handle::get_from_vm(vm, slot);
@@ -129,11 +133,11 @@ impl<'wren, L: Location> Set<'wren, L> for Fiber<'wren> {
     }
 }
 
-impl<'wren> Value for Option<Fiber<'wren>> {
+impl<'wren> Value for TryGetResult<'wren, Fiber<'wren>> {
     const ADDITIONAL_SLOTS_NEEDED: super::Slot = 0;
 }
 
-impl<'wren> Get<'wren, Native> for Option<Fiber<'wren>> {
+impl<'wren> Get<'wren, Native> for TryGetResult<'wren, Fiber<'wren>> {
     unsafe fn get_from_vm(vm: &mut Raw<'wren, Native>, slot: super::Slot) -> Self {
         let handle = Handle::get_from_vm(vm, slot);
 
@@ -146,6 +150,7 @@ mod test {
     use super::Fiber;
     use crate::make_call;
     use crate::wren::test::{create_test_vm, Context};
+    use crate::wren::value::TryGetResult;
     use crate::wren::{context, cstr, Handle};
 
     #[test]
@@ -168,25 +173,25 @@ mod test {
         unsafe {
             let true_handle: Handle = make_call!(context {Test.returnTrue()}).unwrap();
             let true_fiber = fiber_methods.construct(context, true_handle);
-            assert!(true_fiber.is_none());
+            assert!(true_fiber.is_err());
 
             let test_handle: Handle = make_call!(context {Test.returnTest()}).unwrap();
             let test_fiber = fiber_methods.construct(context, test_handle);
-            assert!(test_fiber.is_none());
+            assert!(test_fiber.is_err());
 
             let fiber_handle: Handle = make_call!(context {Test.returnFiber()}).unwrap();
             let fiber = fiber_methods.construct(context, fiber_handle);
-            assert!(fiber.is_some());
+            assert!(fiber.is_ok());
 
             // Test getting directly from vm
-            let true_fiber: Option<Fiber> = make_call!(context {Test.returnTrue()}).unwrap();
-            assert!(true_fiber.is_none());
+            let true_fiber: TryGetResult<Fiber> = make_call!(context {Test.returnTrue()}).unwrap();
+            assert!(true_fiber.is_err());
 
-            let test_fiber: Option<Fiber> = make_call!(context {Test.returnTest()}).unwrap();
-            assert!(test_fiber.is_none());
+            let test_fiber: TryGetResult<Fiber> = make_call!(context {Test.returnTest()}).unwrap();
+            assert!(test_fiber.is_err());
 
-            let fiber: Option<Fiber> = make_call!(context {Test.returnFiber()}).unwrap();
-            assert!(fiber.is_some());
+            let fiber: TryGetResult<Fiber> = make_call!(context {Test.returnFiber()}).unwrap();
+            assert!(fiber.is_ok());
         }
     }
 

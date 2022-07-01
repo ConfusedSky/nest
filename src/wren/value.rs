@@ -9,6 +9,8 @@ use super::{
     Handle, Slot,
 };
 
+pub type TryGetResult<'wren, T> = Result<T, Handle<'wren>>;
+
 struct SlotStorage<'wren> {
     vm: RawContext<'wren, Foreign>,
     slot: Slot,
@@ -196,6 +198,24 @@ impl<'wren, L: Location> Set<'wren, L> for &str {
     }
 }
 
+unsafe fn generic_get_string<L: Location>(vm: &mut RawContext<L>, slot: Slot) -> Option<String> {
+    let t = ffi::wrenGetSlotType(vm.as_ptr(), slot);
+    match t {
+        wren_sys::WrenType_WREN_TYPE_BOOL => {
+            Some(ffi::wrenGetSlotBool(vm.as_ptr(), slot).to_string())
+        }
+        wren_sys::WrenType_WREN_TYPE_NULL => Some("null".to_string()),
+        wren_sys::WrenType_WREN_TYPE_STRING => {
+            let mut len = 0;
+            let ptr = ffi::wrenGetSlotBytes(vm.as_ptr(), slot, &mut len).cast();
+            let len = len.try_into().unwrap();
+            let slice = std::slice::from_raw_parts(ptr, len);
+            Some(String::from_utf8_lossy(slice).to_string())
+        }
+        _ => None,
+    }
+}
+
 impl Value for String {
     const ADDITIONAL_SLOTS_NEEDED: Slot = 0;
 }
@@ -206,34 +226,33 @@ impl<'wren, L: Location> Set<'wren, L> for String {
     }
 }
 
-impl<'wren, L: Location> Get<'wren, L> for String {
-    unsafe fn get_from_vm(vm: &mut RawContext<'wren, L>, slot: Slot) -> Self {
-        let t = ffi::wrenGetSlotType(vm.as_ptr(), slot);
-        match t {
-            wren_sys::WrenType_WREN_TYPE_BOOL => {
-                ffi::wrenGetSlotBool(vm.as_ptr(), slot).to_string()
-            }
-            wren_sys::WrenType_WREN_TYPE_NULL => "null".to_string(),
-            wren_sys::WrenType_WREN_TYPE_STRING => {
-                let mut len = 0;
-                let ptr = ffi::wrenGetSlotBytes(vm.as_ptr(), slot, &mut len).cast();
-                let len = len.try_into().unwrap();
-                let slice = std::slice::from_raw_parts(ptr, len);
-                Self::from_utf8_lossy(slice).to_string()
-            }
-            _ => {
-                panic!("Can't handle non-string type that was passed in as string in a foreign context")
-                // let system_methods = vm.get_system_methods();
-                // let handle = Handle::get_from_vm(vm, slot);
-                // handle.send_to_vm(vm, 0);
+impl<'wren> Get<'wren, Native> for String {
+    unsafe fn get_from_vm(vm: &mut RawContext<'wren, Native>, slot: Slot) -> Self {
+        generic_get_string(vm, slot).unwrap_or_else(|| {
+            // Fall back to calling to string on the returned object
+            // ONLY WORKS IN NATIVE CODE
+            let system_methods = vm.get_system_methods();
+            let handle = Handle::get_from_vm(vm, slot);
+            handle.send_to_vm(vm, 0);
 
-                // vm.call(&system_methods.object_to_string)
-                // .expect("toString should never fail on a valid wren handle");
-                // // Note this shouldn't recurse because the second call
-                // // will always be called on a string
-                // vm.get_return_value_unchecked::<Self>()
-            }
-        }
+            // NOTE: this might break the native stack so it might need to be
+            // saved off first
+            vm.call(&system_methods.object_to_string)
+                .expect("toString should never fail on a valid wren handle");
+            // Note this shouldn't recurse because the second call
+            // will always be called on a "real" string
+            vm.get_return_value_unchecked::<Self>()
+        })
+    }
+}
+
+impl<'wren> Value for TryGetResult<'wren, String> {
+    const ADDITIONAL_SLOTS_NEEDED: Slot = 0;
+}
+
+impl<'wren> Get<'wren, Foreign> for TryGetResult<'wren, String> {
+    unsafe fn get_from_vm(vm: &mut RawContext<'wren, Foreign>, slot: Slot) -> Self {
+        generic_get_string(vm, slot).ok_or_else(|| Handle::get_from_vm(vm, slot))
     }
 }
 

@@ -2,3 +2,5 @@
   - Not sure if this should happen as a build step or automatic test generation
 - [x] Make sure handles are only usable in the VM that created them
 - [x] Be able to run tests on both the rust side and the wren side
+- [ ] Create try_get for safe access of values
+- [ ] Add unknown location because abort fiber is only usable from within a foreign context
