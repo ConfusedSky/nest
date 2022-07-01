@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 
-use super::{context, Fiber, ForeignMethod, Handle, Vm, VmUserData};
+use super::{context, ForeignMethod, Handle, Vm, VmUserData};
 
 pub type Context<'wren, L> = super::Context<'wren, UserData<'wren>, L>;
 
@@ -8,7 +8,7 @@ pub type Context<'wren, L> = super::Context<'wren, UserData<'wren>, L>;
 pub struct UserData<'wren> {
     output: String,
     static_foreign: HashMap<&'wren str, ForeignMethod<'wren, UserData<'wren>>>,
-    pub fiber: Option<Fiber<'wren>>,
+    pub handle: Option<Handle<'wren>>,
 }
 
 impl<'wren> VmUserData<'wren, Self> for UserData<'wren> {

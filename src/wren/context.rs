@@ -159,8 +159,7 @@ impl<'wren, T> Context<'wren, T, Native> {
     /// Checks a handle to see if it is a valid fiber, if it is return the handle as a fiber
     /// in the ok varient, otherwise returns the original handle
     pub fn check_fiber(&mut self, handle: Handle<'wren>) -> TryGetResult<'wren, Fiber<'wren>> {
-        let vm = self.as_raw_mut();
-        vm.get_system_methods().fiber_methods.construct(vm, handle)
+        Fiber::try_from_handle(self, handle)
     }
 }
 

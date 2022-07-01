@@ -1,7 +1,7 @@
 use std::ops::Deref;
 
 use super::{
-    context::{Location, Native, Raw},
+    context::{Context, Location, Native, Raw},
     handle::CallHandle,
     value::TryGetResult,
     Get, Handle, RawNativeContext, Result, Set, Value,
@@ -77,6 +77,16 @@ pub struct Fiber<'wren> {
 }
 
 impl<'wren> Fiber<'wren> {
+    pub fn try_from_handle<V>(
+        vm: &mut Context<'wren, V, Native>,
+        handle: Handle<'wren>,
+    ) -> TryGetResult<'wren, Self> {
+        vm.as_raw()
+            .get_system_methods()
+            .fiber_methods
+            .construct(vm.as_raw_mut(), handle)
+    }
+
     pub fn transfer<G: Get<'wren, Native>>(
         self,
         context: &mut RawNativeContext<'wren>,
@@ -119,15 +129,15 @@ impl<'wren> Value for Fiber<'wren> {
 }
 
 // Getting unchecked fibers will always be unsafe
-impl<'wren, L: Location> Get<'wren, L> for Fiber<'wren> {
-    unsafe fn get_from_vm(vm: &mut Raw<'wren, L>, slot: super::Slot) -> Self {
-        let handle = Handle::get_from_vm(vm, slot);
+// impl<'wren, L: Location> Get<'wren, L> for Fiber<'wren> {
+// unsafe fn get_from_vm(vm: &mut Raw<'wren, L>, slot: super::Slot) -> Self {
+// let handle = Handle::get_from_vm(vm, slot);
 
-        vm.get_system_methods()
-            .fiber_methods
-            .construct_unchecked(handle)
-    }
-}
+// vm.get_system_methods()
+// .fiber_methods
+// .construct_unchecked(handle)
+// }
+// }
 
 impl<'wren, L: Location> Set<'wren, L> for Fiber<'wren> {
     unsafe fn send_to_vm(&self, vm: &mut Raw<'wren, L>, slot: super::Slot) {
@@ -203,8 +213,8 @@ mod test {
     #[allow(non_snake_case)]
     fn test_transfer() {
         unsafe fn test_await(mut vm: Context<context::Foreign>) {
-            let (_, fiber) = vm.get_stack_unchecked::<((), Fiber)>();
-            vm.get_user_data_mut().fiber = Some(fiber);
+            let (_, fiber) = vm.get_stack_unchecked::<((), Handle)>();
+            vm.get_user_data_mut().handle = Some(fiber);
         }
 
         let source = "class Test {
@@ -231,11 +241,14 @@ mod test {
             let _: () = context.call_unchecked(&Test, &test_resume, &()).unwrap();
         }
         assert_eq!(context.get_user_data().get_output(), "Test\n");
-        let fiber = context
+        let handle = context
             .get_user_data_mut()
-            .fiber
+            .handle
             .take()
             .expect("Fiber should have been set by await");
+        let fiber = context
+            .check_fiber(handle)
+            .expect("Handle returned from await should have been a valid fiber");
 
         let ret = fiber
             .transfer_with_arg::<String, _>(context, "From Rust")
