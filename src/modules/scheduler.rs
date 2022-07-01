@@ -168,19 +168,16 @@ impl<'wren> Scheduler<'wren> {
 
     fn resume_waiting(&mut self, vm: &mut RawContext<'wren>) {
         self.has_waiting_fibers = false;
-        unsafe {
-            vm.call_unchecked::<(), _>(&self.class, &self.resume_waiting, &())
-                .unwrap();
-        }
+
+        vm.call::<(), _>(&self.class, &self.resume_waiting, &())
+            .unwrap();
     }
     fn has_next(&mut self, vm: &mut RawContext<'wren>) -> bool {
-        unsafe { vm.call_unchecked(&self.class, &self.has_next, &()).unwrap() }
+        vm.call(&self.class, &self.has_next, &()).unwrap()
     }
     fn run_next_scheduled(&mut self, vm: &mut RawContext<'wren>) {
-        unsafe {
-            vm.call_unchecked::<(), _>(&self.class, &self.run_next_scheduled, &())
-                .unwrap();
-        }
+        vm.call::<(), _>(&self.class, &self.run_next_scheduled, &())
+            .unwrap();
     }
 }
 

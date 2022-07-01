@@ -57,9 +57,9 @@ impl<'wren> Methods<'wren> {
         vm: &mut RawNativeContext<'wren>,
         raw_handle: Handle<'wren>,
     ) -> TryGetResult<'wren, Fiber<'wren>> {
-        let is_fiber: bool = unsafe {
+        let is_fiber: bool = {
             let is = &vm.get_system_methods().object_is;
-            vm.call_unchecked(&raw_handle, is, &(&self.fiber_class))
+            vm.call(&raw_handle, is, &(&self.fiber_class))
                 .expect("is should never fail for a valid wren handle")
         };
 
@@ -92,7 +92,7 @@ impl<'wren> Fiber<'wren> {
         context: &mut RawNativeContext<'wren>,
     ) -> Result<G> {
         let transfer = &self.methods.transfer;
-        let res: G = unsafe { context.call_unchecked(&self, transfer, &())? };
+        let res: G = context.call(&self, transfer, &())?;
         Ok(res)
     }
     pub fn transfer_with_arg<G: Get<'wren, Native>, S: Set<'wren, Native>>(
@@ -101,7 +101,7 @@ impl<'wren> Fiber<'wren> {
         additional_argument: S,
     ) -> Result<G> {
         let transfer = &self.methods.transfer_with_arg;
-        let res: G = unsafe { context.call_unchecked(&self, transfer, &(&additional_argument))? };
+        let res: G = context.call(&self, transfer, &(&additional_argument))?;
         Ok(res)
     }
 
@@ -112,7 +112,7 @@ impl<'wren> Fiber<'wren> {
     {
         let transfer_error = &self.methods.transfer_error;
         let error = error.as_ref();
-        let res: G = unsafe { context.call_unchecked(&self, transfer_error, &(&error))? };
+        let res: G = context.call(&self, transfer_error, &(&error))?;
         Ok(res)
     }
 }
@@ -180,33 +180,28 @@ mod test {
         let returnFiber = context.make_call_handle(cstr!("returnFiber"));
         let returnTest = context.make_call_handle(cstr!("returnTest"));
 
-        unsafe {
-            // We should not be able to convert any other value but a fiber to a fiber
-            let true_handle: Handle = context.call_unchecked(&Test, &returnTrue, &()).unwrap();
-            let true_fiber = fiber_methods.construct(context, true_handle);
-            assert!(true_fiber.is_err());
+        // We should not be able to convert any other value but a fiber to a fiber
+        let true_handle: Handle = context.call(&Test, &returnTrue, &()).unwrap();
+        let true_fiber = fiber_methods.construct(context, true_handle);
+        assert!(true_fiber.is_err());
 
-            let test_handle: Handle = context.call_unchecked(&Test, &returnTest, &()).unwrap();
-            let test_fiber = fiber_methods.construct(context, test_handle);
-            assert!(test_fiber.is_err());
+        let test_handle: Handle = context.call(&Test, &returnTest, &()).unwrap();
+        let test_fiber = fiber_methods.construct(context, test_handle);
+        assert!(test_fiber.is_err());
 
-            let fiber_handle: Handle = context.call_unchecked(&Test, &returnFiber, &()).unwrap();
-            let fiber = fiber_methods.construct(context, fiber_handle);
-            assert!(fiber.is_ok());
+        let fiber_handle: Handle = context.call(&Test, &returnFiber, &()).unwrap();
+        let fiber = fiber_methods.construct(context, fiber_handle);
+        assert!(fiber.is_ok());
 
-            // Test getting directly from vm
-            let true_fiber: TryGetResult<Fiber> =
-                context.call_unchecked(&Test, &returnTrue, &()).unwrap();
-            assert!(true_fiber.is_err());
+        // Test getting directly from vm
+        let true_fiber: TryGetResult<Fiber> = context.call(&Test, &returnTrue, &()).unwrap();
+        assert!(true_fiber.is_err());
 
-            let test_fiber: TryGetResult<Fiber> =
-                context.call_unchecked(&Test, &returnTest, &()).unwrap();
-            assert!(test_fiber.is_err());
+        let test_fiber: TryGetResult<Fiber> = context.call(&Test, &returnTest, &()).unwrap();
+        assert!(test_fiber.is_err());
 
-            let fiber: TryGetResult<Fiber> =
-                context.call_unchecked(&Test, &returnFiber, &()).unwrap();
-            assert!(fiber.is_ok());
-        }
+        let fiber: TryGetResult<Fiber> = context.call(&Test, &returnFiber, &()).unwrap();
+        assert!(fiber.is_ok());
     }
 
     #[test]
@@ -237,8 +232,8 @@ mod test {
 
         assert!(context.get_user_data().get_output().is_empty());
         #[allow(clippy::let_unit_value)]
-        unsafe {
-            let _: () = context.call_unchecked(&Test, &test_resume, &()).unwrap();
+        {
+            let _: () = context.call(&Test, &test_resume, &()).unwrap();
         }
         assert_eq!(context.get_user_data().get_output(), "Test\n");
         let handle = context

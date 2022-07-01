@@ -77,6 +77,10 @@ pub trait Set<'wren, L: Location>: Value {
 }
 
 pub trait Get<'wren, L: Location>: Value {
+    /// NOTE THE IMPLEMENTATION OF GET FROM VM SHOULD BE SAFE REGARDLESS
+    /// OF WHAT IS IN THE SLOT
+    /// get_from_vm is unsafe because it's not guarenteed that
+    /// the slot is a valid slot
     unsafe fn get_from_vm(vm: &mut RawContext<'wren, L>, slot: Slot) -> Self;
 }
 
@@ -264,7 +268,7 @@ impl<'wren> Get<'wren, Native> for String {
             // saved off first
             // Note this shouldn't recurse because the second call
             // will always be called on a "real" string
-            vm.call_unchecked(&handle, to_string, &())
+            vm.call(&handle, to_string, &())
                 .expect("toString should never fail on a valid wren handle")
         })
     }
@@ -322,6 +326,7 @@ impl<'wren, L: Location> Get<'wren, L> for bool {
 }
 
 pub trait SetArgs<'wren, L: Location> {
+    const COUNT: usize;
     const REQUIRED_SLOTS: Slot;
     unsafe fn set_slots(&self, vm: &mut RawContext<'wren, L>, offset: u16);
     /// This fn should probably never be used directly since it only existed
@@ -347,7 +352,16 @@ pub trait SetArgs<'wren, L: Location> {
     }
 }
 
-impl<'wren, L: Location, T: Set<'wren, L> + ?Sized> SetArgs<'wren, L> for T {
+impl<'wren, L: Location> SetArgs<'wren, L> for () {
+    const COUNT: usize = 0;
+    const REQUIRED_SLOTS: Slot = 1;
+    unsafe fn set_slots(&self, vm: &mut RawContext<'wren, L>, offset: u16) {
+        ().send_to_vm(vm, Slot::from(offset));
+    }
+}
+
+impl<'wren, L: Location, T: Set<'wren, L> + ?Sized> SetArgs<'wren, L> for &T {
+    const COUNT: usize = 1;
     const REQUIRED_SLOTS: Slot = 1 + T::ADDITIONAL_SLOTS_NEEDED;
     unsafe fn set_slots(&self, vm: &mut RawContext<'wren, L>, offset: u16) {
         self.send_to_vm(vm, Slot::from(offset));
@@ -381,9 +395,15 @@ macro_rules! expand_set_slots {
     };
 }
 
+macro_rules! count {
+    () => (0usize);
+    ( $x:tt $($xs:tt)* ) => (1usize + count!($($xs)*));
+}
+
 macro_rules! impl_set_args_meta {
     ($location:ty, $( $xs:ident = $i:tt ), *) => {
         impl<'wren, $( $xs: Set<'wren, $location>, )*> SetArgs<'wren, $location> for ($( &$xs, )*) {
+            const COUNT: usize = count!( $( $xs ) * );
             const REQUIRED_SLOTS: Slot =
                 expand_required_slots!($( $xs ), *);
 
@@ -462,7 +482,7 @@ mod test {
         macro_rules! meta_test {
             ($location:ty) => {{
                 type L = $location;
-                assert_eq!(<f64 as SetArgs<L>>::REQUIRED_SLOTS, 1);
+                assert_eq!(<&f64 as SetArgs<L>>::REQUIRED_SLOTS, 1);
                 assert_eq!(<(&f64, &f64) as SetArgs<L>>::REQUIRED_SLOTS, 2);
                 assert_eq!(<(&Vec<Vec<f64>>, &f64) as SetArgs<L>>::REQUIRED_SLOTS, 3);
                 assert_eq!(<(&f64, &Vec<Vec<f64>>) as SetArgs<L>>::REQUIRED_SLOTS, 4);
@@ -490,25 +510,23 @@ mod test {
         let (mut vm, Test) = create_test_vm(source, |_| {});
         let context = vm.get_context();
 
-        unsafe {
-            // False cases
-            call_test_case!(bool, context { Test.returnNull() } == false);
-            call_test_case!(bool, context { Test.returnFalse() } == false);
-            call_test_case!(bool, context { Test.returnValue(false) } == false);
-            call_test_case!(bool, context { Test.returnNegate(true) } == false);
-            call_test_case!(bool, context { Test.returnNegate("") } == false);
+        // False cases
+        call_test_case!(bool, context { Test.returnNull() } == false);
+        call_test_case!(bool, context { Test.returnFalse() } == false);
+        call_test_case!(bool, context { Test.returnValue(false) } == false);
+        call_test_case!(bool, context { Test.returnNegate(true) } == false);
+        call_test_case!(bool, context { Test.returnNegate("") } == false);
 
-            // True cases
-            call_test_case!(bool, context { Test.returnTrue } == true);
-            call_test_case!(bool, context { Test.returnTrue() } == true);
-            call_test_case!(bool, context { Test.returnValue(true) } == true);
-            call_test_case!(bool, context { Test.returnNegate(false) } == true);
-            call_test_case!(bool, context { Test.returnValue("") } == true);
-            call_test_case!(bool, context { Test.returnValue("Test") } == true);
-            call_test_case!(bool, context { Test.returnValue(Test) } == true);
-            call_test_case!(bool, context { Test.returnValue(vec![1.0]) } == true);
-            call_test_case!(bool, context { Test.returnValue(1.0) } == true);
-        }
+        // True cases
+        call_test_case!(bool, context { Test.returnTrue } == true);
+        call_test_case!(bool, context { Test.returnTrue() } == true);
+        call_test_case!(bool, context { Test.returnValue(true) } == true);
+        call_test_case!(bool, context { Test.returnNegate(false) } == true);
+        call_test_case!(bool, context { Test.returnValue("") } == true);
+        call_test_case!(bool, context { Test.returnValue("Test") } == true);
+        call_test_case!(bool, context { Test.returnValue(Test) } == true);
+        call_test_case!(bool, context { Test.returnValue(vec![1.0]) } == true);
+        call_test_case!(bool, context { Test.returnValue(1.0) } == true);
     }
 
     #[test]
@@ -532,22 +550,20 @@ mod test {
         let (mut vm, Test) = create_test_vm(source, |_| {});
         let context = vm.get_context();
 
-        unsafe {
-            call_test_case!(String, context { Test.returnNull() } == "null");
-            call_test_case!(String, context { Test.returnFalse() } == "false");
-            call_test_case!(String, context { Test.returnValue(false) } == "false");
-            call_test_case!(String, context { Test.returnTrue } == "true");
-            call_test_case!(String, context { Test.returnTrue() } == "true");
-            call_test_case!(String, context { Test.returnValue("") } == "");
-            call_test_case!(String, context { Test.returnValue("Test") } == "Test");
-            call_test_case!(String, context { Test.returnValue("Test".to_string()) } == "Test");
-            // call_test_case!(String, context { Test.returnValue(Test) } == "Test");
-            // call_test_case!(String, context { Test.returnValue(vec![1.0]) } == "[1]");
-            // call_test_case!(String, context { Test.returnValue(vec!["1.0", "Other"]) } == "[1.0, Other]");
-            // call_test_case!(String, context { Test.returnValue(1.0) } == "1");
-            // call_test_case!(String, context { Test.returnMap } == "{test: 1, 15: Test}");
-            call_test_case!(String, context { Test.sendMulti("Test", vec![1.0]) } == "Test[1]");
-            call_test_case!(String, context { Test.sendMulti(vec!["One Two"], "Test") } == "[One Two]Test");
-        }
+        call_test_case!(String, context { Test.returnNull() } == "null");
+        call_test_case!(String, context { Test.returnFalse() } == "false");
+        call_test_case!(String, context { Test.returnValue(false) } == "false");
+        call_test_case!(String, context { Test.returnTrue } == "true");
+        call_test_case!(String, context { Test.returnTrue() } == "true");
+        call_test_case!(String, context { Test.returnValue("") } == "");
+        call_test_case!(String, context { Test.returnValue("Test") } == "Test");
+        call_test_case!(String, context { Test.returnValue("Test".to_string()) } == "Test");
+        // call_test_case!(String, context { Test.returnValue(Test) } == "Test");
+        // call_test_case!(String, context { Test.returnValue(vec![1.0]) } == "[1]");
+        // call_test_case!(String, context { Test.returnValue(vec!["1.0", "Other"]) } == "[1.0, Other]");
+        // call_test_case!(String, context { Test.returnValue(1.0) } == "1");
+        // call_test_case!(String, context { Test.returnMap } == "{test: 1, 15: Test}");
+        call_test_case!(String, context { Test.sendMulti("Test", vec![1.0]) } == "Test[1]");
+        call_test_case!(String, context { Test.sendMulti(vec!["One Two"], "Test") } == "[One Two]Test");
     }
 }

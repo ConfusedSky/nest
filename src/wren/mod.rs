@@ -63,6 +63,7 @@ pub enum ErrorKind<'s> {
 pub enum InterpretResultErrorKind {
     Compile,
     Runtime,
+    IncorrectNumberOfArgsPassed,
     Unknown(WrenInterpretResult),
 }
 

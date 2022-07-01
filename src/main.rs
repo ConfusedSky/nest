@@ -99,6 +99,9 @@ fn main() {
         Ok(()) => (),
         Err(wren::InterpretResultErrorKind::Compile) => panic!("COMPILE_ERROR"),
         Err(wren::InterpretResultErrorKind::Runtime) => panic!("RUNTIME_ERROR"),
+        Err(wren::InterpretResultErrorKind::IncorrectNumberOfArgsPassed) => {
+            panic!("INCORRECT_NUMBER_OF_ARGS_PASSED")
+        }
         Err(wren::InterpretResultErrorKind::Unknown(kind)) => panic!("UNKNOWN ERROR: {}", kind),
     }
 

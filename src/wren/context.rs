@@ -133,7 +133,21 @@ impl<'wren, T> Context<'wren, T, Native> {
 
     /// Call [method] on a [subject] with [args] on the vm
     /// subject is usually a class or an object, but all calls require a subject
-    /// this is safe as long as the return type specified is correct
+    pub fn call<G: Get<'wren, Native>, Args: SetArgs<'wren, Native>>(
+        &mut self,
+        subject: &Handle<'wren>,
+        method: &CallHandle<'wren>,
+        args: &Args,
+    ) -> Result<G> {
+        if method.get_argument_count() == Args::COUNT {
+            unsafe { self.call_unchecked(subject, method, args) }
+        } else {
+            Err(InterpretResultErrorKind::IncorrectNumberOfArgsPassed)
+        }
+    }
+
+    /// Call [method] on a [subject] with [args] on the vm
+    /// subject is usually a class or an object, but all calls require a subject
     /// otherwise it's UB
     /// Arguments must be set up correctly as well
     pub unsafe fn call_unchecked<G: Get<'wren, Native>, Args: SetArgs<'wren, Native>>(
