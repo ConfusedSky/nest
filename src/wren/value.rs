@@ -165,15 +165,17 @@ impl<'wren, L: Location, T: Get<'wren, L>> Get<'wren, L> for Vec<T> {
 
         // TODO: Handle this better than just returning an empty vec
         let ty = vm.get_slot_type(slot);
-        if cfg!(debug_assertions) {
-            assert!(ty == WrenType::List, "Unable to get non list value as Vec");
-        }
+        // if cfg!(debug_assertions) {
+        // assert!(ty == WrenType::List, "Unable to get non list value as Vec");
+        // }
 
         if ty == WrenType::List {
             let count = ffi::wrenGetListCount(vm.as_ptr(), slot);
 
             for i in 0..count {
                 ffi::wrenGetListElement(vm.as_ptr(), slot, i, item_slot);
+                // Wren arrays can be mixed items
+                // So this will default a couple of the items presumably
                 vec.push(T::get_from_vm(vm, item_slot));
             }
         }
@@ -565,5 +567,71 @@ mod test {
         call_test_case!(String, context { Test.returnMap } == "{test: 1, 15: Test}");
         call_test_case!(String, context { Test.sendMulti("Test", vec![1.0]) } == "Test[1]");
         call_test_case!(String, context { Test.sendMulti(vec!["One Two"], "Test") } == "[One Two]Test");
+    }
+
+    #[test]
+    #[allow(non_snake_case)]
+    fn test_vec() {
+        let source = "class Test {
+                static returnTrue { true }
+                static returnTrue() { true }
+                static returnFalse() { false }
+                static returnNull() { null }
+                static returnValue(value) { value }
+                static nestedArray { [[[1]]] }
+                static sendMulti(value, value2) { value.toString + value2.toString }
+                static returnMap {
+                    var m = {}
+                    m[\"test\"] = 1
+                    m[15] = Test
+                    return m
+                }
+            }";
+
+        let (mut vm, Test) = create_test_vm(source, |_| {});
+        let context = vm.get_context();
+
+        call_test_case!(Vec<String>, context { 
+            Test.returnNull() } == Vec::<String>::new());
+        call_test_case!(Vec<String>, context {
+            Test.returnFalse() } == Vec::<String>::new());
+        call_test_case!(Vec<String>, context {
+            Test.returnValue(false) } == Vec::<String>::new());
+        call_test_case!(Vec<String>, context {
+            Test.returnTrue } == Vec::<String>::new());
+        call_test_case!(Vec<String>, context {
+            Test.returnTrue() } == Vec::<String>::new());
+        call_test_case!(Vec<String>, context {
+            Test.returnValue("") } == Vec::<String>::new());
+        call_test_case!(Vec<String>, context {
+            Test.returnValue("Test") } == Vec::<String>::new());
+        call_test_case!(Vec<String>, context {
+            Test.returnValue("Test".to_string()) } == Vec::<String>::new());
+        call_test_case!(Vec<String>, context {
+            Test.returnValue(Test) } == Vec::<String>::new());
+        call_test_case!(Vec<String>, context {
+            Test.returnValue(vec![1.0]) } == vec!["1"]);
+        call_test_case!(Vec<String>, context {
+            Test.returnValue(vec!["1.0", "Other"]) } == vec!["1.0", "Other"]);
+        call_test_case!(Vec<String>, context {
+            Test.returnValue(1.0) } == Vec::<String>::new());
+        call_test_case!(Vec<String>, context {
+            Test.returnMap } == Vec::<String>::new());
+        call_test_case!(Vec<String>, context {
+            Test.sendMulti("Test", vec![1.0]) } == Vec::<String>::new());
+        call_test_case!(Vec<String>, context {
+            Test.sendMulti(vec!["One Two"], "Test") } == Vec::<String>::new());
+
+        call_test_case!(Vec<Vec<String>>, context {
+            Test.returnValue(vec![vec!["1.0", "Other"]]) } == vec![vec!["1.0", "Other"]]);
+
+        call_test_case!(Vec<String>, context {
+            Test.returnValue(
+                vec![vec![vec!["1.0", "Other"]]]
+            )
+        } == vec!["[[1.0, Other]]"]);
+        call_test_case!(Vec<Vec<Vec<f64>>>, context {
+            Test.nestedArray
+        } == vec![vec![vec![1.0_f64]]]);
     }
 }
