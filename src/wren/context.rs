@@ -12,7 +12,7 @@ use super::{
     handle::CallHandle,
     system_methods::SystemMethods,
     value::{TryGetResult, WrenType},
-    Fiber, Get, GetArgs, Handle, InterpretResultErrorKind, Result, Set, SetArgs, Slot,
+    Fiber, GetArgs, GetValue, Handle, InterpretResultErrorKind, Result, SetArgs, SetValue, Slot,
     SystemUserData, Value, VmUserData,
 };
 
@@ -133,7 +133,7 @@ impl<'wren, T> Context<'wren, T, Native> {
 
     /// Call [method] on a [subject] with [args] on the vm
     /// subject is usually a class or an object, but all calls require a subject
-    pub fn call<G: Get<'wren, Native>, Args: SetArgs<'wren, Native>>(
+    pub fn call<G: GetValue<'wren, Native>, Args: SetArgs<'wren, Native>>(
         &mut self,
         subject: &Handle<'wren>,
         method: &CallHandle<'wren>,
@@ -152,7 +152,7 @@ impl<'wren, T> Context<'wren, T, Native> {
     /// subject is usually a class or an object, but all calls require a subject
     /// otherwise it's UB
     /// Arguments must be set up correctly as well
-    pub unsafe fn call_unchecked<G: Get<'wren, Native>, Args: SetArgs<'wren, Native>>(
+    pub unsafe fn call_unchecked<G: GetValue<'wren, Native>, Args: SetArgs<'wren, Native>>(
         &mut self,
         subject: &Handle<'wren>,
         method: &CallHandle<'wren>,
@@ -171,7 +171,7 @@ impl<'wren, T> Context<'wren, T, Native> {
         // previous slots can be used as scratch slots
         // without needing to allocate more
         args.set_slots(vm, 1);
-        subject.send_to_vm(vm, 0);
+        subject.set_slot(vm, 0);
 
         let result = ffi::wrenCall(vm.as_ptr(), method.as_ptr());
         InterpretResultErrorKind::new_from_result(result)?;
@@ -236,7 +236,7 @@ impl<'wren, L: Location> Context<'wren, NoTypeInfo, L> {
         slot: Slot,
     ) -> Handle<'wren> {
         ffi::wrenGetVariable(self.as_ptr(), module.as_ptr(), name.as_ptr(), slot);
-        Handle::get_from_vm(self.as_foreign_mut(), slot)
+        Handle::get_slot(self.as_foreign_mut(), slot)
     }
 
     pub fn make_call_handle_slice(
@@ -265,9 +265,13 @@ impl<'wren, L: Location> Context<'wren, NoTypeInfo, L> {
         args.set_wren_stack(self, 0);
     }
 
-    pub fn set_return_value<Args: Set<'wren, L>>(&mut self, arg: &Args) {
+    pub fn set_return_value<Args: SetValue<'wren, L>>(&mut self, arg: &Args) {
         arg.set_wren_stack(self, 0);
     }
+
+    // pub fn get_stack_values(&self) -> &[WrenType] {
+
+    // }
 
     // TODO: Create safe version that returns Options depending on how many slots
     // there are
@@ -275,7 +279,7 @@ impl<'wren, L: Location> Context<'wren, NoTypeInfo, L> {
         Args::get_slots(self)
     }
 
-    pub unsafe fn get_return_value_unchecked<Args: Get<'wren, L>>(&mut self) -> Args {
+    pub unsafe fn get_return_value_unchecked<Args: GetValue<'wren, L>>(&mut self) -> Args {
         Args::get_slots(self)
     }
 

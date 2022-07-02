@@ -19,8 +19,8 @@ macro_rules! create_trait_alias {
     };
 }
 
-create_trait_alias!(WrenGet, crate::wren::Get<'wren, L>);
-create_trait_alias!(WrenSet, crate::wren::Set<'wren, L>);
+create_trait_alias!(WrenGet, crate::wren::GetValue<'wren, L>);
+create_trait_alias!(WrenSet, crate::wren::SetValue<'wren, L>);
 create_trait_alias!(WrenGetArgs, crate::wren::GetArgs<'wren, L>);
 create_trait_alias!(WrenSetArgs, crate::wren::SetArgs<'wren, L>);
 

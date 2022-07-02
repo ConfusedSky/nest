@@ -13,7 +13,7 @@ mod value;
 pub use fiber::Fiber;
 pub use handle::{CallHandle, Handle};
 pub use user_data::UserData as VmUserData;
-pub use value::{Get, GetArgs, Set, SetArgs, Value};
+pub use value::{GetArgs, GetValue, SetArgs, SetValue, Value};
 
 pub use wren_sys::WREN_VERSION_STRING as VERSION;
 

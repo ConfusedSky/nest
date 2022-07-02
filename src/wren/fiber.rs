@@ -4,7 +4,7 @@ use super::{
     context::{Context, Location, Native, Raw},
     handle::CallHandle,
     value::TryGetResult,
-    Get, Handle, RawNativeContext, Result, Set, Value,
+    GetValue, Handle, RawNativeContext, Result, SetValue, Value,
 };
 
 pub struct Methods<'wren> {
@@ -89,7 +89,7 @@ impl<'wren> Fiber<'wren> {
             .construct(vm.as_raw_mut(), handle)
     }
 
-    pub fn transfer<G: Get<'wren, Native>>(
+    pub fn transfer<G: GetValue<'wren, Native>>(
         self,
         context: &mut RawNativeContext<'wren>,
     ) -> Result<G> {
@@ -97,7 +97,7 @@ impl<'wren> Fiber<'wren> {
         let res: G = context.call(&self, transfer, &())?;
         Ok(res)
     }
-    pub fn transfer_with_arg<G: Get<'wren, Native>, S: Set<'wren, Native>>(
+    pub fn transfer_with_arg<G: GetValue<'wren, Native>, S: SetValue<'wren, Native>>(
         self,
         context: &mut RawNativeContext<'wren>,
         additional_argument: S,
@@ -110,7 +110,7 @@ impl<'wren> Fiber<'wren> {
     pub fn transfer_error<S, G>(self, context: &mut RawNativeContext<'wren>, error: S) -> Result<G>
     where
         S: AsRef<str>,
-        G: Get<'wren, Native>,
+        G: GetValue<'wren, Native>,
     {
         let transfer_error = &self.methods.transfer_error;
         let error = error.as_ref();
@@ -141,9 +141,9 @@ impl<'wren> Value for Fiber<'wren> {
 // }
 // }
 
-impl<'wren, L: Location> Set<'wren, L> for Fiber<'wren> {
-    unsafe fn send_to_vm(&self, vm: &mut Raw<'wren, L>, slot: super::Slot) {
-        self.handle.send_to_vm(vm, slot);
+impl<'wren, L: Location> SetValue<'wren, L> for Fiber<'wren> {
+    unsafe fn set_slot(&self, vm: &mut Raw<'wren, L>, slot: super::Slot) {
+        self.handle.set_slot(vm, slot);
     }
 }
 
@@ -151,9 +151,9 @@ impl<'wren> Value for TryGetResult<'wren, Fiber<'wren>> {
     const REQUIRED_SLOTS: super::Slot = 1;
 }
 
-impl<'wren> Get<'wren, Native> for TryGetResult<'wren, Fiber<'wren>> {
-    unsafe fn get_from_vm(vm: &mut Raw<'wren, Native>, slot: super::Slot) -> Self {
-        let handle = Handle::get_from_vm(vm, slot);
+impl<'wren> GetValue<'wren, Native> for TryGetResult<'wren, Fiber<'wren>> {
+    unsafe fn get_slot(vm: &mut Raw<'wren, Native>, slot: super::Slot) -> Self {
+        let handle = Handle::get_slot(vm, slot);
 
         vm.get_system_methods().fiber_methods.construct(vm, handle)
     }
