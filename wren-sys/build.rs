@@ -19,7 +19,8 @@ fn main() {
 
     if !wren_c_path.exists() {
         let script = format!("{}/util/generate_amalgamation.py", wren_dir);
-        let python = which("python3").expect("wren_sys requires python to generate almalgamation!");
+        let python =
+            which("python3").expect("wren_sys requires python3 to generate almalgamation!");
         let result = Command::new(python)
             .current_dir(wren_dir)
             .arg(script)
