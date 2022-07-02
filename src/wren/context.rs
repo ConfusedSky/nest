@@ -37,7 +37,8 @@ impl<'wren, V, L: Location> Context<'wren, V, L> {
     }
 
     // NOTE THESE ARE ALL DOWNCASTS SO THIS IS SAFE
-
+    // Foreign is more restrictive than native
+    // Raw is more restrictive than typed
     pub const fn as_foreign(&self) -> &Context<'wren, V, Foreign> {
         unsafe { self.transmute::<V, Foreign>() }
     }

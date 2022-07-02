@@ -18,6 +18,8 @@ fn main() {
     let wren_c_path = Path::new(wren_c.as_str());
 
     if !wren_c_path.exists() {
+        // TODO: don't require generate amalgamation
+        // and build source direct
         let script = format!("{}/util/generate_amalgamation.py", wren_dir);
         let python =
             which("python3").expect("wren_sys requires python3 to generate almalgamation!");

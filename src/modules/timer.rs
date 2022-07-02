@@ -33,15 +33,12 @@ fn start(mut vm: Context) {
             sleep(Duration::from_secs_f64(ms / 1000.0)).await;
         },
         |vm| {
-            let fiber = vm.check_fiber(fiber);
-            // .expect("Fiber passed to Timer.start_(_,_) was not a valid fiber");
-            if let Ok(fiber) = fiber {
-                fiber
-                    .transfer::<()>(vm)
-                    .expect("Resume failed in Timer.start_(_,_)");
-            } else {
-                panic!("Fiber passed to Timer.start_(_,_) was not a valid fiber");
-            }
+            let fiber = vm
+                .check_fiber(fiber)
+                .expect("Fiber passed to Timer.start_(_,_) was not a valid fiber");
+            fiber
+                .transfer::<()>(vm)
+                .expect("Resume failed in Timer.start_(_,_)");
         },
     );
 }
