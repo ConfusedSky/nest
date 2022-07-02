@@ -19,6 +19,7 @@ pub use wren_sys::WREN_VERSION_STRING as VERSION;
 
 use std::{ffi::c_void, marker::PhantomData, mem::ManuallyDrop};
 
+use self::value::WrenType;
 pub use self::{
     context::{Context, RawForeign as RawForeignContext, RawNative as RawNativeContext},
     system_methods::SystemMethods,
@@ -84,6 +85,9 @@ impl InterpretResultErrorKind {
 #[repr(C)]
 struct SystemUserData<'wren, V: 'wren> {
     system_methods: Option<SystemMethods<'wren>>,
+    // This is used as a backing store for get_stack_values
+    // Otherwise it's not used at all
+    stack_values: Vec<WrenType>,
     // User data must always be the last item in the struct because it is variable
     // size and sometimes we need to access other system user data items from an untyped
     // context so we want to make sure that while this can grow and shrink that it doesn't
@@ -95,6 +99,7 @@ impl<'wren, V> SystemUserData<'wren, V> {
     const fn new(user_data: V) -> Self {
         Self {
             user_data: ManuallyDrop::new(user_data),
+            stack_values: Vec::new(),
             system_methods: None,
         }
     }
