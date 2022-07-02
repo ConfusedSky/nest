@@ -71,20 +71,13 @@ unsafe fn store_slot<'wren, L: Location>(
     }
 }
 
-/// `WrenValue` is a value that is marshallable from the vm to rust and vice-versa
-/// Methods have 3 arguments
-/// VM: The vm pointer
-/// slot: The slot being saved to
-pub trait Value {
+pub trait SetValue<'wren, L: Location> {
     /// Number of additional slots that need to be allocated to use this
     const REQUIRED_SLOTS: Slot;
-}
-
-pub trait SetValue<'wren, L: Location>: Value {
     unsafe fn set_slot(&self, vm: &mut RawContext<'wren, L>, slot: Slot);
 }
 
-pub trait GetValue<'wren, L: Location>: Value {
+pub trait GetValue<'wren, L: Location> {
     /// NOTE THE IMPLEMENTATION OF GET FROM VM SHOULD BE SAFE REGARDLESS
     /// OF WHAT IS IN THE SLOT
     /// `get_from_vm` is unsafe because it's not guarenteed that
@@ -94,11 +87,8 @@ pub trait GetValue<'wren, L: Location>: Value {
 
 // () is implemented to allow skipping slots
 // and to set send null to the vm
-impl Value for () {
-    const REQUIRED_SLOTS: Slot = 1;
-}
-
 impl<'wren, L: Location> SetValue<'wren, L> for () {
+    const REQUIRED_SLOTS: Slot = 1;
     unsafe fn set_slot(&self, vm: &mut RawContext<'wren, L>, slot: Slot) {
         ffi::wrenSetSlotNull(vm.as_ptr(), slot);
     }
@@ -108,20 +98,15 @@ impl<'wren, L: Location> GetValue<'wren, L> for () {
     unsafe fn get_slot(_vm: &mut RawContext<'wren, L>, _slot: Slot) -> Self {}
 }
 
-impl<T: Value> Value for &T {
-    const REQUIRED_SLOTS: Slot = T::REQUIRED_SLOTS;
-}
-
 impl<'wren, L: Location, T: SetValue<'wren, L>> SetValue<'wren, L> for &T {
+    const REQUIRED_SLOTS: Slot = T::REQUIRED_SLOTS;
     unsafe fn set_slot(&self, vm: &mut RawContext<'wren, L>, slot: Slot) {
         (*self).set_slot(vm, slot);
     }
 }
 
-impl<'wren> Value for Handle<'wren> {
-    const REQUIRED_SLOTS: Slot = 1;
-}
 impl<'wren, L: Location> SetValue<'wren, L> for Handle<'wren> {
+    const REQUIRED_SLOTS: Slot = 1;
     unsafe fn set_slot(&self, vm: &mut RawContext<'wren, L>, slot: Slot) {
         ffi::wrenSetSlotHandle(vm.as_ptr(), slot, self.as_ptr());
     }
@@ -163,13 +148,10 @@ unsafe fn send_iterator_to_vm<'wren, L: Location, T: SetValue<'wren, L>, I: Iter
     }
 }
 
-impl<T: Value> Value for Vec<T> {
+impl<'wren, L: Location, T: SetValue<'wren, L>> SetValue<'wren, L> for Vec<T> {
     // This needs at least one for moving values into the wren list as well as
     // any additional slots for T's initialization
     const REQUIRED_SLOTS: Slot = 1 + T::REQUIRED_SLOTS;
-}
-
-impl<'wren, L: Location, T: SetValue<'wren, L>> SetValue<'wren, L> for Vec<T> {
     unsafe fn set_slot(&self, vm: &mut RawContext<'wren, L>, slot: Slot) {
         send_iterator_to_vm(self.iter(), vm, slot);
     }
@@ -209,23 +191,17 @@ impl<'wren, L: Location, T: GetValue<'wren, L>> GetValue<'wren, L> for Vec<T> {
     }
 }
 
-impl<T: Value> Value for [T] {
+impl<'wren, L: Location, T: SetValue<'wren, L>> SetValue<'wren, L> for [T] {
     // This needs at least one for moving values into the wren list as well as
     // any additional slots for T's initialization
     const REQUIRED_SLOTS: Slot = 1 + T::REQUIRED_SLOTS;
-}
-
-impl<'wren, L: Location, T: SetValue<'wren, L>> SetValue<'wren, L> for [T] {
     unsafe fn set_slot(&self, vm: &mut RawContext<'wren, L>, slot: Slot) {
         send_iterator_to_vm(self.iter(), vm, slot);
     }
 }
 
-impl Value for CString {
-    const REQUIRED_SLOTS: Slot = 1;
-}
-
 impl<'wren, L: Location> SetValue<'wren, L> for CString {
+    const REQUIRED_SLOTS: Slot = 1;
     unsafe fn set_slot(&self, vm: &mut RawContext<'wren, L>, slot: Slot) {
         ffi::wrenSetSlotString(vm.as_ptr(), slot, self.as_ptr());
     }
@@ -246,11 +222,8 @@ unsafe fn send_string_to_vm<S: AsRef<str>, L: Location>(
     );
 }
 
-impl Value for &str {
-    const REQUIRED_SLOTS: Slot = 1;
-}
-
 impl<'wren, L: Location> SetValue<'wren, L> for &str {
+    const REQUIRED_SLOTS: Slot = 1;
     unsafe fn set_slot(&self, vm: &mut RawContext<'wren, L>, slot: Slot) {
         send_string_to_vm(vm, self, slot);
     }
@@ -272,11 +245,8 @@ unsafe fn generic_get_string<L: Location>(vm: &mut RawContext<L>, slot: Slot) ->
     }
 }
 
-impl Value for String {
-    const REQUIRED_SLOTS: Slot = 1;
-}
-
 impl<'wren, L: Location> SetValue<'wren, L> for String {
+    const REQUIRED_SLOTS: Slot = 1;
     unsafe fn set_slot(&self, vm: &mut RawContext<'wren, L>, slot: Slot) {
         send_string_to_vm(vm, self, slot);
     }
@@ -301,21 +271,14 @@ impl<'wren> GetValue<'wren, Native> for String {
     }
 }
 
-impl<'wren> Value for TryGetResult<'wren, String> {
-    const REQUIRED_SLOTS: Slot = 1;
-}
-
 impl<'wren> GetValue<'wren, Foreign> for TryGetResult<'wren, String> {
     unsafe fn get_slot(vm: &mut RawContext<'wren, Foreign>, slot: Slot) -> Self {
         generic_get_string(vm, slot).ok_or_else(|| Handle::get_slot(vm, slot))
     }
 }
 
-impl Value for f64 {
-    const REQUIRED_SLOTS: Slot = 1;
-}
-
 impl<'wren, L: Location> SetValue<'wren, L> for f64 {
+    const REQUIRED_SLOTS: Slot = 1;
     unsafe fn set_slot(&self, vm: &mut RawContext<'wren, L>, slot: Slot) {
         ffi::wrenSetSlotDouble(vm.as_ptr(), slot, *self);
     }
@@ -331,11 +294,8 @@ impl<'wren, L: Location> GetValue<'wren, L> for f64 {
     }
 }
 
-impl Value for bool {
-    const REQUIRED_SLOTS: Slot = 1;
-}
-
 impl<'wren, L: Location> SetValue<'wren, L> for bool {
+    const REQUIRED_SLOTS: Slot = 1;
     unsafe fn set_slot(&self, vm: &mut RawContext<'wren, L>, slot: Slot) {
         ffi::wrenSetSlotBool(vm.as_ptr(), slot, *self);
     }

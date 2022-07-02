@@ -13,7 +13,7 @@ use super::{
     system_methods::SystemMethods,
     value::{TryGetResult, WrenType},
     Fiber, GetArgs, GetValue, Handle, InterpretResultErrorKind, Result, SetArgs, SetValue, Slot,
-    SystemUserData, Value, VmUserData,
+    SystemUserData, VmUserData,
 };
 
 pub type Raw<'wren, L> = Context<'wren, NoTypeInfo, L>;
@@ -139,7 +139,8 @@ impl<'wren, T> Context<'wren, T, Native> {
         method: &CallHandle<'wren>,
         args: &Args,
     ) -> Result<G> {
-        let slot_count = Handle::REQUIRED_SLOTS + Args::TOTAL_REQUIRED_SLOTS;
+        let slot_count =
+            <Handle as SetValue<'wren, Native>>::REQUIRED_SLOTS + Args::TOTAL_REQUIRED_SLOTS;
 
         if method.get_argument_count() == Args::COUNT {
             unsafe { self.call_unchecked(subject, method, args, slot_count) }

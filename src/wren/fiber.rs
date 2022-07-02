@@ -4,7 +4,7 @@ use super::{
     context::{Context, Location, Native, Raw},
     handle::CallHandle,
     value::TryGetResult,
-    GetValue, Handle, RawNativeContext, Result, SetValue, Value,
+    GetValue, Handle, RawNativeContext, Result, SetValue,
 };
 
 pub struct Methods<'wren> {
@@ -126,10 +126,6 @@ impl<'wren> Deref for Fiber<'wren> {
     }
 }
 
-impl<'wren> Value for Fiber<'wren> {
-    const REQUIRED_SLOTS: super::Slot = 1;
-}
-
 // Getting unchecked fibers will always be unsafe
 // impl<'wren, L: Location> Get<'wren, L> for Fiber<'wren> {
 // unsafe fn get_from_vm(vm: &mut Raw<'wren, L>, slot: super::Slot) -> Self {
@@ -142,13 +138,10 @@ impl<'wren> Value for Fiber<'wren> {
 // }
 
 impl<'wren, L: Location> SetValue<'wren, L> for Fiber<'wren> {
+    const REQUIRED_SLOTS: super::Slot = 1;
     unsafe fn set_slot(&self, vm: &mut Raw<'wren, L>, slot: super::Slot) {
         self.handle.set_slot(vm, slot);
     }
-}
-
-impl<'wren> Value for TryGetResult<'wren, Fiber<'wren>> {
-    const REQUIRED_SLOTS: super::Slot = 1;
 }
 
 impl<'wren> GetValue<'wren, Native> for TryGetResult<'wren, Fiber<'wren>> {
