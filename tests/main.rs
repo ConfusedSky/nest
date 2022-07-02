@@ -3,9 +3,9 @@ use predicates::prelude::*; // Used for writing assertions
 use std::{borrow::Cow, fs::read_to_string, path::Path, process::Command}; // Run programs
 use test_case::test_case;
 
-#[test_case("test_scheduler")]
-#[test_case("test_scheduled_tasks_should_run")]
-#[test_case("test_random")]
+#[test_case("test/scheduler_order")]
+#[test_case("test/scheduled_tasks_should_run")]
+#[test_case("test/random_is_deterministic")]
 fn test_runner(script: &str) -> Result<(), Box<dyn std::error::Error>> {
     test_script(script)
 }
