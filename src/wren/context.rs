@@ -139,8 +139,10 @@ impl<'wren, T> Context<'wren, T, Native> {
         method: &CallHandle<'wren>,
         args: &Args,
     ) -> Result<G> {
+        let slot_count = Handle::REQUIRED_SLOTS + Args::TOTAL_REQUIRED_SLOTS;
+
         if method.get_argument_count() == Args::COUNT {
-            unsafe { self.call_unchecked(subject, method, args) }
+            unsafe { self.call_unchecked(subject, method, args, slot_count) }
         } else {
             Err(InterpretResultErrorKind::IncorrectNumberOfArgsPassed)
         }
@@ -155,15 +157,21 @@ impl<'wren, T> Context<'wren, T, Native> {
         subject: &Handle<'wren>,
         method: &CallHandle<'wren>,
         args: &Args,
+        slot_count: Slot,
     ) -> Result<G> {
         // make sure there enough slots to send over the subject
         // and all it's args
         let vm = self.as_raw_mut();
-        vm.ensure_slots(Handle::REQUIRED_SLOTS + Args::TOTAL_REQUIRED_SLOTS);
+
+        // Allocate enough space for the subject and for the args
+        vm.ensure_slots(slot_count);
 
         // Send over the subject and all of it's args
-        subject.send_to_vm(vm, 0);
+        // Sending is always done in reverse order so
+        // previous slots can be used as scratch slots
+        // without needing to allocate more
         args.set_slots(vm, 1);
+        subject.send_to_vm(vm, 0);
 
         let result = ffi::wrenCall(vm.as_ptr(), method.as_ptr());
         InterpretResultErrorKind::new_from_result(result)?;
@@ -245,7 +253,7 @@ impl<'wren, L: Location> Context<'wren, NoTypeInfo, L> {
     pub fn ensure_slots(&mut self, num_slots: Slot) {
         // SAFETY: this one is always safe to call even if the value is negative
         unsafe {
-            wren_sys::wrenEnsureSlots(self.as_ptr(), num_slots);
+            wren_sys::wrenEnsureSlots(self.as_ptr(), num_slots + 10);
         }
     }
 

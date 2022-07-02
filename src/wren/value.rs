@@ -46,6 +46,7 @@ struct SlotStorage<'wren> {
 
 impl<'wren> Drop for SlotStorage<'wren> {
     fn drop(&mut self) {
+        self.vm.ensure_slots(self.slot);
         unsafe { self.handle.send_to_vm(&mut self.vm, self.slot) }
     }
 }
@@ -122,7 +123,7 @@ impl<'wren, L: Location> Get<'wren, L> for Handle<'wren> {
     // We are always able to Get<'wren> a handle from wren
     unsafe fn get_from_vm(vm: &mut RawContext<'wren, L>, slot: Slot) -> Self {
         let handle = ffi::wrenGetSlotHandle(vm.as_ptr(), slot);
-        Self::new(vm.as_foreign(), NonNull::new_unchecked(handle))
+        Self::new_unchecked(vm.as_foreign(), NonNull::new_unchecked(handle))
     }
 }
 
@@ -131,11 +132,29 @@ unsafe fn send_iterator_to_vm<'wren, L: Location, T: Set<'wren, L>, I: Iterator<
     vm: &mut RawContext<'wren, L>,
     slot: Slot,
 ) {
+    let mut list = None;
     ffi::wrenSetSlotNewList(vm.as_ptr(), slot);
+    // Store the next slot so we don't overwrite it's value
+    // Or use the previous slot instead of juggling slots
+    let (_store, item_slot) = if slot == 0 {
+        // Make sure the slot that we are storing actually exits
+        vm.ensure_slots(slot + 1);
+        //  We should store the list in a handle as well just
+        // in case send_to_vm overwrites [slot]
+        list = Some(Handle::get_from_vm(vm, slot));
+        (Some(store_slot(vm, slot + 1)), slot + 1)
+    } else {
+        (None, slot - 1)
+    };
 
     for value in iterator {
-        value.send_to_vm(vm, slot + 1);
-        ffi::wrenInsertInList(vm.as_ptr(), slot, -1, slot + 1);
+        value.send_to_vm(vm, item_slot);
+        // If we had to store the list earlier
+        // then it needs to be sent to the vm again
+        if let Some(list) = &list {
+            list.send_to_vm(vm, slot);
+        }
+        ffi::wrenInsertInList(vm.as_ptr(), slot, -1, item_slot);
     }
 }
 
@@ -156,6 +175,8 @@ impl<'wren, L: Location, T: Get<'wren, L>> Get<'wren, L> for Vec<T> {
         // Store the next slot so we don't overwrite it's value
         // Or use the previous slot instead of juggling slots
         let (_store, item_slot) = if slot == 0 {
+            // Make sure the slot that we are storing actually exits
+            vm.ensure_slots(slot + 1);
             (Some(store_slot(vm, slot + 1)), slot + 1)
         } else {
             (None, slot - 1)
@@ -357,8 +378,10 @@ pub trait SetArgs<'wren, L: Location> {
 impl<'wren, L: Location> SetArgs<'wren, L> for () {
     const COUNT: usize = 0;
     const TOTAL_REQUIRED_SLOTS: Slot = 1;
-    unsafe fn set_slots(&self, vm: &mut RawContext<'wren, L>, offset: u16) {
-        ().send_to_vm(vm, Slot::from(offset));
+    unsafe fn set_slots(&self, _: &mut RawContext<'wren, L>, _: u16) {
+        // An empty arg list should do nothing
+        // This currently sends a null
+        // ().send_to_vm(vm, Slot::from(offset));
     }
 }
 
@@ -392,8 +415,8 @@ macro_rules! expand_set_slots {
         $self.$i.$method($vm, $i + $offset as Slot);
     };
     ($self:ident, $vm:ident, $method:ident, $offset:expr, $i:tt, $($xs:tt),+ $(,)?) => {
-        expand_set_slots!($self, $vm, $method, $offset, $i);
         expand_set_slots!($self, $vm, $method, $offset, $( $xs ), *);
+        expand_set_slots!($self, $vm, $method, $offset, $i);
     };
 }
 
@@ -411,6 +434,8 @@ macro_rules! impl_set_args_meta {
 
 
             unsafe fn set_slots(&self, vm: &mut RawContext<'wren, $location>, offset: u16) {
+                // Expansion happens in reverse order so previous slots
+                // can be used when scratch slots are needed
                 expand_set_slots!(self, vm, send_to_vm, offset, $( $i ), *);
             }
         }
@@ -446,6 +471,8 @@ macro_rules! impl_get_args_meta {
         impl<'wren, $( $xs: Get<'wren, $location>, )*> GetArgs<'wren, $location> for ($( $xs, )*) {
             unsafe fn get_slots(vm: &mut RawContext<'wren, $location>) -> Self{
                 (
+                    // Expansion happens in forward order so
+                    // Previous slots can be reused for reads
                     $( $xs::get_from_vm(vm, $i) ), *
                 )
             }

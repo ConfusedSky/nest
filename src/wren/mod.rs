@@ -94,9 +94,18 @@ struct SystemUserData<'wren, V: 'wren> {
 impl<'wren, V> SystemUserData<'wren, V> {
     const fn new(user_data: V) -> Self {
         Self {
-            user_data,
+            user_data: user_data,
             system_methods: None,
         }
+    }
+}
+
+impl<'wren, V> Drop for SystemUserData<'wren, V> {
+    fn drop(&mut self) {
+        // Make sure user data is dropped first because there might be things that
+        // the user_data depends on that are used in system methods
+        // drop(self.user_data.take());
+        // drop(self.system_methods.take());
     }
 }
 

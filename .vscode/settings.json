@@ -4,5 +4,5 @@
     ],
     "lldb.launch.sourceMap": {
         "/rustc/fe5b13d681f25ee6474be29d748c65adcd91f69e/": "/Users/masa/.rustup/toolchains/stable-x86_64-apple-darwin/lib/rustlib/src/rust/"
-    },
+    }
 }

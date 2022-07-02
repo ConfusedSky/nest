@@ -13,10 +13,7 @@
             "cwd": "${workspaceRoot}",
             "sourceLanguages": [
                 "rust"
-            ],
-            "env": {
-                "WREN_DEBUG": "true"
-            }
+            ]
         }
     ]
 }

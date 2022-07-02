@@ -28,7 +28,10 @@ impl<'wren> Debug for Handle<'wren> {
 }
 
 impl<'wren> Handle<'wren> {
-    pub(crate) fn new(vm: &RawForeignContext<'wren>, pointer: NonNull<WrenHandle>) -> Self {
+    pub(crate) unsafe fn new_unchecked(
+        vm: &RawForeignContext<'wren>,
+        pointer: NonNull<WrenHandle>,
+    ) -> Self {
         Self {
             vm: vm.clone(),
             pointer,
@@ -43,20 +46,32 @@ impl<'wren> Handle<'wren> {
 
 impl<'wren> Drop for Handle<'wren> {
     fn drop(&mut self) {
+        println!("{:?}", self);
         unsafe { wrenReleaseHandle(self.vm.as_ptr(), self.pointer.as_ptr()) }
     }
 }
 
 /// This is just a thin wrapper around a handle so we can guarente it's a call handle
+#[derive(Debug)]
 pub struct CallHandle<'wren> {
     handle: Handle<'wren>,
     argument_count: usize,
+    // If we need to debug we should have access to the call handle's signature
+    // TODO: Lock this behind a feature flag?
+    // Only exists for debug purposes
+    _signature: String,
 }
 
 impl<'wren> Deref for CallHandle<'wren> {
     type Target = Handle<'wren>;
     fn deref(&self) -> &Self::Target {
         &self.handle
+    }
+}
+
+impl<'wren> Drop for CallHandle<'wren> {
+    fn drop(&mut self) {
+        println!("{:?}", self);
     }
 }
 
@@ -78,13 +93,14 @@ impl<'wren> CallHandle<'wren> {
         // SAFETY: this function is always safe to call but may be unsafe to use the handle it returns
         // as that handle might not be valid and safe to use
         let ptr = ffi::wrenMakeCallHandle(vm.as_ptr(), signature.as_ptr());
-        let handle = Handle::new(
+        let handle = Handle::new_unchecked(
             vm.as_foreign_mut().as_raw_mut(),
             NonNull::new_unchecked(ptr),
         );
         CallHandle {
             handle,
             argument_count,
+            _signature: signature.to_string_lossy().to_string(),
         }
     }
 
@@ -94,6 +110,8 @@ impl<'wren> CallHandle<'wren> {
     ) -> Self {
         let mut argument_count = 0;
 
+        // Count the number of underscores in a signature that appear after the
+        // opening paren
         signature
             .to_bytes()
             .iter()
@@ -129,25 +147,25 @@ mod test {
         let context = vm.get_context();
 
         assert!(
-            CallHandle::new_from_slice(context, call_signature!(Test))
+            CallHandle::new_from_slice(context, call_signature!(Te_st_))
                 .unwrap()
                 .argument_count
                 == 0
         );
         assert!(
-            CallHandle::new_from_slice(context, call_signature!(Test, 0))
+            CallHandle::new_from_slice(context, call_signature!(Te_st, 0))
                 .unwrap()
                 .argument_count
                 == 0
         );
         assert!(
-            CallHandle::new_from_slice(context, call_signature!(Test, 1))
+            CallHandle::new_from_slice(context, call_signature!(Te_st, 1))
                 .unwrap()
                 .argument_count
                 == 1
         );
         assert!(
-            CallHandle::new_from_slice(context, call_signature!(Test, 2))
+            CallHandle::new_from_slice(context, call_signature!(Test_, 2))
                 .unwrap()
                 .argument_count
                 == 2
