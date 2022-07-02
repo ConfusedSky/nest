@@ -28,14 +28,14 @@ fn main() {
         std::fs::write(wren_c_path, &result.stdout).expect("Failed writing wren.c");
     }
 
-    let debug = true;
-    // let debug = {
-    // if let Ok(v) = env::var("WREN_DEBUG") {
-    // v == "true"
-    // } else {
-    // false
-    // }
-    // };
+    // let debug = true;
+    let debug = {
+        if let Ok(v) = env::var("WREN_DEBUG") {
+            v == "true"
+        } else {
+            false
+        }
+    };
 
     let mut build = cc::Build::new();
     build.file(wren_c_path).warnings(false);
