@@ -17,7 +17,7 @@ pub use value::{Get, GetArgs, Set, SetArgs, Value};
 
 pub use wren_sys::WREN_VERSION_STRING as VERSION;
 
-use std::{ffi::c_void, marker::PhantomData};
+use std::{ffi::c_void, marker::PhantomData, mem::ManuallyDrop};
 
 pub use self::{
     context::{Context, RawForeign as RawForeignContext, RawNative as RawNativeContext},
@@ -88,13 +88,13 @@ struct SystemUserData<'wren, V: 'wren> {
     // size and sometimes we need to access other system user data items from an untyped
     // context so we want to make sure that while this can grow and shrink that it doesn't
     // affect the offsets to other items in the system data
-    user_data: V,
+    user_data: ManuallyDrop<V>,
 }
 
 impl<'wren, V> SystemUserData<'wren, V> {
     const fn new(user_data: V) -> Self {
         Self {
-            user_data: user_data,
+            user_data: ManuallyDrop::new(user_data),
             system_methods: None,
         }
     }
@@ -104,8 +104,10 @@ impl<'wren, V> Drop for SystemUserData<'wren, V> {
     fn drop(&mut self) {
         // Make sure user data is dropped first because there might be things that
         // the user_data depends on that are used in system methods
-        // drop(self.user_data.take());
-        // drop(self.system_methods.take());
+        unsafe {
+            ManuallyDrop::drop(&mut self.user_data);
+        }
+        drop(self.system_methods.take());
     }
 }
 

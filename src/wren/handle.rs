@@ -46,7 +46,7 @@ impl<'wren> Handle<'wren> {
 
 impl<'wren> Drop for Handle<'wren> {
     fn drop(&mut self) {
-        println!("{:?}", self);
+        // println!("{:?}", self);
         unsafe { wrenReleaseHandle(self.vm.as_ptr(), self.pointer.as_ptr()) }
     }
 }
@@ -71,7 +71,7 @@ impl<'wren> Deref for CallHandle<'wren> {
 
 impl<'wren> Drop for CallHandle<'wren> {
     fn drop(&mut self) {
-        println!("{:?}", self);
+        // println!("{:?}", self);
     }
 }
 
