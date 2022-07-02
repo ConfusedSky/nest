@@ -253,7 +253,7 @@ impl<'wren, L: Location> Context<'wren, NoTypeInfo, L> {
     pub fn ensure_slots(&mut self, num_slots: Slot) {
         // SAFETY: this one is always safe to call even if the value is negative
         unsafe {
-            wren_sys::wrenEnsureSlots(self.as_ptr(), num_slots + 10);
+            wren_sys::wrenEnsureSlots(self.as_ptr(), num_slots);
         }
     }
 

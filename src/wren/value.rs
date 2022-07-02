@@ -46,7 +46,9 @@ struct SlotStorage<'wren> {
 
 impl<'wren> Drop for SlotStorage<'wren> {
     fn drop(&mut self) {
-        self.vm.ensure_slots(self.slot);
+        // Slots are counted from 0 so to store this slot
+        // we must ensure slot + 1 exist
+        self.vm.ensure_slots(self.slot + 1);
         unsafe { self.handle.send_to_vm(&mut self.vm, self.slot) }
     }
 }
@@ -56,6 +58,8 @@ unsafe fn store_slot<'wren, L: Location>(
     slot: Slot,
 ) -> SlotStorage<'wren> {
     let vm = vm.as_foreign_mut();
+    // Same idea as above for the drop function
+    vm.ensure_slots(slot + 1);
     let handle = Handle::get_from_vm(vm, slot);
     SlotStorage {
         vm: vm.clone(),
@@ -137,8 +141,6 @@ unsafe fn send_iterator_to_vm<'wren, L: Location, T: Set<'wren, L>, I: Iterator<
     // Store the next slot so we don't overwrite it's value
     // Or use the previous slot instead of juggling slots
     let (_store, item_slot) = if slot == 0 {
-        // Make sure the slot that we are storing actually exits
-        vm.ensure_slots(slot + 1);
         //  We should store the list in a handle as well just
         // in case send_to_vm overwrites [slot]
         list = Some(Handle::get_from_vm(vm, slot));
@@ -176,7 +178,6 @@ impl<'wren, L: Location, T: Get<'wren, L>> Get<'wren, L> for Vec<T> {
         // Or use the previous slot instead of juggling slots
         let (_store, item_slot) = if slot == 0 {
             // Make sure the slot that we are storing actually exits
-            vm.ensure_slots(slot + 1);
             (Some(store_slot(vm, slot + 1)), slot + 1)
         } else {
             (None, slot - 1)
