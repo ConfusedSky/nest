@@ -27,7 +27,9 @@ impl<'wren> Methods<'wren> {
         vm.interpret("<fiber-test>", "var out = Fiber")
             .expect("Fiber class initialize failure");
 
-        vm.ensure_slots(1);
+        unsafe {
+            vm.ensure_slots(1);
+        }
         let fiber_class = vm
             .get_variable("<fiber-test>", "out", 0)
             .expect("Should be able to extract Fiber class");

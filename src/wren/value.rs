@@ -48,8 +48,10 @@ impl<'wren> Drop for SlotStorage<'wren> {
     fn drop(&mut self) {
         // Slots are counted from 0 so to store this slot
         // we must ensure slot + 1 exist
-        self.vm.ensure_slots(self.slot + 1);
-        unsafe { self.handle.send_to_vm(&mut self.vm, self.slot) }
+        unsafe {
+            self.vm.ensure_slots(self.slot + 1);
+            self.handle.send_to_vm(&mut self.vm, self.slot);
+        }
     }
 }
 

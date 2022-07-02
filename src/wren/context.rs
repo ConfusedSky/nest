@@ -250,11 +250,10 @@ impl<'wren, L: Location> Context<'wren, NoTypeInfo, L> {
         CallHandle::new_from_signature(self.as_foreign_mut(), signature)
     }
 
-    pub fn ensure_slots(&mut self, num_slots: Slot) {
-        // SAFETY: this one is always safe to call even if the value is negative
-        unsafe {
-            wren_sys::wrenEnsureSlots(self.as_ptr(), num_slots);
-        }
+    /// It is unclear how safe this one is now, since increasing the
+    /// slots seems to have lead to a bug
+    pub unsafe fn ensure_slots(&mut self, num_slots: Slot) {
+        wren_sys::wrenEnsureSlots(self.as_ptr(), num_slots);
     }
 
     pub(super) unsafe fn get_slot_type(&mut self, slot: Slot) -> WrenType {

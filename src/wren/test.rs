@@ -108,7 +108,9 @@ pub fn create_test_vm<'wren>(
         .interpret("<test>", source)
         .expect("Code should run successfully");
 
-    vmptr.ensure_slots(1);
+    unsafe {
+        vmptr.ensure_slots(1);
+    }
     let class = vmptr
         .get_variable("<test>", "Test", 0)
         .expect("Test class should be defined in source");
