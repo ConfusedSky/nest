@@ -39,7 +39,10 @@ fn test_script(script: &str) -> Result<(), Box<dyn std::error::Error>> {
         .filter_map(|x| x.split(": ").nth(1).map(str::to_string))
         .map(|s| s.trim().to_string())
         .collect();
-    let expectations = expectations.join("\n") + "\n";
+    let mut expectations = expectations.join("\n");
+    if !expectations.is_empty() {
+        expectations += "\n";
+    }
 
     let mut cmd = Command::cargo_bin("rust_wren")?;
     cmd.arg(script);
