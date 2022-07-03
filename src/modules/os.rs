@@ -51,7 +51,8 @@ fn all_arguments(mut vm: Context) {
 }
 
 fn version(mut vm: Context) {
-    let version = unsafe { std::ffi::CString::from_vec_with_nul_unchecked(VERSION.to_vec()) };
+    let version = std::ffi::CString::from_vec_with_nul(VERSION.to_vec())
+        .expect("Version string should be valid");
     vm.set_return_value(&version);
 }
 

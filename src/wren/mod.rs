@@ -36,6 +36,7 @@ macro_rules! cstr {
         const CSTR: *const i8 =
             (concat!($s, "\0") as *const str as *const [::std::os::raw::c_char]).cast::<i8>();
         #[allow(unused_unsafe)]
+        #[allow(unsafe_code)]
         unsafe {
             CStr::from_ptr(CSTR)
         }

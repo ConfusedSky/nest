@@ -253,6 +253,7 @@ impl<'wren, L: Location> Context<'wren, NoTypeInfo, L> {
             {
                 None
             } else {
+                self.ensure_slots(1);
                 Some(self.get_variable_unchecked(module.as_c_str(), name.as_c_str(), slot))
             }
         }

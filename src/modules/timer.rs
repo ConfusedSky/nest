@@ -1,5 +1,3 @@
-#![allow(unsafe_code)]
-
 use tokio::time::{sleep, Duration};
 
 use crate::wren;
@@ -25,7 +23,11 @@ fn start(mut vm: Context) {
     // and fiber is always passed as Fiber.current
     // Still we get a raw handle back here to make sure that the
     // fiber we create is genuine to prevent any UB
-    let (_, ms, fiber) = unsafe { vm.get_stack_unchecked::<((), f64, Handle)>() };
+    // let (_, ms, fiber) = unsafe { vm.get_stack_unchecked::<((), f64, Handle)>() };
+    // But now we can be 100% safe and use safe functions
+    let (_, ms, fiber) = vm.get_stack::<((), f64, Handle)>();
+    let ms = ms.expect("Invalid number passed to Timer.start_(_,_) for ms");
+    let fiber = fiber.expect("Invalid handle passed to Timer.start_(_,_) for fiber");
 
     let scheduler = vm.get_user_data_mut().scheduler.as_mut().unwrap();
     scheduler.schedule_task(

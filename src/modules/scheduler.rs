@@ -1,5 +1,3 @@
-#![allow(unsafe_code)]
-
 use std::{future::Future, pin::Pin};
 
 use crate::{
@@ -183,9 +181,6 @@ impl<'wren> Scheduler<'wren> {
 
 fn capture_methods<'wren>(mut vm: Context<'wren>) {
     use crate::wren::cstr;
-    unsafe {
-        vm.ensure_slots(1);
-    }
     let class = vm
         .get_variable("scheduler", "Scheduler", 0)
         .expect("Scheduler variable hasn't been defined");

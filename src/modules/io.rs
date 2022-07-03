@@ -1,5 +1,3 @@
-#![allow(unsafe_code)]
-
 use crate::Context;
 
 use super::{source_file, Class, Module};

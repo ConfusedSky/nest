@@ -1,4 +1,3 @@
-#![allow(unsafe_code)]
 #![allow(clippy::module_name_repetitions)]
 
 use std::{ffi::CString, ptr::NonNull};

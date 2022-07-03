@@ -1,8 +1,6 @@
 #![deny(clippy::all)]
 #![warn(clippy::pedantic, clippy::nursery)]
-// Eventaully we will ban unsafe code, but we are still figuring out the abstractions
-// right now
-// #![warn(unsafe_code)]
+#![warn(unsafe_code)]
 
 use modules::{scheduler::Scheduler, Modules};
 use std::{env, ffi::CStr, fs, path::PathBuf};
