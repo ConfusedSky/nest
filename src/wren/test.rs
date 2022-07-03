@@ -57,39 +57,21 @@ macro_rules! call_test_case {
             let slice = wren_macros::to_signature!($handle);
             let handle = $vm.make_call_handle_slice(slice).unwrap();
             // println!("{:?}, {}", handle, line!());
-            let res: $type = $vm.call(&$class, &handle, &()).expect(
-                &format!(
-                    "{}.{} is not a valid invocation",
-                    stringify!($class),
-                    stringify!($handle),
-                )
-            );
+            let res = $vm.call::<$type, _>(&$class, &handle, &());
             assert_eq!( res, $res );
         };
         ($type:ty, $vm:ident { $class:ident.$handle:ident() } == $res:expr) => {
             let slice = wren_macros::to_signature!($handle());
             let handle = $vm.make_call_handle_slice(slice).unwrap();
             // println!("{:?}, {}", handle, line!());
-            let res: $type = $vm.call(&$class, &handle, &()).expect(
-                &format!(
-                    "{}.{} is not a valid invocation",
-                    stringify!($class),
-                    stringify!($handle),
-                )
-            );
+            let res = $vm.call::<$type, _>(&$class, &handle, &());
             assert_eq!( res, $res );
         };
         ($type:ty, $vm:ident { $class:ident.$handle:ident($($args:expr),+ ) } == $res:expr) => {
             let slice = wren_macros::to_signature!($handle($($args),+ ));
             let handle = $vm.make_call_handle_slice(slice).unwrap();
             // println!("{:?}, {}", handle, line!());
-            let res: $type = $vm.call(&$class, &handle, &($(&$args),+ )).expect(
-                &format!(
-                    "{}.{} is not a valid invocation",
-                    stringify!($class),
-                    stringify!($handle),
-                )
-            );
+            let res = $vm.call::<$type, _>(&$class, &handle, &($(&$args),+ ));
             assert_eq!( res, $res );
         };
     }

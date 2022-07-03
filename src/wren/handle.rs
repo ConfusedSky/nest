@@ -27,6 +27,12 @@ impl<'wren> Debug for Handle<'wren> {
     }
 }
 
+impl<'wren> PartialEq for Handle<'wren> {
+    fn eq(&self, other: &Self) -> bool {
+        self.as_ptr() == other.as_ptr()
+    }
+}
+
 impl<'wren> Handle<'wren> {
     pub(crate) unsafe fn new_unchecked(
         vm: &RawForeignContext<'wren>,

@@ -11,7 +11,7 @@ use super::{
 };
 use enumflags2::{bitflags, make_bitflags, BitFlags};
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq)]
 pub enum TryGetError<'wren> {
     // If type is incompatible there is still an option to
     // retreive the handle for another reason
@@ -514,8 +514,7 @@ pub trait GetArgs<'wren, L: Location> {
     fn try_get_slots(vm: &mut RawContext<'wren, L>, get_handles: bool) -> Self::TryGetTarget;
 }
 
-impl<'wren, L: Location, T: GetValue<'wren, L>> GetArgs<'wren, L> for T
-{
+impl<'wren, L: Location, T: GetValue<'wren, L>> GetArgs<'wren, L> for T {
     type TryGetTarget = TryGetResult<'wren, T>;
     unsafe fn get_slots_unchecked(vm: &mut RawContext<'wren, L>) -> Self {
         T::get_slot_unchecked(vm, 0)
@@ -524,7 +523,7 @@ impl<'wren, L: Location, T: GetValue<'wren, L>> GetArgs<'wren, L> for T
         // Hack to make sure () does nothing
         // Should compile out since it's a const function on a type
         if std::mem::size_of::<T>() == 0 {
-            unsafe { T::try_get_slot_raw(vm, 0, WrenType::Unknown, false)}
+            unsafe { T::try_get_slot_raw(vm, 0, WrenType::Unknown, false) }
         } else {
             if vm.get_slot_count() < 1 {
                 return Err(TryGetError::NoAvailableSlot);
@@ -587,6 +586,7 @@ mod test {
         wren::{
             context::{Foreign, Native},
             test::create_test_vm,
+            value::TryGetError,
         },
     };
 
@@ -635,22 +635,22 @@ mod test {
         let context = vm.get_context();
 
         // False cases
-        call_test_case!(bool, context { Test.returnNull() } == false);
-        call_test_case!(bool, context { Test.returnFalse() } == false);
-        call_test_case!(bool, context { Test.returnValue(false) } == false);
-        call_test_case!(bool, context { Test.returnNegate(true) } == false);
-        call_test_case!(bool, context { Test.returnNegate("") } == false);
+        call_test_case!(bool, context { Test.returnNull() } == Ok(false));
+        call_test_case!(bool, context { Test.returnFalse() } == Ok(false));
+        call_test_case!(bool, context { Test.returnValue(false) } == Ok(false));
+        call_test_case!(bool, context { Test.returnNegate(true) } == Ok(false));
+        call_test_case!(bool, context { Test.returnNegate("") } == Ok(false));
 
         // True cases
-        call_test_case!(bool, context { Test.returnTrue } == true);
-        call_test_case!(bool, context { Test.returnTrue() } == true);
-        call_test_case!(bool, context { Test.returnValue(true) } == true);
-        call_test_case!(bool, context { Test.returnNegate(false) } == true);
-        call_test_case!(bool, context { Test.returnValue("") } == true);
-        call_test_case!(bool, context { Test.returnValue("Test") } == true);
-        call_test_case!(bool, context { Test.returnValue(Test) } == true);
-        call_test_case!(bool, context { Test.returnValue(vec![1.0]) } == true);
-        call_test_case!(bool, context { Test.returnValue(1.0) } == true);
+        call_test_case!(bool, context { Test.returnTrue } == Ok(true));
+        call_test_case!(bool, context { Test.returnTrue() } == Ok(true));
+        call_test_case!(bool, context { Test.returnValue(true) } == Ok(true));
+        call_test_case!(bool, context { Test.returnNegate(false) } == Ok(true));
+        call_test_case!(bool, context { Test.returnValue("") } == Ok(true));
+        call_test_case!(bool, context { Test.returnValue("Test") } == Ok(true));
+        call_test_case!(bool, context { Test.returnValue(Test) } == Ok(true));
+        call_test_case!(bool, context { Test.returnValue(vec![1.0]) } == Ok(true));
+        call_test_case!(bool, context { Test.returnValue(1.0) } == Ok(true));
     }
 
     #[test]
@@ -674,21 +674,37 @@ mod test {
         let (mut vm, Test) = create_test_vm(source, |_| {});
         let context = vm.get_context();
 
-        call_test_case!(String, context { Test.returnNull() } == "null");
-        call_test_case!(String, context { Test.returnFalse() } == "false");
-        call_test_case!(String, context { Test.returnValue(false) } == "false");
-        call_test_case!(String, context { Test.returnTrue } == "true");
-        call_test_case!(String, context { Test.returnTrue() } == "true");
-        call_test_case!(String, context { Test.returnValue("") } == "");
-        call_test_case!(String, context { Test.returnValue("Test") } == "Test");
-        call_test_case!(String, context { Test.returnValue("Test".to_string()) } == "Test");
-        call_test_case!(String, context { Test.returnValue(Test) } == "Test");
-        call_test_case!(String, context { Test.returnValue(vec![1.0]) } == "[1]");
-        call_test_case!(String, context { Test.returnValue(vec!["1.0", "Other"]) } == "[1.0, Other]");
-        call_test_case!(String, context { Test.returnValue(1.0) } == "1");
-        call_test_case!(String, context { Test.returnMap } == "{test: 1, 15: Test}");
-        call_test_case!(String, context { Test.sendMulti("Test", vec![1.0]) } == "Test[1]");
-        call_test_case!(String, context { Test.sendMulti(vec!["One Two"], "Test") } == "[One Two]Test");
+        // TODO: Tidy up these test cases
+        call_test_case!(String, context { Test.returnNull() }
+            == Ok("null".to_string()));
+        call_test_case!(String, context { Test.returnFalse() }
+            == Ok("false".to_string()));
+        call_test_case!(String, context { Test.returnValue(false) }
+            == Ok("false".to_string()));
+        call_test_case!(String, context { Test.returnTrue }
+            == Ok("true".to_string()));
+        call_test_case!(String, context { Test.returnTrue() }
+            == Ok("true".to_string()));
+        call_test_case!(String, context { Test.returnValue("") }
+            == Ok("".to_string()));
+        call_test_case!(String, context { Test.returnValue("Test") }
+            == Ok("Test".to_string()));
+        call_test_case!(String, context { Test.returnValue("Test".to_string()) }
+            == Ok("Test".to_string()));
+        call_test_case!(String, context { Test.returnValue(Test) }
+            == Ok("Test".to_string()));
+        call_test_case!(String, context { Test.returnValue(vec![1.0]) }
+            == Ok("[1]".to_string()));
+        call_test_case!(String, context { Test.returnValue(vec!["1.0", "Other"]) }
+            == Ok("[1.0, Other]".to_string()));
+        call_test_case!(String, context { Test.returnValue(1.0) }
+            == Ok("1".to_string()));
+        call_test_case!(String, context { Test.returnMap }
+            == Ok("{test: 1, 15: Test}".to_string()));
+        call_test_case!(String, context { Test.sendMulti("Test", vec![1.0]) }
+            == Ok("Test[1]".to_string()));
+        call_test_case!(String, context { Test.sendMulti(vec!["One Two"], "Test") }
+            == Ok("[One Two]Test".to_string()));
     }
 
     #[test]
@@ -714,46 +730,46 @@ mod test {
         let context = vm.get_context();
 
         call_test_case!(Vec<String>, context { 
-            Test.returnNull() } == Vec::<String>::new());
+            Test.returnNull() } == Err(TryGetError::IncompatibleType(None).into()));
         call_test_case!(Vec<String>, context {
-            Test.returnFalse() } == Vec::<String>::new());
+            Test.returnFalse() } == Err(TryGetError::IncompatibleType(None).into()));
         call_test_case!(Vec<String>, context {
-            Test.returnValue(false) } == Vec::<String>::new());
+            Test.returnValue(false) } == Err(TryGetError::IncompatibleType(None).into()));
         call_test_case!(Vec<String>, context {
-            Test.returnTrue } == Vec::<String>::new());
+            Test.returnTrue } == Err(TryGetError::IncompatibleType(None).into()));
         call_test_case!(Vec<String>, context {
-            Test.returnTrue() } == Vec::<String>::new());
+            Test.returnTrue() } == Err(TryGetError::IncompatibleType(None).into()));
         call_test_case!(Vec<String>, context {
-            Test.returnValue("") } == Vec::<String>::new());
+            Test.returnValue("") } == Err(TryGetError::IncompatibleType(None).into()));
         call_test_case!(Vec<String>, context {
-            Test.returnValue("Test") } == Vec::<String>::new());
+            Test.returnValue("Test") } == Err(TryGetError::IncompatibleType(None).into()));
         call_test_case!(Vec<String>, context {
-            Test.returnValue("Test".to_string()) } == Vec::<String>::new());
+            Test.returnValue("Test".to_string()) } == Err(TryGetError::IncompatibleType(None).into()));
         call_test_case!(Vec<String>, context {
-            Test.returnValue(Test) } == Vec::<String>::new());
+            Test.returnValue(Test) } == Err(TryGetError::IncompatibleType(None).into()));
         call_test_case!(Vec<String>, context {
-            Test.returnValue(vec![1.0]) } == vec!["1"]);
+            Test.returnValue(vec![1.0]) } == Ok(vec!["1".to_string()]));
         call_test_case!(Vec<String>, context {
-            Test.returnValue(vec!["1.0", "Other"]) } == vec!["1.0", "Other"]);
+            Test.returnValue(vec!["1.0", "Other"]) } == Ok(vec!["1.0".to_string(), "Other".to_string()]));
         call_test_case!(Vec<String>, context {
-            Test.returnValue(1.0) } == Vec::<String>::new());
+            Test.returnValue(1.0) } == Err(TryGetError::IncompatibleType(None).into()));
         call_test_case!(Vec<String>, context {
-            Test.returnMap } == Vec::<String>::new());
+            Test.returnMap } == Err(TryGetError::IncompatibleType(None).into()));
         call_test_case!(Vec<String>, context {
-            Test.sendMulti("Test", vec![1.0]) } == Vec::<String>::new());
+            Test.sendMulti("Test", vec![1.0]) } == Err(TryGetError::IncompatibleType(None).into()));
         call_test_case!(Vec<String>, context {
-            Test.sendMulti(vec!["One Two"], "Test") } == Vec::<String>::new());
+            Test.sendMulti(vec!["One Two"], "Test") } == Err(TryGetError::IncompatibleType(None).into()));
 
         call_test_case!(Vec<Vec<String>>, context {
-            Test.returnValue(vec![vec!["1.0", "Other"]]) } == vec![vec!["1.0", "Other"]]);
+            Test.returnValue(vec![vec!["1.0", "Other"]]) } == Ok(vec![vec!["1.0".to_string(), "Other".to_string()]]));
 
         call_test_case!(Vec<String>, context {
             Test.returnValue(
                 vec![vec![vec!["1.0", "Other"]]]
             )
-        } == vec!["[[1.0, Other]]"]);
+        } == Ok(vec!["[[1.0, Other]]".to_string()]));
         call_test_case!(Vec<Vec<Vec<f64>>>, context {
             Test.nestedArray
-        } == vec![vec![vec![1.0_f64]]]);
+        } == Ok(vec![vec![vec![1.0_f64]]]));
     }
 }

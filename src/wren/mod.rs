@@ -60,7 +60,7 @@ pub enum ErrorKind<'s> {
     Unknown(WrenErrorType, ErrorContext<'s>),
 }
 
-#[derive(Debug)]
+#[derive(Debug, Eq, PartialEq)]
 pub enum InterpretResultErrorKind {
     Compile,
     Runtime,

@@ -114,7 +114,7 @@ impl<'wren, V: VmUserData<'wren, V>> DerefMut for Context<'wren, V, Foreign> {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq)]
 pub enum CallError<'wren> {
     InterpretError(InterpretResultErrorKind),
     TryGetError(TryGetError<'wren>),
