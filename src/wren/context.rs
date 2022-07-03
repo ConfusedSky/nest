@@ -11,7 +11,7 @@ use super::{
     foreign,
     handle::CallHandle,
     system_methods::SystemMethods,
-    value::{TryGetResult, WrenType},
+    value::{TryGetError, TryGetResult, WrenType},
     Fiber, GetArgs, GetValue, Handle, InterpretResultErrorKind, Result, SetArgs, SetValue, Slot,
     SystemUserData, VmUserData,
 };
@@ -114,6 +114,26 @@ impl<'wren, V: VmUserData<'wren, V>> DerefMut for Context<'wren, V, Foreign> {
     }
 }
 
+#[derive(Debug)]
+pub enum CallError<'wren> {
+    InterpretError(InterpretResultErrorKind),
+    TryGetError(TryGetError<'wren>),
+}
+
+impl<'wren> From<InterpretResultErrorKind> for CallError<'wren> {
+    fn from(e: InterpretResultErrorKind) -> Self {
+        Self::InterpretError(e)
+    }
+}
+
+impl<'wren> From<TryGetError<'wren>> for CallError<'wren> {
+    fn from(e: TryGetError<'wren>) -> Self {
+        Self::TryGetError(e)
+    }
+}
+
+pub type CallResult<'wren, T> = std::result::Result<T, CallError<'wren>>;
+
 // Calling can only happen from a native context
 impl<'wren, T> Context<'wren, T, Native> {
     pub fn interpret<M, S>(&self, module: M, source: S) -> Result<()>
@@ -139,14 +159,14 @@ impl<'wren, T> Context<'wren, T, Native> {
         subject: &Handle<'wren>,
         method: &CallHandle<'wren>,
         args: &Args,
-    ) -> Result<G> {
+    ) -> CallResult<'wren, G> {
         let slot_count =
             <Handle as SetValue<'wren, Native>>::REQUIRED_SLOTS + Args::TOTAL_REQUIRED_SLOTS;
 
         if method.get_argument_count() == Args::COUNT {
             unsafe { self.call_unchecked(subject, method, args, slot_count) }
         } else {
-            Err(InterpretResultErrorKind::IncorrectNumberOfArgsPassed)
+            Err(InterpretResultErrorKind::IncorrectNumberOfArgsPassed.into())
         }
     }
 
@@ -160,7 +180,7 @@ impl<'wren, T> Context<'wren, T, Native> {
         method: &CallHandle<'wren>,
         args: &Args,
         slot_count: Slot,
-    ) -> Result<G> {
+    ) -> CallResult<'wren, G> {
         // make sure there enough slots to send over the subject
         // and all it's args
         let vm = self.as_raw_mut();

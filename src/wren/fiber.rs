@@ -3,10 +3,10 @@ use std::ops::Deref;
 use enumflags2::make_bitflags;
 
 use super::{
-    context::{Context, Location, Native, Raw},
+    context::{CallResult, Context, Location, Native, Raw},
     handle::CallHandle,
     value::{TryGetError, TryGetResult, WrenType},
-    GetValue, Handle, RawNativeContext, Result, SetValue,
+    GetValue, Handle, RawNativeContext, SetValue,
 };
 
 pub struct Methods<'wren> {
@@ -94,30 +94,31 @@ impl<'wren> Fiber<'wren> {
     pub fn transfer<G: GetValue<'wren, Native>>(
         self,
         context: &mut RawNativeContext<'wren>,
-    ) -> Result<G> {
+    ) -> CallResult<'wren, G> {
         let transfer = &self.methods.transfer;
-        let res: G = context.call(&self, transfer, &())?;
-        Ok(res)
+        context.call(&self, transfer, &())
     }
     pub fn transfer_with_arg<G: GetValue<'wren, Native>, S: SetValue<'wren, Native>>(
         self,
         context: &mut RawNativeContext<'wren>,
         additional_argument: S,
-    ) -> Result<G> {
+    ) -> CallResult<'wren, G> {
         let transfer = &self.methods.transfer_with_arg;
-        let res: G = context.call(&self, transfer, &(&additional_argument))?;
-        Ok(res)
+        context.call(&self, transfer, &(&additional_argument))
     }
 
-    pub fn transfer_error<S, G>(self, context: &mut RawNativeContext<'wren>, error: S) -> Result<G>
+    pub fn transfer_error<S, G>(
+        self,
+        context: &mut RawNativeContext<'wren>,
+        error: S,
+    ) -> CallResult<'wren, G>
     where
         S: AsRef<str>,
         G: GetValue<'wren, Native>,
     {
         let transfer_error = &self.methods.transfer_error;
         let error = error.as_ref();
-        let res: G = context.call(&self, transfer_error, &(&error))?;
-        Ok(res)
+        context.call(&self, transfer_error, &(&error))
     }
 }
 
