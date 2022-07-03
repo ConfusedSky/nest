@@ -497,23 +497,51 @@ impl_set_args!(T0 = 0, T1 = 1, T2 = 2, T3 = 3, T4 = 4, T5 = 5);
 impl_set_args!(T0 = 0, T1 = 1, T2 = 2, T3 = 3, T4 = 4, T5 = 5, T6 = 6);
 
 pub trait GetArgs<'wren, L: Location> {
-    unsafe fn get_slots(vm: &mut RawContext<'wren, L>) -> Self;
+    type TryGetTarget;
+
+    unsafe fn get_slots_unchecked(vm: &mut RawContext<'wren, L>) -> Self;
+    fn try_get_slots(vm: &mut RawContext<'wren, L>, get_handles: bool) -> Self::TryGetTarget;
 }
 
 impl<'wren, L: Location, T: GetValue<'wren, L>> GetArgs<'wren, L> for T {
-    unsafe fn get_slots(vm: &mut RawContext<'wren, L>) -> Self {
+    type TryGetTarget = TryGetResult<'wren, T>;
+    unsafe fn get_slots_unchecked(vm: &mut RawContext<'wren, L>) -> Self {
         T::get_slot_unchecked(vm, 0)
+    }
+    fn try_get_slots(vm: &mut RawContext<'wren, L>, get_handles: bool) -> Self::TryGetTarget {
+        if vm.get_slot_count() < 1 {
+            return Err(TryGetError::NoAvailableSlot);
+        }
+
+        let slot_type = unsafe { vm.get_slot_type(0) };
+        unsafe { T::try_get_slot_raw(vm, 0, slot_type, get_handles) }
     }
 }
 
 macro_rules! impl_get_args_meta {
     ($location:ty, $( $xs:ident = $i:tt ), *) => {
         impl<'wren, $( $xs: GetValue<'wren, $location>, )*> GetArgs<'wren, $location> for ($( $xs, )*) {
-            unsafe fn get_slots(vm: &mut RawContext<'wren, $location>) -> Self {
+            type TryGetTarget = ($(TryGetResult<'wren, $xs>),*);
+            unsafe fn get_slots_unchecked(vm: &mut RawContext<'wren, $location>) -> Self {
                 (
                     // Expansion happens in forward order so
                     // Previous slots can be reused for reads
                     $( $xs::get_slot_unchecked(vm, $i) ), *
+                )
+            }
+            fn try_get_slots(vm: &mut RawContext<'wren, $location>, get_handles: bool) -> Self::TryGetTarget {
+                let stack_types = vm.get_stack_types();
+
+                (
+                    $({
+                        if stack_types.len() < $i + 1 {
+                            Err(TryGetError::NoAvailableSlot)
+                        } else {
+                            unsafe {
+                                $xs::try_get_slot_raw(vm, $i, stack_types[$i], get_handles)
+                            }
+                        }
+                    }), *
                 )
             }
         }

@@ -291,32 +291,37 @@ impl<'wren, L: Location> Context<'wren, NoTypeInfo, L> {
         arg.set_wren_stack(self, 0);
     }
 
+    pub fn get_slot_count(&self) -> Slot {
+        // This call should always be safe, since it doesn't
+        // modify any state
+        unsafe { ffi::wrenGetSlotCount(self.as_ptr()) }
+    }
+
     // Note this is only valid till the &mut call so
     // it is represented as a immutable reference
     // That way the vm can't be used while a reference is held
     // to the types
-    pub fn get_stack_types(&self) -> &[WrenType] {
+    pub fn get_stack_types(&self) -> Vec<WrenType> {
         unsafe {
-            let slot_count = ffi::wrenGetSlotCount(self.as_ptr());
-            let stack_values = &mut foreign::get_system_user_data::<()>(self.as_ptr()).stack_values;
-            stack_values.clear();
+            let slot_count = self.get_slot_count();
+            let mut stack_values = Vec::new();
 
             for i in 0..slot_count {
                 stack_values.push(self.get_slot_type(i));
             }
 
-            &stack_values[..]
+            stack_values
         }
     }
 
     // TODO: Create safe version that returns Options depending on how many slots
     // there are
     pub unsafe fn get_stack_unchecked<Args: GetArgs<'wren, L>>(&mut self) -> Args {
-        Args::get_slots(self)
+        Args::get_slots_unchecked(self)
     }
 
     pub unsafe fn get_return_value_unchecked<Args: GetValue<'wren, L>>(&mut self) -> Args {
-        Args::get_slots(self)
+        Args::get_slots_unchecked(self)
     }
 
     // TODO: Make sure this can only be run in a foreign context
