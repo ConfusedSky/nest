@@ -81,10 +81,10 @@ fn main() {
     }
 
     let module = module.unwrap();
-    let mut module_path = PathBuf::new();
-    module_path.push("scripts");
-    module_path.push(&module);
-    module_path.set_extension("wren");
+    let mut module_path = PathBuf::from(&module);
+    if module_path.extension().is_none() {
+        module_path.set_extension("wren");
+    }
 
     let source = fs::read_to_string(&module_path)
         .unwrap_or_else(|_| panic!("Ensure {} is a valid module name to continue", &module));

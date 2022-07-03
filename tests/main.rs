@@ -5,12 +5,19 @@ use std::{borrow::Cow, fs::read_to_string, path::Path, process::Command}; // Run
 // TODO: Make failure output better
 wren_macros::generate_tests!();
 
+#[test]
+fn should_work_without_extension() -> Result<(), Box<dyn std::error::Error>> {
+    test_script("scripts/test/empty")
+}
+
 fn test_script(script: &str) -> Result<(), Box<dyn std::error::Error>> {
     let manifest_dir =
         std::env::var("CARGO_MANIFEST_DIR").expect("WE SHOULD HAVE ACCESS TO THE MANIFEST DIR");
     let manifest_path = Path::new(&manifest_dir);
-    let mut script_path = manifest_path.join("scripts").join(script);
-    script_path.set_extension("wren");
+    let mut script_path = manifest_path.join(script);
+    if script_path.extension().is_none() {
+        script_path.set_extension("wren");
+    }
 
     if !script_path.is_file() {
         panic!("Script file does not exist at {:?}", script_path);

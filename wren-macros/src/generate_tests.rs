@@ -8,19 +8,14 @@ pub fn generate_tests() -> syn::Result<TokenStream> {
     let mut output = TokenStream::new();
 
     for file in dir.read_dir().expect("We can read the directory").flatten() {
-        let file = file.file_name();
-        let file = file.to_str().ok_or_else(|| {
-            syn::Error::new(Span::call_site(), "Failed to convert filename to string")
-        })?;
-        let file = file.split('.').next().ok_or_else(|| {
-            syn::Error::new(
-                Span::call_site(),
-                "failed to remove the extension from script name",
-            )
-        })?;
-        let script = "test/".to_string() + file;
+        let file: PathBuf = file.file_name().into();
+        let file = file
+            .to_str()
+            .expect("Failed to convert file path to string");
+        let script = "scripts/test/".to_string() + file;
+        let name = file.split('.').next().unwrap();
 
-        let file_identifier = syn::Ident::new(&file, Span::call_site());
+        let file_identifier = syn::Ident::new(&name, Span::call_site());
         let fun = quote::quote!(
             #[test]
             fn #file_identifier() -> Result<(), Box<dyn std::error::Error>> {
