@@ -5,7 +5,7 @@ use std::{ffi::CString, ptr::NonNull};
 use wren_sys as ffi;
 
 use super::{
-    context::{Foreign, Location, Native, Raw as RawContext},
+    context::{Foreign, Location, Native, Raw as RawContext, UnknownLocation},
     Handle, Slot,
 };
 use enumflags2::{bitflags, make_bitflags, BitFlags};
@@ -50,7 +50,7 @@ impl From<ffi::WrenType> for WrenType {
 }
 
 struct SlotStorage<'wren> {
-    vm: RawContext<'wren, Foreign>,
+    vm: RawContext<'wren, UnknownLocation>,
     slot: Slot,
     handle: Handle<'wren>,
 }
@@ -70,7 +70,7 @@ unsafe fn store_slot<'wren, L: Location>(
     vm: &mut RawContext<'wren, L>,
     slot: Slot,
 ) -> SlotStorage<'wren> {
-    let vm = vm.as_foreign_mut();
+    let vm = vm.as_unknown_mut();
     // Same idea as above for the drop function
     vm.ensure_slots(slot + 1);
     // Here we are just storing a handle so we don't care too much
@@ -180,7 +180,7 @@ impl<'wren, L: Location> GetValue<'wren, L> for Handle<'wren> {
         _slot_type: WrenType,
     ) -> Self {
         let handle = ffi::wrenGetSlotHandle(vm.as_ptr(), slot);
-        Self::new_unchecked(vm.as_foreign(), NonNull::new_unchecked(handle))
+        Self::new_unchecked(vm.as_unknown(), NonNull::new_unchecked(handle))
     }
     unsafe fn get_slot_unchecked(vm: &mut RawContext<'wren, L>, slot: Slot) -> Self
     where

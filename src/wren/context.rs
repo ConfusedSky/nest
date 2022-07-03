@@ -19,6 +19,7 @@ use super::{
 pub type Raw<'wren, L> = Context<'wren, NoTypeInfo, L>;
 pub type RawForeign<'wren> = Raw<'wren, Foreign>;
 pub type RawNative<'wren> = Raw<'wren, Native>;
+pub type RawUnknown<'wren> = Raw<'wren, UnknownLocation>;
 
 #[repr(transparent)]
 #[derive(Debug, Clone)]
@@ -39,12 +40,12 @@ impl<'wren, V, L: Location> Context<'wren, V, L> {
     // NOTE THESE ARE ALL DOWNCASTS SO THIS IS SAFE
     // Foreign is more restrictive than native
     // Raw is more restrictive than typed
-    pub const fn as_foreign(&self) -> &Context<'wren, V, Foreign> {
-        unsafe { self.transmute::<V, Foreign>() }
+    pub const fn as_unknown(&self) -> &Context<'wren, V, UnknownLocation> {
+        unsafe { self.transmute::<V, UnknownLocation>() }
     }
 
-    pub fn as_foreign_mut(&mut self) -> &mut Context<'wren, V, Foreign> {
-        unsafe { self.transmute_mut::<V, Foreign>() }
+    pub fn as_unknown_mut(&mut self) -> &mut Context<'wren, V, UnknownLocation> {
+        unsafe { self.transmute_mut::<V, UnknownLocation>() }
     }
 
     pub const fn as_raw(&self) -> &Context<'wren, NoTypeInfo, L> {
@@ -109,6 +110,18 @@ impl<'wren, V: VmUserData<'wren, V>> Deref for Context<'wren, V, Foreign> {
     }
 }
 impl<'wren, V: VmUserData<'wren, V>> DerefMut for Context<'wren, V, Foreign> {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        self.as_raw_mut()
+    }
+}
+
+impl<'wren, V: VmUserData<'wren, V>> Deref for Context<'wren, V, UnknownLocation> {
+    type Target = RawUnknown<'wren>;
+    fn deref(&self) -> &Self::Target {
+        self.as_raw()
+    }
+}
+impl<'wren, V: VmUserData<'wren, V>> DerefMut for Context<'wren, V, UnknownLocation> {
     fn deref_mut(&mut self) -> &mut Self::Target {
         self.as_raw_mut()
     }
@@ -270,18 +283,42 @@ impl<'wren, L: Location> Context<'wren, NoTypeInfo, L> {
         slot: Slot,
     ) -> Handle<'wren> {
         ffi::wrenGetVariable(self.as_ptr(), module.as_ptr(), name.as_ptr(), slot);
-        Handle::get_slot_unchecked(self.as_foreign_mut(), slot)
+        Handle::get_slot_unchecked(self.as_unknown_mut(), slot)
     }
 
     pub fn make_call_handle_slice(
         &mut self,
         signature: &[u8],
     ) -> std::result::Result<CallHandle<'wren>, FromBytesWithNulError> {
-        CallHandle::new_from_slice(self.as_foreign_mut(), signature)
+        CallHandle::new_from_slice(self.as_unknown_mut(), signature)
     }
 
     pub fn make_call_handle(&mut self, signature: &CStr) -> CallHandle<'wren> {
-        CallHandle::new_from_signature(self.as_foreign_mut(), signature)
+        CallHandle::new_from_signature(self.as_unknown_mut(), signature)
+    }
+
+    pub unsafe fn get_stack_unchecked<Args: GetArgs<'wren, L>>(&mut self) -> Args {
+        Args::get_slots_unchecked(self)
+    }
+
+    pub unsafe fn get_return_value_unchecked<Args: GetValue<'wren, L>>(&mut self) -> Args {
+        Args::get_slots_unchecked(self)
+    }
+
+    pub fn get_stack<Args: GetArgs<'wren, L>>(&mut self) -> Args::TryGetTarget {
+        Args::try_get_slots(self, false)
+    }
+
+    pub fn get_return_value<Args: GetValue<'wren, L>>(&mut self) -> TryGetResult<'wren, Args> {
+        Args::try_get_slots(self, false)
+    }
+
+    pub fn set_stack<Args: SetArgs<'wren, L>>(&mut self, args: &Args) {
+        args.set_wren_stack(self, 0);
+    }
+
+    pub fn set_return_value<Args: SetValue<'wren, L>>(&mut self, arg: &Args) {
+        arg.set_wren_stack(self, 0);
     }
 
     /// It is unclear how safe this one is now, since increasing the
@@ -293,14 +330,6 @@ impl<'wren, L: Location> Context<'wren, NoTypeInfo, L> {
     pub(super) unsafe fn get_slot_type(&self, slot: Slot) -> WrenType {
         let t = ffi::wrenGetSlotType(self.as_ptr(), slot);
         WrenType::from(t)
-    }
-
-    pub fn set_stack<Args: SetArgs<'wren, L>>(&mut self, args: &Args) {
-        args.set_wren_stack(self, 0);
-    }
-
-    pub fn set_return_value<Args: SetValue<'wren, L>>(&mut self, arg: &Args) {
-        arg.set_wren_stack(self, 0);
     }
 
     pub fn get_slot_count(&self) -> Slot {
@@ -326,22 +355,6 @@ impl<'wren, L: Location> Context<'wren, NoTypeInfo, L> {
         }
     }
 
-    pub unsafe fn get_stack_unchecked<Args: GetArgs<'wren, L>>(&mut self) -> Args {
-        Args::get_slots_unchecked(self)
-    }
-
-    pub unsafe fn get_return_value_unchecked<Args: GetValue<'wren, L>>(&mut self) -> Args {
-        Args::get_slots_unchecked(self)
-    }
-
-    pub fn get_stack<Args: GetArgs<'wren, L>>(&mut self) -> Args::TryGetTarget {
-        Args::try_get_slots(self, false)
-    }
-
-    pub fn get_return_value<Args: GetValue<'wren, L>>(&mut self) -> TryGetResult<'wren, Args> {
-        Args::try_get_slots(self, false)
-    }
-
     // TODO: Make sure this can only be run in a foreign context
     // since it requires a fiber to be active in the vm
     pub fn abort_fiber<S>(&mut self, value: S)
@@ -359,11 +372,12 @@ impl<'wren, L: Location> Context<'wren, NoTypeInfo, L> {
 pub struct NoTypeInfo;
 
 mod sealed {
-    use super::{Foreign, Native};
+    use super::{Foreign, Native, UnknownLocation};
 
     pub trait Location {}
     impl Location for Foreign {}
     impl Location for Native {}
+    impl Location for UnknownLocation {}
 }
 
 pub trait Location: sealed::Location {}
@@ -373,6 +387,10 @@ impl Location for Foreign {}
 #[derive(Clone)]
 pub struct Native;
 impl Location for Native {}
+
+#[derive(Clone)]
+pub struct UnknownLocation;
+impl Location for UnknownLocation {}
 
 mod assert {
     use super::{Context, Native, VmUserData, WrenVM};

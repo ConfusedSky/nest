@@ -21,7 +21,10 @@ use std::{ffi::c_void, marker::PhantomData, mem::ManuallyDrop};
 
 use self::value::WrenType;
 pub use self::{
-    context::{Context, RawForeign as RawForeignContext, RawNative as RawNativeContext},
+    context::{
+        Context, RawForeign as RawForeignContext, RawNative as RawNativeContext,
+        RawUnknown as RawUnknownContext,
+    },
     system_methods::SystemMethods,
 };
 use wren_sys::{self as ffi, WrenErrorType, WrenInterpretResult, WrenVM};

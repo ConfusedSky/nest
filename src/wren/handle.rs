@@ -12,11 +12,11 @@ use wren_sys::{self as ffi, wrenReleaseHandle, WrenHandle};
 
 use super::{
     context::{Context, Location},
-    RawForeignContext,
+    RawUnknownContext,
 };
 
 pub struct Handle<'wren> {
-    vm: RawForeignContext<'wren>,
+    vm: RawUnknownContext<'wren>,
     pointer: NonNull<WrenHandle>,
     phantom: PhantomData<WrenHandle>,
 }
@@ -35,7 +35,7 @@ impl<'wren> PartialEq for Handle<'wren> {
 
 impl<'wren> Handle<'wren> {
     pub(crate) unsafe fn new_unchecked(
-        vm: &RawForeignContext<'wren>,
+        vm: &RawUnknownContext<'wren>,
         pointer: NonNull<WrenHandle>,
     ) -> Self {
         Self {
@@ -100,7 +100,7 @@ impl<'wren> CallHandle<'wren> {
         // as that handle might not be valid and safe to use
         let ptr = ffi::wrenMakeCallHandle(vm.as_ptr(), signature.as_ptr());
         let handle = Handle::new_unchecked(
-            vm.as_foreign_mut().as_raw_mut(),
+            vm.as_unknown_mut().as_raw_mut(),
             NonNull::new_unchecked(ptr),
         );
         CallHandle {
