@@ -7,19 +7,10 @@ use std::{
     process::Command,
 }; // Run programs
 
-macro_rules! print {
-    ($($xs:expr),*) => {{
-        use std::io::Write;
-        let _ = std::write!(std::io::stderr().lock(), $($xs),*);
-    }};
-}
+mod term;
+use termcolor::Color::*;
 
-macro_rules! println {
-    ($($xs:expr),*) => {{
-        use std::io::Write;
-        let _ = std::writeln!(std::io::stderr().lock(), $($xs),*);
-    }};
-}
+// TODO: Make failure output better
 
 #[test]
 fn integration_test_runner() -> Result<(), Box<dyn std::error::Error>> {
@@ -28,8 +19,11 @@ fn integration_test_runner() -> Result<(), Box<dyn std::error::Error>> {
     let dir = PathBuf::from(manifest_dir + "/scripts/test");
 
     let mut failures = Vec::new();
+    let mut attempted = 0;
 
+    println!();
     for file in dir.read_dir().expect("We can read the directory").flatten() {
+        attempted += 1;
         let file = file
             .file_name()
             .to_str()
@@ -47,20 +41,31 @@ fn integration_test_runner() -> Result<(), Box<dyn std::error::Error>> {
         match result {
             Ok(res) => match res {
                 Ok(()) => {
-                    println!("ok")
+                    term::color(Green);
+                    println!("ok");
+                    term::reset();
                 }
                 Err(e) => {
+                    term::color(Red);
                     println!("FAILED");
+                    term::reset();
                     println!("{:?}", e);
                     panic!("{}", e);
                 }
             },
             Err(e) => {
+                term::color(Red);
                 println!("FAILED");
+                term::reset();
                 failures.push(e);
             }
         }
     }
+
+    println!(
+        "{} tests out of {attempted} succeeded\n",
+        attempted - failures.len()
+    );
 
     if !failures.is_empty() {
         let first = failures.pop().unwrap();
