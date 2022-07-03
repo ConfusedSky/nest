@@ -3,7 +3,7 @@ use std::ops::Deref;
 use super::{
     context::{Context, Location, Native, Raw},
     handle::CallHandle,
-    value::TryGetResult,
+    value::{TryGetError, TryGetResult},
     GetValue, Handle, RawNativeContext, Result, SetValue,
 };
 
@@ -68,7 +68,7 @@ impl<'wren> Methods<'wren> {
         if is_fiber {
             Ok(unsafe { self.construct_unchecked(raw_handle) })
         } else {
-            Err(raw_handle)
+            Err(TryGetError::IncompatibleType(Some(raw_handle)))
         }
     }
 }
@@ -144,19 +144,18 @@ impl<'wren, L: Location> SetValue<'wren, L> for Fiber<'wren> {
     }
 }
 
-impl<'wren> GetValue<'wren, Native> for TryGetResult<'wren, Fiber<'wren>> {
-    unsafe fn get_slot(vm: &mut Raw<'wren, Native>, slot: super::Slot) -> Self {
-        let handle = Handle::get_slot(vm, slot);
+// impl<'wren> GetValue<'wren, Native> for TryGetResult<'wren, Fiber<'wren>> {
+// const COMPATIBLE_TYPES: enumflags2::BitFlags<WrenType> = make_bitflags!(WrenType::{Unknown});
+// unsafe fn get_slot(vm: &mut Raw<'wren, Native>, slot: super::Slot) -> Self {
+// let handle = Handle::get_slot(vm, slot);
 
-        vm.get_system_methods().fiber_methods.construct(vm, handle)
-    }
-}
+// vm.get_system_methods().fiber_methods.construct(vm, handle)
+// }
+// }
 
 #[cfg(test)]
 mod test {
-    use super::Fiber;
     use crate::wren::test::{create_test_vm, Context};
-    use crate::wren::value::TryGetResult;
     use crate::wren::{context, cstr, Handle};
 
     #[test]
@@ -189,14 +188,14 @@ mod test {
         assert!(fiber.is_ok());
 
         // Test getting directly from vm
-        let true_fiber: TryGetResult<Fiber> = context.call(&Test, &returnTrue, &()).unwrap();
-        assert!(true_fiber.is_err());
+        // let true_fiber: TryGetResult<Fiber> = context.call(&Test, &returnTrue, &()).unwrap();
+        // assert!(true_fiber.is_err());
 
-        let test_fiber: TryGetResult<Fiber> = context.call(&Test, &returnTest, &()).unwrap();
-        assert!(test_fiber.is_err());
+        // let test_fiber: TryGetResult<Fiber> = context.call(&Test, &returnTest, &()).unwrap();
+        // assert!(test_fiber.is_err());
 
-        let fiber: TryGetResult<Fiber> = context.call(&Test, &returnFiber, &()).unwrap();
-        assert!(fiber.is_ok());
+        // let fiber: TryGetResult<Fiber> = context.call(&Test, &returnFiber, &()).unwrap();
+        // assert!(fiber.is_ok());
     }
 
     #[test]

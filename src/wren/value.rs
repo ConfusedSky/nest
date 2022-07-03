@@ -9,10 +9,21 @@ use super::{
     context::{Foreign, Location, Native, Raw as RawContext},
     Handle, Slot,
 };
+use enumflags2::{bitflags, make_bitflags, BitFlags};
 
-pub type TryGetResult<'wren, T> = Result<T, Handle<'wren>>;
+#[derive(Debug)]
+pub enum TryGetError<'wren> {
+    // If type is incompatible there is still an option to
+    // retreive the handle for another reason
+    IncompatibleType(Option<Handle<'wren>>),
+    NoAvailableSlot,
+}
 
-#[derive(PartialEq, Eq, Debug)]
+pub type TryGetResult<'wren, T> = Result<T, TryGetError<'wren>>;
+
+#[bitflags]
+#[repr(u8)]
+#[derive(PartialEq, Debug, Copy, Clone)]
 pub enum WrenType {
     Bool,
     Num,
@@ -78,6 +89,7 @@ pub trait SetValue<'wren, L: Location> {
 }
 
 pub trait GetValue<'wren, L: Location> {
+    const COMPATIBLE_TYPES: BitFlags<WrenType>;
     /// NOTE THE IMPLEMENTATION OF GET FROM VM SHOULD BE SAFE REGARDLESS
     /// OF WHAT IS IN THE SLOT
     /// `get_from_vm` is unsafe because it's not guarenteed that
@@ -95,6 +107,7 @@ impl<'wren, L: Location> SetValue<'wren, L> for () {
 }
 
 impl<'wren, L: Location> GetValue<'wren, L> for () {
+    const COMPATIBLE_TYPES: BitFlags<WrenType> = BitFlags::ALL;
     unsafe fn get_slot(_vm: &mut RawContext<'wren, L>, _slot: Slot) -> Self {}
 }
 
@@ -112,6 +125,7 @@ impl<'wren, L: Location> SetValue<'wren, L> for Handle<'wren> {
     }
 }
 impl<'wren, L: Location> GetValue<'wren, L> for Handle<'wren> {
+    const COMPATIBLE_TYPES: BitFlags<WrenType> = BitFlags::ALL;
     // We are always able to Get<'wren> a handle from wren
     unsafe fn get_slot(vm: &mut RawContext<'wren, L>, slot: Slot) -> Self {
         let handle = ffi::wrenGetSlotHandle(vm.as_ptr(), slot);
@@ -158,6 +172,7 @@ impl<'wren, L: Location, T: SetValue<'wren, L>> SetValue<'wren, L> for Vec<T> {
 }
 
 impl<'wren, L: Location, T: GetValue<'wren, L>> GetValue<'wren, L> for Vec<T> {
+    const COMPATIBLE_TYPES: BitFlags<WrenType> = make_bitflags!(WrenType::{List});
     unsafe fn get_slot(vm: &mut RawContext<'wren, L>, slot: Slot) -> Self {
         // Store the next slot so we don't overwrite it's value
         // Or use the previous slot instead of juggling slots
@@ -253,6 +268,7 @@ impl<'wren, L: Location> SetValue<'wren, L> for String {
 }
 
 impl<'wren> GetValue<'wren, Native> for String {
+    const COMPATIBLE_TYPES: BitFlags<WrenType> = BitFlags::ALL;
     unsafe fn get_slot(vm: &mut RawContext<'wren, Native>, slot: Slot) -> Self {
         generic_get_string(vm, slot).unwrap_or_else(|| {
             // Fall back to calling to string on the returned object
@@ -271,9 +287,10 @@ impl<'wren> GetValue<'wren, Native> for String {
     }
 }
 
-impl<'wren> GetValue<'wren, Foreign> for TryGetResult<'wren, String> {
+impl<'wren> GetValue<'wren, Foreign> for String {
+    const COMPATIBLE_TYPES: BitFlags<WrenType> = make_bitflags!(WrenType::{Bool | Null | String});
     unsafe fn get_slot(vm: &mut RawContext<'wren, Foreign>, slot: Slot) -> Self {
-        generic_get_string(vm, slot).ok_or_else(|| Handle::get_slot(vm, slot))
+        generic_get_string(vm, slot).expect("Should not be called on incompatible type")
     }
 }
 
@@ -285,6 +302,7 @@ impl<'wren, L: Location> SetValue<'wren, L> for f64 {
 }
 
 impl<'wren, L: Location> GetValue<'wren, L> for f64 {
+    const COMPATIBLE_TYPES: BitFlags<WrenType> = make_bitflags!(WrenType::{Num});
     unsafe fn get_slot(vm: &mut RawContext<'wren, L>, slot: Slot) -> Self {
         if WrenType::Num == vm.get_slot_type(slot) {
             ffi::wrenGetSlotDouble(vm.as_ptr(), slot)
@@ -302,6 +320,7 @@ impl<'wren, L: Location> SetValue<'wren, L> for bool {
 }
 
 impl<'wren, L: Location> GetValue<'wren, L> for bool {
+    const COMPATIBLE_TYPES: BitFlags<WrenType> = make_bitflags!(WrenType::{Bool | Null});
     unsafe fn get_slot(vm: &mut RawContext<'wren, L>, slot: Slot) -> Self {
         let ty = vm.get_slot_type(slot);
         match ty {
