@@ -1,79 +1,9 @@
 use assert_cmd::prelude::*; // Add methods on commands
 use predicates::prelude::*; // Used for writing assertions
-use std::{
-    borrow::Cow,
-    fs::read_to_string,
-    path::{Path, PathBuf},
-    process::Command,
-}; // Run programs
-
-mod term;
-use termcolor::Color::*;
+use std::{borrow::Cow, fs::read_to_string, path::Path, process::Command}; // Run programs
 
 // TODO: Make failure output better
-
-#[test]
-fn integration_test_runner() -> Result<(), Box<dyn std::error::Error>> {
-    let manifest_dir =
-        std::env::var("CARGO_MANIFEST_DIR").expect("WE SHOULD HAVE ACCESS TO THE MANIFEST DIR");
-    let dir = PathBuf::from(manifest_dir + "/scripts/test");
-
-    let mut failures = Vec::new();
-    let mut attempted = 0;
-
-    println!();
-    for file in dir.read_dir().expect("We can read the directory").flatten() {
-        attempted += 1;
-        let file = file
-            .file_name()
-            .to_str()
-            .ok_or("Failed to convert filename to string")?
-            .to_string();
-        let file = file
-            .split('.')
-            .next()
-            .ok_or("Failed to remove the extension from script name")?;
-
-        print!("test {} ... ", file);
-
-        let script = "test/".to_string() + file;
-        let result = std::panic::catch_unwind(|| test_script(script.as_str()));
-        match result {
-            Ok(res) => match res {
-                Ok(()) => {
-                    term::color(Green);
-                    println!("ok");
-                    term::reset();
-                }
-                Err(e) => {
-                    term::color(Red);
-                    println!("FAILED");
-                    term::reset();
-                    println!("{:?}", e);
-                    panic!("{}", e);
-                }
-            },
-            Err(e) => {
-                term::color(Red);
-                println!("FAILED");
-                term::reset();
-                failures.push(e);
-            }
-        }
-    }
-
-    println!(
-        "{} tests out of {attempted} succeeded\n",
-        attempted - failures.len()
-    );
-
-    if !failures.is_empty() {
-        let first = failures.pop().unwrap();
-        std::panic::resume_unwind(first);
-    }
-
-    Ok(())
-}
+wren_macros::generate_tests!();
 
 fn test_script(script: &str) -> Result<(), Box<dyn std::error::Error>> {
     let path = Path::new(file!());
