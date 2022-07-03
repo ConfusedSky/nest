@@ -234,6 +234,18 @@ impl<'wren, T> Context<'wren, T, Native> {
     }
 }
 
+impl<'wren> Context<'wren, NoTypeInfo, Foreign> {
+    pub fn abort_fiber<S>(&mut self, value: S)
+    where
+        S: AsRef<str>,
+    {
+        self.set_return_value(&value.as_ref());
+        unsafe {
+            ffi::wrenAbortFiber(self.as_ptr(), 0);
+        }
+    }
+}
+
 impl<'wren, L: Location> Context<'wren, NoTypeInfo, L> {
     pub(super) fn get_system_methods<'s>(&self) -> &'s SystemMethods<'wren> {
         unsafe {
@@ -352,18 +364,6 @@ impl<'wren, L: Location> Context<'wren, NoTypeInfo, L> {
             }
 
             stack_values
-        }
-    }
-
-    // TODO: Make sure this can only be run in a foreign context
-    // since it requires a fiber to be active in the vm
-    pub fn abort_fiber<S>(&mut self, value: S)
-    where
-        S: AsRef<str>,
-    {
-        self.set_return_value(&value.as_ref());
-        unsafe {
-            ffi::wrenAbortFiber(self.as_ptr(), 0);
         }
     }
 }
