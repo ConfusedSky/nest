@@ -8,6 +8,10 @@ edition = "2021"
 [features]
 leaks = []
 
+[[test]]
+name = "tests"
+path = "tests/main.rs"
+
 [dependencies]
 tokio = { version = "1.18.2", features = ["full"] }
 wren_sys = { path = "./wren-sys" }
