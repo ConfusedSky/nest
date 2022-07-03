@@ -97,14 +97,30 @@ pub trait GetValue<'wren, L: Location> {
     /// `get_from_vm` is unsafe because it's not guarenteed that
     /// the slot is a valid slot
     unsafe fn get_slot_raw(vm: &mut RawContext<'wren, L>, slot: Slot, slot_type: WrenType) -> Self;
-    unsafe fn get_slot_unchecked(
-        vm: &mut RawContext<'wren, L>,
-        slot: Slot,
-    ) -> Self
+    unsafe fn get_slot_unchecked(vm: &mut RawContext<'wren, L>, slot: Slot) -> Self
     where
         Self: Sized,
     {
         Self::get_slot_raw(vm, slot, vm.get_slot_type(slot))
+    }
+    unsafe fn try_get_slot_raw(
+        vm: &mut RawContext<'wren, L>,
+        slot: Slot,
+        slot_type: WrenType,
+        get_handle: bool,
+    ) -> TryGetResult<'wren, Self>
+    where
+        Self: Sized,
+    {
+        if Self::COMPATIBLE_TYPES.contains(slot_type) {
+            Ok(Self::get_slot_raw(vm, slot, slot_type))
+        } else {
+            Err(TryGetError::IncompatibleType(if get_handle {
+                Some(Handle::get_slot_unchecked(vm, slot))
+            } else {
+                None
+            }))
+        }
     }
 }
 
@@ -125,10 +141,7 @@ impl<'wren, L: Location> GetValue<'wren, L> for () {
         _slot_type: WrenType,
     ) -> Self {
     }
-    unsafe fn get_slot_unchecked(
-        _vm: &mut RawContext<'wren, L>,
-        _slot: Slot,
-    ) -> Self
+    unsafe fn get_slot_unchecked(_vm: &mut RawContext<'wren, L>, _slot: Slot) -> Self
     where
         Self: Sized,
     {
@@ -159,10 +172,7 @@ impl<'wren, L: Location> GetValue<'wren, L> for Handle<'wren> {
         let handle = ffi::wrenGetSlotHandle(vm.as_ptr(), slot);
         Self::new_unchecked(vm.as_foreign(), NonNull::new_unchecked(handle))
     }
-    unsafe fn get_slot_unchecked(
-        vm: &mut RawContext<'wren, L>,
-        slot: Slot,
-    ) -> Self
+    unsafe fn get_slot_unchecked(vm: &mut RawContext<'wren, L>, slot: Slot) -> Self
     where
         Self: Sized,
     {
@@ -499,7 +509,7 @@ impl<'wren, L: Location, T: GetValue<'wren, L>> GetArgs<'wren, L> for T {
 macro_rules! impl_get_args_meta {
     ($location:ty, $( $xs:ident = $i:tt ), *) => {
         impl<'wren, $( $xs: GetValue<'wren, $location>, )*> GetArgs<'wren, $location> for ($( $xs, )*) {
-            unsafe fn get_slots(vm: &mut RawContext<'wren, $location>) -> Self{
+            unsafe fn get_slots(vm: &mut RawContext<'wren, $location>) -> Self {
                 (
                     // Expansion happens in forward order so
                     // Previous slots can be reused for reads

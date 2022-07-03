@@ -1,9 +1,11 @@
 use std::ops::Deref;
 
+use enumflags2::make_bitflags;
+
 use super::{
     context::{Context, Location, Native, Raw},
     handle::CallHandle,
-    value::{TryGetError, TryGetResult},
+    value::{TryGetError, TryGetResult, WrenType},
     GetValue, Handle, RawNativeContext, Result, SetValue,
 };
 
@@ -144,14 +146,43 @@ impl<'wren, L: Location> SetValue<'wren, L> for Fiber<'wren> {
     }
 }
 
-// impl<'wren> GetValue<'wren, Native> for TryGetResult<'wren, Fiber<'wren>> {
-// const COMPATIBLE_TYPES: enumflags2::BitFlags<WrenType> = make_bitflags!(WrenType::{Unknown});
-// unsafe fn get_slot(vm: &mut Raw<'wren, Native>, slot: super::Slot) -> Self {
-// let handle = Handle::get_slot(vm, slot);
+impl<'wren> GetValue<'wren, Native> for Fiber<'wren> {
+    const COMPATIBLE_TYPES: enumflags2::BitFlags<WrenType> = make_bitflags!(WrenType::{Unknown});
+    unsafe fn get_slot_raw(
+        _vm: &mut Raw<'wren, Native>,
+        _slot: super::Slot,
+        _slot_type: WrenType,
+    ) -> Self {
+        panic!("Getting a fiber raw is an illigal operation");
+    }
+    unsafe fn get_slot_unchecked(vm: &mut Raw<'wren, Native>, slot: super::Slot) -> Self {
+        let handle = Handle::get_slot_unchecked(vm, slot);
 
-// vm.get_system_methods().fiber_methods.construct(vm, handle)
-// }
-// }
+        vm.get_system_methods()
+            .fiber_methods
+            .construct_unchecked(handle)
+    }
+    unsafe fn try_get_slot_raw(
+        vm: &mut Raw<'wren, Native>,
+        slot: super::Slot,
+        slot_type: WrenType,
+        get_handle: bool,
+    ) -> TryGetResult<'wren, Self>
+    where
+        Self: Sized,
+    {
+        if slot_type != WrenType::Unknown {
+            return Err(TryGetError::IncompatibleType(if get_handle {
+                Some(Handle::get_slot_unchecked(vm, slot))
+            } else {
+                None
+            }));
+        }
+
+        let handle = Handle::get_slot_unchecked(vm, slot);
+        vm.get_system_methods().fiber_methods.construct(vm, handle)
+    }
+}
 
 #[cfg(test)]
 mod test {
