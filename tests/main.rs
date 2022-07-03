@@ -6,14 +6,10 @@ use std::{borrow::Cow, fs::read_to_string, path::Path, process::Command}; // Run
 wren_macros::generate_tests!();
 
 fn test_script(script: &str) -> Result<(), Box<dyn std::error::Error>> {
-    let path = Path::new(file!());
-    let mut script_path = path
-        .parent()
-        .expect("Couldn't get this files parent path")
-        .parent()
-        .expect("Couldn't get this files parent path")
-        .join("scripts")
-        .join(script);
+    let manifest_dir =
+        std::env::var("CARGO_MANIFEST_DIR").expect("WE SHOULD HAVE ACCESS TO THE MANIFEST DIR");
+    let manifest_path = Path::new(&manifest_dir);
+    let mut script_path = manifest_path.join("scripts").join(script);
     script_path.set_extension("wren");
 
     if !script_path.is_file() {
