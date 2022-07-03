@@ -180,7 +180,7 @@ impl<'wren, L: Location> GetValue<'wren, L> for Handle<'wren> {
         _slot_type: WrenType,
     ) -> Self {
         let handle = ffi::wrenGetSlotHandle(vm.as_ptr(), slot);
-        Self::new_unchecked(vm.as_unknown(), NonNull::new_unchecked(handle))
+        Self::new_unchecked(vm, NonNull::new_unchecked(handle))
     }
     unsafe fn get_slot_unchecked(vm: &mut RawContext<'wren, L>, slot: Slot) -> Self
     where

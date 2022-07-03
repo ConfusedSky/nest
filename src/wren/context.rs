@@ -295,7 +295,7 @@ impl<'wren, L: Location> Context<'wren, NoTypeInfo, L> {
         slot: Slot,
     ) -> Handle<'wren> {
         ffi::wrenGetVariable(self.as_ptr(), module.as_ptr(), name.as_ptr(), slot);
-        Handle::get_slot_unchecked(self.as_unknown_mut(), slot)
+        Handle::get_slot_unchecked(self, slot)
     }
 
     pub fn make_call_handle_slice(

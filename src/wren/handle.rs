@@ -34,12 +34,12 @@ impl<'wren> PartialEq for Handle<'wren> {
 }
 
 impl<'wren> Handle<'wren> {
-    pub(crate) unsafe fn new_unchecked(
-        vm: &RawUnknownContext<'wren>,
+    pub(crate) unsafe fn new_unchecked<V, L: Location>(
+        vm: &Context<'wren, V, L>,
         pointer: NonNull<WrenHandle>,
     ) -> Self {
         Self {
-            vm: vm.clone(),
+            vm: vm.as_raw().as_unknown().clone(),
             pointer,
             phantom: PhantomData,
         }
@@ -99,10 +99,7 @@ impl<'wren> CallHandle<'wren> {
         // SAFETY: this function is always safe to call but may be unsafe to use the handle it returns
         // as that handle might not be valid and safe to use
         let ptr = ffi::wrenMakeCallHandle(vm.as_ptr(), signature.as_ptr());
-        let handle = Handle::new_unchecked(
-            vm.as_unknown_mut().as_raw_mut(),
-            NonNull::new_unchecked(ptr),
-        );
+        let handle = Handle::new_unchecked(vm, NonNull::new_unchecked(ptr));
         CallHandle {
             handle,
             argument_count,
