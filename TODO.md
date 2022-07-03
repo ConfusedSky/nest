@@ -7,3 +7,9 @@
 - [ ] Figure out a way to allow calling back into wren from a foreign method
   - That is by default illegal but we want to be able to call wren methods when we are
     validating our methods
+- [x] Create try_get for safe access of values
+- [ ] Add unknown location because abort fiber is only usable from within a foreign context
+- [ ] Test at compile time that all foreign methods and classes are defined and hooked up
+  - Not sure if this should happen as a build step or automatic test generation
+- [x] Make sure handles are only usable in the VM that created them
+- [x] Be able to run tests on both the rust side and the wren side

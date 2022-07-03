@@ -188,7 +188,7 @@ impl<'wren> GetValue<'wren, Native> for Fiber<'wren> {
 #[cfg(test)]
 mod test {
     use crate::wren::test::{create_test_vm, Context};
-    use crate::wren::{context, cstr, Handle};
+    use crate::wren::{context, cstr, Fiber, Handle};
 
     #[test]
     #[allow(non_snake_case)]
@@ -220,14 +220,14 @@ mod test {
         assert!(fiber.is_ok());
 
         // Test getting directly from vm
-        // let true_fiber: TryGetResult<Fiber> = context.call(&Test, &returnTrue, &()).unwrap();
-        // assert!(true_fiber.is_err());
+        let true_fiber = context.call::<Fiber, _>(&Test, &returnTrue, &());
+        assert!(true_fiber.is_err());
 
-        // let test_fiber: TryGetResult<Fiber> = context.call(&Test, &returnTest, &()).unwrap();
-        // assert!(test_fiber.is_err());
+        let test_fiber = context.call::<Fiber, _>(&Test, &returnTest, &());
+        assert!(test_fiber.is_err());
 
-        // let fiber: TryGetResult<Fiber> = context.call(&Test, &returnFiber, &()).unwrap();
-        // assert!(fiber.is_ok());
+        let fiber = context.call::<Fiber, _>(&Test, &returnFiber, &());
+        assert!(fiber.is_ok());
     }
 
     #[test]
@@ -258,9 +258,7 @@ mod test {
 
         assert!(context.get_user_data().get_output().is_empty());
         #[allow(clippy::let_unit_value)]
-        {
-            let _: () = context.call(&Test, &test_resume, &()).unwrap();
-        }
+        context.call::<(), _>(&Test, &test_resume, &()).unwrap();
         assert_eq!(context.get_user_data().get_output(), "Test\n");
         let handle = context
             .get_user_data_mut()

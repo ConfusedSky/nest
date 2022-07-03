@@ -146,6 +146,17 @@ impl<'wren, L: Location> GetValue<'wren, L> for () {
         Self: Sized,
     {
     }
+    unsafe fn try_get_slot_raw(
+        _vm: &mut RawContext<'wren, L>,
+        _slot: Slot,
+        _slot_type: WrenType,
+        _get_handle: bool,
+    ) -> TryGetResult<'wren, Self>
+    where
+        Self: Sized,
+    {
+        Ok(())
+    }
 }
 
 impl<'wren, L: Location, T: SetValue<'wren, L>> SetValue<'wren, L> for &T {
@@ -503,18 +514,25 @@ pub trait GetArgs<'wren, L: Location> {
     fn try_get_slots(vm: &mut RawContext<'wren, L>, get_handles: bool) -> Self::TryGetTarget;
 }
 
-impl<'wren, L: Location, T: GetValue<'wren, L>> GetArgs<'wren, L> for T {
+impl<'wren, L: Location, T: GetValue<'wren, L>> GetArgs<'wren, L> for T
+{
     type TryGetTarget = TryGetResult<'wren, T>;
     unsafe fn get_slots_unchecked(vm: &mut RawContext<'wren, L>) -> Self {
         T::get_slot_unchecked(vm, 0)
     }
     fn try_get_slots(vm: &mut RawContext<'wren, L>, get_handles: bool) -> Self::TryGetTarget {
-        if vm.get_slot_count() < 1 {
-            return Err(TryGetError::NoAvailableSlot);
-        }
+        // Hack to make sure () does nothing
+        // Should compile out since it's a const function on a type
+        if std::mem::size_of::<T>() == 0 {
+            unsafe { T::try_get_slot_raw(vm, 0, WrenType::Unknown, false)}
+        } else {
+            if vm.get_slot_count() < 1 {
+                return Err(TryGetError::NoAvailableSlot);
+            }
 
-        let slot_type = unsafe { vm.get_slot_type(0) };
-        unsafe { T::try_get_slot_raw(vm, 0, slot_type, get_handles) }
+            let slot_type = unsafe { vm.get_slot_type(0) };
+            unsafe { T::try_get_slot_raw(vm, 0, slot_type, get_handles) }
+        }
     }
 }
 

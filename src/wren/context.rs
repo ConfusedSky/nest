@@ -152,35 +152,15 @@ impl<'wren, T> Context<'wren, T, Native> {
         }
     }
 
-    /// Call [method] on a [subject] with [args] on the vm
-    /// subject is usually a class or an object, but all calls require a subject
-    pub fn call<G: GetValue<'wren, Native>, Args: SetArgs<'wren, Native>>(
+    unsafe fn _call<Args: SetArgs<'wren, Native>>(
         &mut self,
         subject: &Handle<'wren>,
         method: &CallHandle<'wren>,
         args: &Args,
-    ) -> CallResult<'wren, G> {
+    ) -> CallResult<'wren, ()> {
         let slot_count =
             <Handle as SetValue<'wren, Native>>::REQUIRED_SLOTS + Args::TOTAL_REQUIRED_SLOTS;
 
-        if method.get_argument_count() == Args::COUNT {
-            unsafe { self.call_unchecked(subject, method, args, slot_count) }
-        } else {
-            Err(InterpretResultErrorKind::IncorrectNumberOfArgsPassed.into())
-        }
-    }
-
-    /// Call [method] on a [subject] with [args] on the vm
-    /// subject is usually a class or an object, but all calls require a subject
-    /// otherwise it's UB
-    /// Arguments must be set up correctly as well
-    pub unsafe fn call_unchecked<G: GetValue<'wren, Native>, Args: SetArgs<'wren, Native>>(
-        &mut self,
-        subject: &Handle<'wren>,
-        method: &CallHandle<'wren>,
-        args: &Args,
-        slot_count: Slot,
-    ) -> CallResult<'wren, G> {
         // make sure there enough slots to send over the subject
         // and all it's args
         let vm = self.as_raw_mut();
@@ -197,10 +177,41 @@ impl<'wren, T> Context<'wren, T, Native> {
 
         let result = ffi::wrenCall(vm.as_ptr(), method.as_ptr());
         InterpretResultErrorKind::new_from_result(result)?;
+        Ok(())
+    }
+
+    /// Call [method] on a [subject] with [args] on the vm
+    /// subject is usually a class or an object, but all calls require a subject
+    pub fn call<G: GetValue<'wren, Native>, Args: SetArgs<'wren, Native>>(
+        &mut self,
+        subject: &Handle<'wren>,
+        method: &CallHandle<'wren>,
+        args: &Args,
+    ) -> CallResult<'wren, G> {
+        if method.get_argument_count() == Args::COUNT {
+            unsafe {
+                self._call(subject, method, args)?;
+                self.as_raw_mut().get_return_value().map_err(Into::into)
+            }
+        } else {
+            Err(InterpretResultErrorKind::IncorrectNumberOfArgsPassed.into())
+        }
+    }
+
+    /// Call [method] on a [subject] with [args] on the vm
+    /// subject is usually a class or an object, but all calls require a subject
+    /// otherwise it's UB
+    /// Arguments must be set up correctly as well
+    pub unsafe fn call_unchecked<G: GetValue<'wren, Native>, Args: SetArgs<'wren, Native>>(
+        &mut self,
+        subject: &Handle<'wren>,
+        method: &CallHandle<'wren>,
+        args: &Args,
+    ) -> CallResult<'wren, G> {
+        self._call(subject, method, args)?;
 
         // This should be safe as long as the type is set correctly
-        // TODO: Make this safer probably use a try_get
-        Ok(vm.get_return_value_unchecked::<G>())
+        Ok(self.as_raw_mut().get_return_value_unchecked::<G>())
     }
 
     /// Checks a handle to see if it is a valid fiber, if it is return the handle as a fiber
@@ -314,14 +325,20 @@ impl<'wren, L: Location> Context<'wren, NoTypeInfo, L> {
         }
     }
 
-    // TODO: Create safe version that returns Options depending on how many slots
-    // there are
     pub unsafe fn get_stack_unchecked<Args: GetArgs<'wren, L>>(&mut self) -> Args {
         Args::get_slots_unchecked(self)
     }
 
     pub unsafe fn get_return_value_unchecked<Args: GetValue<'wren, L>>(&mut self) -> Args {
         Args::get_slots_unchecked(self)
+    }
+
+    pub fn get_stack<Args: GetArgs<'wren, L>>(&mut self) -> Args::TryGetTarget {
+        Args::try_get_slots(self, false)
+    }
+
+    pub fn get_return_value<Args: GetValue<'wren, L>>(&mut self) -> TryGetResult<'wren, Args> {
+        Args::try_get_slots(self, false)
     }
 
     // TODO: Make sure this can only be run in a foreign context
