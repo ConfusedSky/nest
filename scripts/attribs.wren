@@ -12,7 +12,7 @@ class Example {
 
     static printObject(o, depth) {
         if (o is Map) {
-            pprint(o, depth+1)
+            this.pprint(o, depth+1)
         } else {
             System.write(o)
         }
@@ -23,7 +23,7 @@ class Example {
 
         for (entry in map) {
             System.write("  "*(depth + 1) + entry.key.toString + ": ")
-            printObject(entry.value, depth)
+            this.printObject(entry.value, depth)
             System.print(",")
         }
 
@@ -31,13 +31,13 @@ class Example {
     }
 
     static pprint(map) { 
-        pprint(map, 0)
+        this.pprint(map, 0)
         System.print()
     }
 
     static test() {
-        pprint(attributes.self)
-        pprint(attributes.methods)
+        this.pprint(attributes.self)
+        this.pprint(attributes.methods)
     }
 
     //!place_generated
