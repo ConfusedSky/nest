@@ -162,13 +162,13 @@ where
 
             let user_data = SystemUserData::new(user_data);
             let user_data = Box::new(user_data);
-            let user_data_ptr = Box::into_raw(user_data);
+            let user_data = Box::into_raw(user_data);
 
-            config.userData = user_data_ptr.cast::<c_void>();
+            config.userData = user_data.cast::<c_void>();
 
             let mut vm: Context<V, context::Native> =
                 Context::new_unchecked(ffi::wrenNewVM(&mut config));
-            (*user_data_ptr).system_methods = Some(SystemMethods::new(&mut vm));
+            (*user_data).system_methods = Some(SystemMethods::new(&mut vm));
 
             Self {
                 vm,
