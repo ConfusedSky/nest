@@ -578,7 +578,7 @@ impl_get_args!(T0 = 0, T1 = 1, T2 = 2, T3 = 3, T4 = 4, T5 = 5, T6 = 6);
 #[cfg(test)]
 mod test {
     use crate::{
-        call_test_case,
+        call_test_case, call_test_case2,
         wren::{
             context::{Foreign, Native},
             test::create_test_vm,
@@ -630,23 +630,24 @@ mod test {
         let (mut vm, Test) = create_test_vm(source, |_| {});
         let context = vm.get_context();
 
-        // False cases
-        call_test_case!(bool, context { Test.returnNull() } == Ok(false));
-        call_test_case!(bool, context { Test.returnFalse() } == Ok(false));
-        call_test_case!(bool, context { Test.returnValue(false) } == Ok(false));
-        call_test_case!(bool, context { Test.returnNegate(true) } == Ok(false));
-        call_test_case!(bool, context { Test.returnNegate("") } == Ok(false));
-
-        // True cases
-        call_test_case!(bool, context { Test.returnTrue } == Ok(true));
-        call_test_case!(bool, context { Test.returnTrue() } == Ok(true));
-        call_test_case!(bool, context { Test.returnValue(true) } == Ok(true));
-        call_test_case!(bool, context { Test.returnNegate(false) } == Ok(true));
-        call_test_case!(bool, context { Test.returnValue("") } == Ok(true));
-        call_test_case!(bool, context { Test.returnValue("Test") } == Ok(true));
-        call_test_case!(bool, context { Test.returnValue(Test) } == Ok(true));
-        call_test_case!(bool, context { Test.returnValue(vec![1.0]) } == Ok(true));
-        call_test_case!(bool, context { Test.returnValue(1.0) } == Ok(true));
+        call_test_case2!(context {
+            // False cases
+            Test.returnNull() == Ok(false)
+            Test.returnFalse() == Ok(false)
+            Test.returnValue(false) == Ok(false)
+            Test.returnNegate(true) == Ok(false)
+            Test.returnNegate("") == Ok(false)
+            // True Cases
+            Test.returnTrue == Ok(true)
+            Test.returnTrue() == Ok(true)
+            Test.returnValue(true) == Ok(true)
+            Test.returnNegate(false) == Ok(true)
+            Test.returnValue("") == Ok(true)
+            Test.returnValue("Test") == Ok(true)
+            Test.returnValue(Test) == Ok(true)
+            Test.returnValue(vec![1.0]) == Ok(true)
+            Test.returnValue(1.0) == Ok(true)
+        });
     }
 
     #[test]
