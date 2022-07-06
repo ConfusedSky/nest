@@ -448,10 +448,10 @@ const fn _const_max_helper(a: Slot, b: Slot) -> Slot {
 }
 
 macro_rules! expand_TOTAL_REQUIRED_SLOTS {
-    (@step $i:expr, $x:ty) => (<$x>::REQUIRED_SLOTS+ $i);
+    (@step $i:expr, $x:ty) => (<$x>::REQUIRED_SLOTS + $i);
     (@step $i:expr, $x:ty, $($y:ty),+ $(,)?) => (
         _const_max_helper(
-            <$x>::REQUIRED_SLOTS+ $i,
+            <$x>::REQUIRED_SLOTS + $i,
             expand_TOTAL_REQUIRED_SLOTS!(@step $i + 1, $($y),+),
         )
     );
@@ -461,12 +461,9 @@ macro_rules! expand_TOTAL_REQUIRED_SLOTS {
 }
 
 macro_rules! expand_set_slots {
-    ($self:ident, $vm:ident, $method:ident, $offset:expr, $i:tt) => {
+    ($self:ident, $vm:ident, $method:ident, $offset:expr, $i:tt $(, $($xs:tt),+)?) => {
+        $(expand_set_slots!($self, $vm, $method, $offset, $( $xs ), *);)?
         $self.$i.$method($vm, $i + $offset as Slot);
-    };
-    ($self:ident, $vm:ident, $method:ident, $offset:expr, $i:tt, $($xs:tt),+ $(,)?) => {
-        expand_set_slots!($self, $vm, $method, $offset, $( $xs ), *);
-        expand_set_slots!($self, $vm, $method, $offset, $i);
     };
 }
 
