@@ -1,5 +1,5 @@
 use criterion::{
-    criterion_group, criterion_main, measurement::WallTime, BenchmarkGroup, Criterion,
+    criterion_group, criterion_main, measurement::WallTime, BenchmarkGroup, Criterion, Throughput,
 };
 use wren::{
     context::{Foreign, Native},
@@ -57,12 +57,24 @@ fn setup<'wren>(
     group: &mut BenchmarkGroup<WallTime>,
     name: &str,
     foreign: ForeignMethod<'wren, UserData<'wren>>,
+    is_multi: bool,
 ) {
     let (mut vm, test) = create_test_vm(
         "class Test {
             static add_three() { add_three_(1, 2, 3) == \"6\" }
             static add_three_wrapped() { add_three_wrapper(1, 2, 3) == \"6\" }
-
+            static add_three_multi() {
+                for (i in 0..100) {
+                    add_three_(i+1, i+2, i+3)
+                }
+                return true
+            }
+            static add_three_multi_wrapped() {
+                for (i in 0..1000) {
+                    add_three_wrapper(i+1, i+2, i+3)
+                }
+                return true
+            }
             static add_three_wrapper(a, b, c) {
                 if ( !(a is Num) || !(b is Num) || !(c is Num)) {
                     Fiber.abort(\"All arguments must be numbers\")
@@ -76,22 +88,40 @@ fn setup<'wren>(
     let context = vm.get_context();
     let add_three = context.make_call_handle(wren::cstr!("add_three()"));
     let add_three_wrapped = context.make_call_handle(wren::cstr!("add_three_wrapped()"));
+    let _add_three_multi_wrapped =
+        context.make_call_handle(wren::cstr!("add_three_multi_wrapped()"));
+    let add_three_multi = context.make_call_handle(wren::cstr!("add_three_multi()"));
 
-    let bench_2_name = name.to_string() + " Wrapped";
-
-    group.bench_function(name, |b| b.iter(|| callback(context, &test, &add_three)));
-    group.bench_function(&bench_2_name, |b| {
-        b.iter(|| callback(context, &test, &add_three_wrapped))
-    });
+    if is_multi {
+        group.bench_function(&(name.to_string() + " Multi"), |b| {
+            b.iter(|| callback(context, &test, &add_three_multi))
+        });
+        // group.bench_function(&(name.to_string() + " Multi Wrapped"), |b| {
+        // b.iter(|| callback(context, &test, &add_three_multi_wrapped))
+        // });
+    } else {
+        group.bench_function(name, |b| b.iter(|| callback(context, &test, &add_three)));
+        group.bench_function(&(name.to_string() + " Wrapped"), |b| {
+            b.iter(|| callback(context, &test, &add_three_wrapped))
+        });
+    }
 }
 
 pub fn foreign_call(c: &mut Criterion) {
     let mut group = c.benchmark_group("Foreign Call");
-    setup(&mut group, "Raw FFI", raw_ffi);
-    setup(&mut group, "Unchecked Raw", unchecked_raw);
-    setup(&mut group, "Unchecked", unchecked);
-    setup(&mut group, "Checked", checked);
+    setup(&mut group, "Raw FFI", raw_ffi, false);
+    setup(&mut group, "Unchecked Raw", unchecked_raw, false);
+    setup(&mut group, "Unchecked", unchecked, false);
+    setup(&mut group, "Checked", checked, false);
 }
 
-criterion_group!(benches, foreign_call);
+pub fn foreign_call_multi(c: &mut Criterion) {
+    let mut group = c.benchmark_group("Foreign Call Multi");
+    setup(&mut group, "Raw FFI", raw_ffi, true);
+    setup(&mut group, "Unchecked Raw", unchecked_raw, true);
+    setup(&mut group, "Unchecked", unchecked, true);
+    setup(&mut group, "Checked", checked, true);
+}
+
+criterion_group!(benches, foreign_call, foreign_call_multi);
 criterion_main!(benches);
