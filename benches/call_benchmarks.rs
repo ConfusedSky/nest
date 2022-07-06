@@ -12,7 +12,9 @@ pub fn criterion_benchmark(c: &mut Criterion) {
     let context = vm.get_context();
     let add_three = context.make_call_handle(wren::cstr!("add_three(_,_,_)"));
 
-    c.bench_function("Test call Raw FFI", |b| {
+    let mut group = c.benchmark_group("Call");
+
+    group.bench_function("Raw FFI", |b| {
         b.iter(|| unsafe {
             let test_ptr = test.as_ptr();
             let context_ptr = context.as_ptr();
@@ -40,7 +42,7 @@ pub fn criterion_benchmark(c: &mut Criterion) {
         });
     });
 
-    c.bench_function("Test Call Unchecked", |b| {
+    group.bench_function("Unchecked", |b| {
         b.iter(|| unsafe {
             let res = context
                 .call_unchecked::<String, _>(
@@ -56,7 +58,8 @@ pub fn criterion_benchmark(c: &mut Criterion) {
             assert!(res == "6");
         })
     });
-    c.bench_function("Test Call Checked", |b| {
+
+    group.bench_function("Checked", |b| {
         b.iter(|| {
             let res = context
                 .call::<String, _>(
