@@ -187,8 +187,8 @@ impl<'wren> GetValue<'wren, Native> for Fiber<'wren> {
 
 #[cfg(test)]
 mod test {
-    use crate::wren::test::{create_test_vm, Context};
-    use crate::wren::{context, cstr, Fiber, Handle};
+    use crate::test::{create_test_vm, Context};
+    use crate::{context, cstr, Fiber, Handle};
 
     #[test]
     #[allow(non_snake_case)]

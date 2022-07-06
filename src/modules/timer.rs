@@ -1,8 +1,8 @@
 use tokio::time::{sleep, Duration};
 
-use crate::wren;
-use crate::wren::Handle;
 use crate::Context;
+use wren;
+use wren::Handle;
 
 use super::{source_file, Class, Module};
 

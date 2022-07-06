@@ -3,14 +3,14 @@
 #![warn(unsafe_code)]
 
 mod modules;
-mod wren;
+
 use modules::{scheduler::Scheduler, Modules};
 use std::{env, ffi::CStr, fs, path::PathBuf};
 use wren::context::{self, Location};
 
 type Context<'wren> = wren::Context<'wren, MyUserData<'wren>, context::Foreign>;
-type Handle<'wren> = crate::wren::Handle<'wren>;
-type ForeignMethod<'wren> = crate::wren::ForeignMethod<'wren, MyUserData<'wren>>;
+type Handle<'wren> = wren::Handle<'wren>;
+type ForeignMethod<'wren> = wren::ForeignMethod<'wren, MyUserData<'wren>>;
 
 macro_rules! create_trait_alias {
     ($name:ident$(<$( $gen:tt $(: $bound:tt $(+ $additional_bounds:tt)*)? ),+>)?, $($bounds_to_alias:tt)*) => {
@@ -20,16 +20,10 @@ macro_rules! create_trait_alias {
     };
 }
 
-create_trait_alias!(WrenGet<'wren, L: Location>, crate::wren::GetValue<'wren, L>);
-create_trait_alias!(WrenSet<'wren, L: Location>, crate::wren::SetValue<'wren, L>);
-create_trait_alias!(
-    WrenGetArgs<'wren, L: Location>,
-    crate::wren::GetArgs<'wren, L>
-);
-create_trait_alias!(
-    WrenSetArgs<'wren, L: Location>,
-    crate::wren::SetArgs<'wren, L>
-);
+create_trait_alias!(WrenGet<'wren, L: Location>, wren::GetValue<'wren, L>);
+create_trait_alias!(WrenSet<'wren, L: Location>, wren::SetValue<'wren, L>);
+create_trait_alias!(WrenGetArgs<'wren, L: Location>, wren::GetArgs<'wren, L>);
+create_trait_alias!(WrenSetArgs<'wren, L: Location>, wren::SetArgs<'wren, L>);
 
 pub struct MyUserData<'wren> {
     scheduler: Option<Scheduler<'wren>>,

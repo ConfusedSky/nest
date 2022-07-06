@@ -17,9 +17,10 @@ fn fibonacci(n: u64) -> u64 {
 
     // n2
     fn help(a: u64, b: u64, n: u64) -> u64 {
-        match n {
-            0 => a,
-            n => help(b, a + b, n - 1),
+        if n == 0 {
+            a
+        } else {
+            help(b, a + b, n - 1)
         }
     }
     help(0, 1, n)

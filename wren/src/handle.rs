@@ -136,7 +136,7 @@ impl<'wren> CallHandle<'wren> {
 
 #[cfg(test)]
 mod test {
-    use crate::wren::test::create_test_vm;
+    use crate::test::create_test_vm;
 
     use super::CallHandle;
     use wren_macros::call_signature;

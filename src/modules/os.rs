@@ -1,5 +1,5 @@
-use crate::wren::VERSION;
 use crate::Context;
+use wren::VERSION;
 
 use super::{source_file, Class, Module};
 use std::env::args;

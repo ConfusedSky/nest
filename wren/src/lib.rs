@@ -45,7 +45,6 @@ macro_rules! cstr {
         }
     }};
 }
-pub use cstr;
 
 pub type Slot = std::os::raw::c_int;
 

@@ -13,7 +13,7 @@ mod macros {
     #[macro_export]
     macro_rules! source_file {
         ($file:expr) => {{
-            use crate::wren;
+            use wren;
             wren::cstr!(include_str!($file))
         }};
     }

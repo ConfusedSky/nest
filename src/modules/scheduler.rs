@@ -1,9 +1,7 @@
 use std::{future::Future, pin::Pin};
 
-use crate::{
-    wren::{self, CallHandle, RawNativeContext as RawContext},
-    Context, Handle,
-};
+use crate::{Context, Handle};
+use wren::{self, CallHandle, RawNativeContext as RawContext};
 
 use super::{source_file, Class, Module};
 
@@ -180,7 +178,7 @@ impl<'wren> Scheduler<'wren> {
 }
 
 fn capture_methods<'wren>(mut vm: Context<'wren>) {
-    use crate::wren::cstr;
+    use wren::cstr;
     let class = vm
         .get_variable("scheduler", "Scheduler", 0)
         .expect("Scheduler variable hasn't been defined");
