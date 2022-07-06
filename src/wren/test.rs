@@ -51,9 +51,12 @@ impl<'wren> UserData<'wren> {
     }
 }
 #[macro_export]
-macro_rules! call_test_case2 {
+macro_rules! call_test_case {
     (
-        $vm:ident<$type:ty> {
+        // What context to run these tests in
+        // and also an optional type to case all return values
+        // in this test to
+        $vm:ident$(<$type:ty>)? {
             // Create zero or more test cases within a vm context
             $(
                 // Match Class.method
@@ -71,6 +74,10 @@ macro_rules! call_test_case2 {
             )*
         }
     ) => {
+        // We need this here since type is optional and it's not a repeated argument
+        macro_rules! call_test_case_helper {
+            ($c: expr, $h: expr, $a: expr) => {$vm.call$(::<$type, _>)?($c, $h, $a)}
+        }
         $({
             let slice = wren_macros::to_signature!(
                 // To signature takes one of
@@ -86,14 +93,17 @@ macro_rules! call_test_case2 {
             );
             let handle = $vm.make_call_handle_slice(slice).unwrap();
             // println!("{:?}, {}", handle, line!());
-            let res = $vm.call::<$type, _>(
+            let res = call_test_case_helper!(
                 &$class,
                 &handle,
                 // Args should be
                 // * &() if there is no argument list
                 // * &() if there are zero arguments
                 // * &(&1, &2, &3) if there are arguments
+                //
                 // First there should always be at least &()
+                // So regardless of what happens on the inside
+                // this should be here unconditionally
                 &(
                     // Check if there was an argument list
                     $(
@@ -105,56 +115,6 @@ macro_rules! call_test_case2 {
             assert_eq!( res, $res );
         });*
     }
-}
-
-pub use call_test_case2;
-
-#[macro_export]
-macro_rules! call_test_case {
-    (
-        $type:ty,
-        $vm:ident {
-            $class:ident.$method:ident
-            // Check if there are parenthesis at all
-            $(
-                // If there are parenthesis then there are 0 or more args
-                // inside of them
-                ($($args:expr),*)
-            )?
-        } == $res:expr
-    ) => {
-        let slice = wren_macros::to_signature!(
-            // To signature takes one of
-            // * method
-            // * method()
-            // * method(1,2,3)
-            $method
-            // Check if there is a paren
-            $(
-                // add the paren and have a comma separated list of the args
-                ($($args),*)
-            )?
-        );
-        let handle = $vm.make_call_handle_slice(slice).unwrap();
-        // println!("{:?}, {}", handle, line!());
-        let res = $vm.call::<$type, _>(
-            &$class,
-            &handle,
-            // Args should be
-            // * &() if there is no argument list
-            // * &() if there are zero arguments
-            // * &(&1, &2, &3) if there are arguments
-            // First there should always be at least &()
-            &(
-                // Check if there was an argument list
-                $(
-                    // Create a comma separated list of references to the args
-                    $( & $args ),*
-                )?
-            )
-        );
-        assert_eq!( res, $res );
-    };
 }
 
 pub use call_test_case;

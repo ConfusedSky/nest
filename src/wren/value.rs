@@ -578,7 +578,7 @@ impl_get_args!(T0 = 0, T1 = 1, T2 = 2, T3 = 3, T4 = 4, T5 = 5, T6 = 6);
 #[cfg(test)]
 mod test {
     use crate::{
-        call_test_case, call_test_case2,
+        call_test_case,
         wren::{
             context::{Foreign, Native},
             test::create_test_vm,
@@ -630,7 +630,7 @@ mod test {
         let (mut vm, Test) = create_test_vm(source, |_| {});
         let context = vm.get_context();
 
-        call_test_case2!(context<bool> {
+        call_test_case!(context {
             // False cases
             Test.returnNull() == Ok(false)
             Test.returnFalse() == Ok(false)
@@ -671,7 +671,7 @@ mod test {
         let (mut vm, Test) = create_test_vm(source, |_| {});
         let context = vm.get_context();
 
-        call_test_case2!(context<String> {
+        call_test_case!(context {
             Test.returnNull() == Ok("null".to_string())
             Test.returnFalse() == Ok("false".to_string())
             Test.returnValue(false) == Ok("false".to_string())
@@ -712,7 +712,7 @@ mod test {
         let (mut vm, Test) = create_test_vm(source, |_| {});
         let context = vm.get_context();
 
-        call_test_case2!(context<Vec<String>> {
+        call_test_case!(context<Vec<String>> {
             Test.returnNull() == Err(TryGetError::IncompatibleType(None).into())
             Test.returnFalse() == Err(TryGetError::IncompatibleType(None).into())
             Test.returnValue(false) == Err(TryGetError::IncompatibleType(None).into())
@@ -722,15 +722,44 @@ mod test {
             Test.returnValue("Test") == Err(TryGetError::IncompatibleType(None).into())
             Test.returnValue("Test".to_string()) == Err(TryGetError::IncompatibleType(None).into())
             Test.returnValue(Test) == Err(TryGetError::IncompatibleType(None).into())
-            Test.returnValue(vec![1.0]) == Ok(vec!["1".to_string()])
-            Test.returnValue(vec!["1.0", "Other"]) == Ok(vec!["1.0".to_string(), "Other".to_string()])
             Test.returnValue(1.0) == Err(TryGetError::IncompatibleType(None).into())
             Test.returnMap == Err(TryGetError::IncompatibleType(None).into())
             Test.sendMulti("Test", vec![1.0]) == Err(TryGetError::IncompatibleType(None).into())
-            Test.sendMulti(vec!["One Two"], "Test") == Err(TryGetError::IncompatibleType(None).into())
-            Test.returnValue( vec![vec![vec!["1.0", "Other"]]]) == Ok(vec!["[[1.0, Other]]".to_string()])
+            Test.sendMulti(
+                vec!["One Two"], "Test"
+            ) == Err(TryGetError::IncompatibleType(None).into())
+
+            Test.returnValue(
+                vec![1.0]
+            ) == Ok(
+                vec!["1".to_string()]
+            )
+            Test.returnValue(
+                vec![vec![vec!["1.0", "Other"]]]
+            ) == Ok(
+                vec!["[[1.0, Other]]".to_string()]
+            )
+            Test.returnValue(
+                vec!["1.0", "Other"]
+            ) == Ok(
+                vec!["1.0".to_string(), "Other".to_string()]
+            )
         });
-        call_test_case!(Vec<Vec<Vec<f64>>>, context { Test.nestedArray } == Ok(vec![vec![vec![1.0_f64]]]));
-        call_test_case!(Vec<Vec<String>>, context { Test.returnValue(vec![vec!["1.0", "Other"]]) } == Ok(vec![vec!["1.0".to_string(), "Other".to_string()]]));
+
+        call_test_case!(context {
+            Test.nestedArray == Ok(
+                vec![vec![vec![1.0_f64]]]
+            )
+
+            Test.nestedArray == Ok(
+                vec![vec![vec!["1".to_string()]]]
+            )
+
+            Test.returnValue(
+                vec![vec!["1.0", "Other"]]
+            ) == Ok(
+                vec![vec!["1.0".to_string(), "Other".to_string()]]
+            )
+        });
     }
 }
