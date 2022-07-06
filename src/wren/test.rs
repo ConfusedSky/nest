@@ -53,25 +53,18 @@ impl<'wren> UserData<'wren> {
 
 #[macro_export]
 macro_rules! call_test_case {
-        ($type:ty, $vm:ident { $class:ident.$handle:ident } == $res:expr) => {
-            let slice = wren_macros::to_signature!($handle);
-            let handle = $vm.make_call_handle_slice(slice).unwrap();
-            // println!("{:?}, {}", handle, line!());
-            let res = $vm.call::<$type, _>(&$class, &handle, &());
-            assert_eq!( res, $res );
-        };
-        ($type:ty, $vm:ident { $class:ident.$handle:ident() } == $res:expr) => {
-            let slice = wren_macros::to_signature!($handle());
-            let handle = $vm.make_call_handle_slice(slice).unwrap();
-            // println!("{:?}, {}", handle, line!());
-            let res = $vm.call::<$type, _>(&$class, &handle, &());
-            assert_eq!( res, $res );
-        };
         ($type:ty, $vm:ident { $class:ident.$handle:ident($($args:expr),+ ) } == $res:expr) => {
             let slice = wren_macros::to_signature!($handle($($args),+ ));
             let handle = $vm.make_call_handle_slice(slice).unwrap();
             // println!("{:?}, {}", handle, line!());
             let res = $vm.call::<$type, _>(&$class, &handle, &($(&$args),+ ));
+            assert_eq!( res, $res );
+        };
+        ($type:ty, $vm:ident { $class:ident.$handle:ident$($l:tt)? } == $res:expr) => {
+            let slice = wren_macros::to_signature!($handle$($l)?);
+            let handle = $vm.make_call_handle_slice(slice).unwrap();
+            // println!("{:?}, {}", handle, line!());
+            let res = $vm.call::<$type, _>(&$class, &handle, &());
             assert_eq!( res, $res );
         };
     }

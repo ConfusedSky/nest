@@ -462,7 +462,7 @@ macro_rules! expand_TOTAL_REQUIRED_SLOTS {
 
 macro_rules! expand_set_slots {
     ($self:ident, $vm:ident, $method:ident, $offset:expr, $i:tt $(, $($xs:tt),+)?) => {
-        $(expand_set_slots!($self, $vm, $method, $offset, $( $xs ), *);)?
+        $(expand_set_slots!($self, $vm, $method, $offset, $( $xs ), +);)?
         $self.$i.$method($vm, $i + $offset as Slot);
     };
 }
