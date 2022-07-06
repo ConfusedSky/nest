@@ -1,33 +1,48 @@
 use criterion::{black_box, criterion_group, criterion_main, Criterion};
-
-#[inline]
-fn fibonacci(n: u64) -> u64 {
-    // match n {
-    // 0 => 1,
-    // 1 => 1,
-    // n => fibonacci(n - 1) + fibonacci(n - 2),
-    // }
-    // let mut n1 = 0;
-    // let mut n2 = 1;
-    // for _i in 1..n {
-    // let sum = n1 + n2;
-    // n1 = n2;
-    // n2 = sum;
-    // }
-
-    // n2
-    fn help(a: u64, b: u64, n: u64) -> u64 {
-        if n == 0 {
-            a
-        } else {
-            help(b, a + b, n - 1)
-        }
-    }
-    help(0, 1, n)
-}
+use wren::test::create_test_vm;
 
 pub fn criterion_benchmark(c: &mut Criterion) {
-    c.bench_function("fib 20", |b| b.iter(|| fibonacci(black_box(20))));
+    let (mut vm, test) = create_test_vm(
+        "class Test {
+            static add_three(a, b, c) { (a+b+c).toString }
+        }",
+        |_| {},
+    );
+    let context = vm.get_context();
+    let add_three = context.make_call_handle(wren::cstr!("add_three(_,_,_)"));
+
+    c.bench_function("Test Call Unchecked", |b| {
+        b.iter(|| unsafe {
+            let res = context
+                .call_unchecked::<String, _>(
+                    &test,
+                    &add_three,
+                    &(
+                        &black_box(1.0_f64),
+                        &black_box(2.0_f64),
+                        &black_box(3.0_f64),
+                    ),
+                )
+                .unwrap();
+            assert!(res == "6");
+        })
+    });
+    c.bench_function("Test Call Checked", |b| {
+        b.iter(|| {
+            let res = context
+                .call::<String, _>(
+                    &test,
+                    &add_three,
+                    &(
+                        &black_box(1.0_f64),
+                        &black_box(2.0_f64),
+                        &black_box(3.0_f64),
+                    ),
+                )
+                .unwrap();
+            assert!(res == "6");
+        })
+    });
 }
 
 criterion_group!(benches, criterion_benchmark);

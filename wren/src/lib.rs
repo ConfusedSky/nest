@@ -5,8 +5,9 @@ mod fiber;
 mod foreign;
 mod handle;
 mod system_methods;
-#[cfg(test)]
-mod test;
+// #[cfg(any(test, bench))]
+#[doc(hidden)]
+pub mod test;
 pub mod user_data;
 mod value;
 
