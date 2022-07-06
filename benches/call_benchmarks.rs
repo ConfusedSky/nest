@@ -145,11 +145,11 @@ pub fn call(c: &mut Criterion) {
     });
 
     group.bench_function("No VM String", |b| {
-        b.iter(|| (black_box(1) + black_box(2) + black_box(3)).to_string())
+        b.iter(|| black_box(black_box(1) + black_box(2) + black_box(3)).to_string())
     });
 
     group.bench_function("No VM Number", |b| {
-        b.iter(|| (black_box(1) + black_box(2) + black_box(3)).to_string())
+        b.iter(|| black_box(black_box(1) + black_box(2) + black_box(3)))
     });
 }
 
