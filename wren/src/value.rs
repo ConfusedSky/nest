@@ -746,6 +746,10 @@ mod test {
 
         call_test_case!(context {
             Test.nestedArray == Ok(
+                vec![vec![vec![true]]]
+            )
+
+            Test.nestedArray == Ok(
                 vec![vec![vec![1.0_f64]]]
             )
 

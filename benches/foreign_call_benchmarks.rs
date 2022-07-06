@@ -13,7 +13,14 @@ unsafe fn raw_ffi(context: wren::test::Context<Foreign>) {
     let a = ffi::wrenGetSlotDouble(context, 1);
     let b = ffi::wrenGetSlotDouble(context, 2);
     let c = ffi::wrenGetSlotDouble(context, 3);
-    ffi::wrenSetSlotDouble(context, 0, a + b + c);
+    // ffi::wrenSetSlotDouble(context, 0, a + b + c);
+    let str = (a + b + c).to_string();
+    ffi::wrenSetSlotBytes(
+        context,
+        0,
+        str.as_ptr().cast(),
+        str.len().try_into().unwrap(),
+    );
 }
 
 unsafe fn unchecked_raw(mut context: wren::test::Context<Foreign>) {
@@ -21,20 +28,20 @@ unsafe fn unchecked_raw(mut context: wren::test::Context<Foreign>) {
     let b = f64::get_slot_raw(&mut context, 2, wren::WrenType::Num);
     let c = f64::get_slot_raw(&mut context, 3, wren::WrenType::Num);
 
-    context.set_return_value(&(a + b + c));
+    context.set_return_value(&(a + b + c).to_string());
 }
 
 unsafe fn unchecked(mut context: wren::test::Context<Foreign>) {
     let (_, a, b, c) = context.get_stack_unchecked::<((), f64, f64, f64)>();
 
-    context.set_return_value(&(a + b + c));
+    context.set_return_value(&(a + b + c).to_string());
 }
 
 fn checked(mut context: wren::test::Context<Foreign>) {
     let (_, a, b, c) = context.get_stack::<((), f64, f64, f64)>();
     let (a, b, c) = (a.unwrap(), b.unwrap(), c.unwrap());
 
-    context.set_return_value(&(a + b + c));
+    context.set_return_value(&(a + b + c).to_string());
 }
 
 fn callback<'wren>(
@@ -42,8 +49,8 @@ fn callback<'wren>(
     test: &Handle<'wren>,
     add_three: &CallHandle<'wren>,
 ) {
-    let result = context.call::<f64, _>(test, add_three, &()).unwrap();
-    assert_eq!(result, 6.0_f64);
+    let result = context.call::<bool, _>(test, add_three, &()).unwrap();
+    assert!(result);
 }
 
 fn setup<'wren>(
@@ -53,8 +60,8 @@ fn setup<'wren>(
 ) {
     let (mut vm, test) = create_test_vm(
         "class Test {
-            static add_three() { add_three_(1, 2, 3) }
-            static add_three_wrapped() { add_three_wrapper(1, 2, 3) }
+            static add_three() { add_three_(1, 2, 3) == \"6\" }
+            static add_three_wrapped() { add_three_wrapper(1, 2, 3) == \"6\" }
 
             static add_three_wrapper(a, b, c) {
                 if ( !(a is Num) || !(b is Num) || !(c is Num)) {
