@@ -53,11 +53,8 @@ impl<'wren> UserData<'wren> {
 
 #[macro_export]
 macro_rules! call_test_case {
-        ($type:ty, $vm:ident { $class:ident.$method:ident($($args:expr),+ ) } == $res:expr) => {
-            call_test_case!(@call $type, $vm, $class, &($(&$args),+), $res, $method($($args),+));
-        };
-        ($type:ty, $vm:ident { $class:ident.$method:ident$($args:tt)? } == $res:expr) => {
-            call_test_case!(@call $type, $vm, $class, &(), $res, $method$($args)?);
+        ($type:ty, $vm:ident { $class:ident.$method:ident$(($($args:expr),*))? } == $res:expr) => {
+            call_test_case!(@call $type, $vm, $class, &($($(&$args),*)?), $res, $method$(($($args),*))?);
         };
         (@call $type:ty, $vm: ident, $class:ident, $args:expr, $res: expr, $($signature:tt)*) => {
             let slice = wren_macros::to_signature!($($signature)*);
