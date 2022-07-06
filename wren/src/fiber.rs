@@ -233,9 +233,9 @@ mod test {
     #[test]
     #[allow(non_snake_case)]
     fn test_transfer() {
-        unsafe fn test_await(mut vm: Context<context::Foreign>) {
-            let (_, fiber) = vm.get_stack_unchecked::<((), Handle)>();
-            vm.get_user_data_mut().handle = Some(fiber);
+        fn test_await(mut vm: Context<context::Foreign>) {
+            let (_, fiber) = vm.get_stack::<((), Handle)>();
+            vm.get_user_data_mut().handle = fiber.ok();
         }
 
         let source = "class Test {

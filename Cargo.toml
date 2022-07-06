@@ -22,6 +22,10 @@ path = "tests/main.rs"
 name = "call_benchmarks"
 harness = false
 
+[[bench]]
+name = "foreign_call_benchmarks"
+harness = false
+
 [dependencies]
 tokio = { version = "1.18.2", features = ["full"] }
 dirs = "4.0.0"
