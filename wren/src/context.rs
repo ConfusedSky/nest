@@ -227,6 +227,25 @@ impl<'wren, T> Context<'wren, T, Native> {
         Ok(self.as_raw_mut().get_return_value_unchecked::<G>())
     }
 
+    /// Call [method] on a [subject] with [args] on the vm
+    /// subject is usually a class or an object, but all calls require a subject
+    /// otherwise it's UB
+    /// Arguments must be set up correctly as well
+    pub unsafe fn call_raw<G: GetValue<'wren, Native>, Args: SetArgs<'wren, Native>>(
+        &mut self,
+        subject: &Handle<'wren>,
+        method: &CallHandle<'wren>,
+        args: &Args,
+        assume_slot_type: WrenType,
+    ) -> CallResult<'wren, G> {
+        self._call(subject, method, args)?;
+
+        // This should be safe as long as the type is set correctly
+        Ok(self
+            .as_raw_mut()
+            .get_return_value_raw::<G>(assume_slot_type))
+    }
+
     /// Checks a handle to see if it is a valid fiber, if it is return the handle as a fiber
     /// in the ok varient, otherwise returns the original handle
     pub fn check_fiber(&mut self, handle: Handle<'wren>) -> TryGetResult<'wren, Fiber<'wren>> {
@@ -315,6 +334,10 @@ impl<'wren, L: Location> Context<'wren, NoTypeInfo, L> {
 
     pub unsafe fn get_return_value_unchecked<Args: GetValue<'wren, L>>(&mut self) -> Args {
         Args::get_slots_unchecked(self)
+    }
+
+    pub unsafe fn get_return_value_raw<Args: GetValue<'wren, L>>(&mut self, ty: WrenType) -> Args {
+        Args::get_slot_raw(self, 0, ty)
     }
 
     pub fn get_stack<Args: GetArgs<'wren, L>>(&mut self) -> Args::TryGetTarget {

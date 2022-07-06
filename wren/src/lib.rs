@@ -14,13 +14,12 @@ mod value;
 pub use fiber::Fiber;
 pub use handle::{CallHandle, Handle};
 pub use user_data::UserData as VmUserData;
-pub use value::{GetArgs, GetValue, SetArgs, SetValue};
+pub use value::{GetArgs, GetValue, SetArgs, SetValue, WrenType};
 
 pub use wren_sys::WREN_VERSION_STRING as VERSION;
 
 use std::{ffi::c_void, marker::PhantomData, mem::ManuallyDrop};
 
-use self::value::WrenType;
 pub use self::{
     context::{
         Context, RawForeign as RawForeignContext, RawNative as RawNativeContext,

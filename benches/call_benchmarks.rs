@@ -1,5 +1,5 @@
 use criterion::{black_box, criterion_group, criterion_main, Criterion};
-use wren::{context::Native, test::create_test_vm, CallHandle, GetValue, Handle};
+use wren::{context::Native, test::create_test_vm, CallHandle, GetValue, Handle, WrenType};
 use wren_sys as ffi;
 
 fn raw_ffi<'wren, G: GetValue<'wren, Native>>(
@@ -22,13 +22,36 @@ fn raw_ffi<'wren, G: GetValue<'wren, Native>>(
             _ => panic!("Interpret failed"),
         }
 
+        // This is a hack to make sure that () doesn't get handle the return path
         if std::mem::size_of::<G>() != 0 {
             let mut len = std::mem::MaybeUninit::uninit();
             let res = ffi::wrenGetSlotBytes(context, 0, len.as_mut_ptr()).cast();
             let len = len.assume_init().try_into().unwrap();
             let slice = std::slice::from_raw_parts(res, len);
-            let str = String::from_utf8_lossy(slice).to_string();
+            let _str = String::from_utf8_lossy(slice).to_string();
         }
+    }
+}
+
+fn raw<'wren, G: GetValue<'wren, Native>>(
+    context: &mut wren::test::Context<'wren, Native>,
+    test: &Handle<'wren>,
+    add_three: &CallHandle<'wren>,
+    slot_type: WrenType,
+) {
+    unsafe {
+        context
+            .call_raw::<G, _>(
+                test,
+                add_three,
+                &(
+                    &black_box(1.0_f64),
+                    &black_box(2.0_f64),
+                    &black_box(3.0_f64),
+                ),
+                slot_type,
+            )
+            .unwrap();
     }
 }
 
@@ -89,6 +112,10 @@ pub fn call(c: &mut Criterion) {
         b.iter(|| raw_ffi::<String>(context_ptr, test_ptr, add_three_ptr));
     });
 
+    group.bench_function("Unchecked Raw", |b| {
+        b.iter(|| raw::<String>(context, &test, &add_three, WrenType::String))
+    });
+
     group.bench_function("Unchecked", |b| {
         b.iter(|| unchecked::<String>(context, &test, &add_three))
     });
@@ -115,6 +142,10 @@ pub fn call_drop_output(c: &mut Criterion) {
     let mut group = c.benchmark_group("Call Drop Output");
     group.bench_function("Raw FFI", |b| {
         b.iter(|| raw_ffi::<()>(context_ptr, test_ptr, add_three_ptr));
+    });
+
+    group.bench_function("Unchecked Raw", |b| {
+        b.iter(|| raw::<()>(context, &test, &add_three, WrenType::Unknown))
     });
 
     group.bench_function("Unchecked", |b| {
