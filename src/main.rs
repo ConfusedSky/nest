@@ -13,13 +13,9 @@ type Handle<'wren> = crate::wren::Handle<'wren>;
 type ForeignMethod<'wren> = crate::wren::ForeignMethod<'wren, MyUserData<'wren>>;
 
 macro_rules! create_trait_alias {
-    ($name:ident, $($bounds:tt)*) => {
-        pub trait $name: $($bounds)* {}
-        impl <T: $($bounds)* > $name for T {}
-    };
-    ($name:ident<$( $gen:tt $(: $bound:tt),* ),+>, $($bounds:tt)*) => {
-        pub trait $name<$($gen $(: $bound),*),+>: $($bounds)* {}
-        impl <$($gen $(: $bound),*),+, T: $($bounds)*> $name<$($gen),+> for T {}
+    ($name:ident$(<$( $gen:tt $(: $bound:tt $(+ $additional_bounds:tt)*)? ),+>)?, $($bounds:tt)*) => {
+        pub trait $name$(<$($gen $(: $bound $(+ $additional_bounds)*)?),+>)?: $($bounds)* {}
+        impl <$($($gen $(: $bound $(+ $additional_bounds)*)?),+,)? T: $($bounds)*> $name<$($($gen),+)?> for T {}
     };
 }
 
