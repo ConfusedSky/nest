@@ -45,7 +45,7 @@ impl<'wren> Handle<'wren> {
         }
     }
 
-    pub(crate) const fn as_ptr(&self) -> *mut WrenHandle {
+    pub const fn as_ptr(&self) -> *mut WrenHandle {
         self.pointer.as_ptr()
     }
 }

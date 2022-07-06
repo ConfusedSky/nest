@@ -733,6 +733,7 @@ dependencies = [
  "tokio",
  "wren",
  "wren_macros",
+ "wren_sys",
 ]
 
 [[package]]

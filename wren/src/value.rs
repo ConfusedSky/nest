@@ -310,9 +310,9 @@ unsafe fn generic_get_string<L: Location>(
         WrenType::Bool => Some(ffi::wrenGetSlotBool(vm.as_ptr(), slot).to_string()),
         WrenType::Null => Some("null".to_string()),
         WrenType::String => {
-            let mut len = 0;
-            let ptr = ffi::wrenGetSlotBytes(vm.as_ptr(), slot, &mut len).cast();
-            let len = len.try_into().unwrap();
+            let mut len = std::mem::MaybeUninit::uninit();
+            let ptr = ffi::wrenGetSlotBytes(vm.as_ptr(), slot, len.as_mut_ptr()).cast();
+            let len = len.assume_init().try_into().unwrap();
             let slice = std::slice::from_raw_parts(ptr, len);
             Some(String::from_utf8_lossy(slice).to_string())
         }

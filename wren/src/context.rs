@@ -55,7 +55,7 @@ impl<'wren, V, L: Location> Context<'wren, V, L> {
         unsafe { self.transmute_mut::<NoTypeInfo, L>() }
     }
 
-    pub(super) const fn as_ptr(&self) -> *mut WrenVM {
+    pub const fn as_ptr(&self) -> *mut WrenVM {
         self.0.as_ptr()
     }
 

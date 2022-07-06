@@ -32,3 +32,4 @@ wren_macros = { path = "./wren-macros" }
 assert_cmd = "2.0"
 predicates = "2.1"
 criterion = "0.3"
+wren_sys = { path = "./wren-sys" }
