@@ -630,7 +630,7 @@ mod test {
         let (mut vm, Test) = create_test_vm(source, |_| {});
         let context = vm.get_context();
 
-        call_test_case2!(context {
+        call_test_case2!(context<bool> {
             // False cases
             Test.returnNull() == Ok(false)
             Test.returnFalse() == Ok(false)
@@ -671,37 +671,23 @@ mod test {
         let (mut vm, Test) = create_test_vm(source, |_| {});
         let context = vm.get_context();
 
-        // TODO: Tidy up these test cases
-        call_test_case!(String, context { Test.returnNull() }
-            == Ok("null".to_string()));
-        call_test_case!(String, context { Test.returnFalse() }
-            == Ok("false".to_string()));
-        call_test_case!(String, context { Test.returnValue(false) }
-            == Ok("false".to_string()));
-        call_test_case!(String, context { Test.returnTrue }
-            == Ok("true".to_string()));
-        call_test_case!(String, context { Test.returnTrue() }
-            == Ok("true".to_string()));
-        call_test_case!(String, context { Test.returnValue("") }
-            == Ok("".to_string()));
-        call_test_case!(String, context { Test.returnValue("Test") }
-            == Ok("Test".to_string()));
-        call_test_case!(String, context { Test.returnValue("Test".to_string()) }
-            == Ok("Test".to_string()));
-        call_test_case!(String, context { Test.returnValue(Test) }
-            == Ok("Test".to_string()));
-        call_test_case!(String, context { Test.returnValue(vec![1.0]) }
-            == Ok("[1]".to_string()));
-        call_test_case!(String, context { Test.returnValue(vec!["1.0", "Other"]) }
-            == Ok("[1.0, Other]".to_string()));
-        call_test_case!(String, context { Test.returnValue(1.0) }
-            == Ok("1".to_string()));
-        call_test_case!(String, context { Test.returnMap }
-            == Ok("{test: 1, 15: Test}".to_string()));
-        call_test_case!(String, context { Test.sendMulti("Test", vec![1.0]) }
-            == Ok("Test[1]".to_string()));
-        call_test_case!(String, context { Test.sendMulti(vec!["One Two"], "Test") }
-            == Ok("[One Two]Test".to_string()));
+        call_test_case2!(context<String> {
+            Test.returnNull() == Ok("null".to_string())
+            Test.returnFalse() == Ok("false".to_string())
+            Test.returnValue(false) == Ok("false".to_string())
+            Test.returnTrue == Ok("true".to_string())
+            Test.returnTrue() == Ok("true".to_string())
+            Test.returnValue("") == Ok("".to_string())
+            Test.returnValue("Test") == Ok("Test".to_string())
+            Test.returnValue("Test".to_string()) == Ok("Test".to_string())
+            Test.returnValue(Test) == Ok("Test".to_string())
+            Test.returnValue(vec![1.0]) == Ok("[1]".to_string())
+            Test.returnValue(vec!["1.0", "Other"]) == Ok("[1.0, Other]".to_string())
+            Test.returnValue(1.0) == Ok("1".to_string())
+            Test.returnMap == Ok("{test: 1, 15: Test}".to_string())
+            Test.sendMulti("Test", vec![1.0]) == Ok("Test[1]".to_string())
+            Test.sendMulti(vec!["One Two"], "Test") == Ok("[One Two]Test".to_string())
+        });
     }
 
     #[test]

@@ -53,7 +53,7 @@ impl<'wren> UserData<'wren> {
 #[macro_export]
 macro_rules! call_test_case2 {
     (
-        $vm:ident {
+        $vm:ident<$ty:ty> {
             // Create zero or more test cases within a vm context
             $(
                 // Match Class.method
@@ -86,7 +86,7 @@ macro_rules! call_test_case2 {
             );
             let handle = $vm.make_call_handle_slice(slice).unwrap();
             // println!("{:?}, {}", handle, line!());
-            let res = $vm.call(
+            let res = $vm.call::<$ty, _>(
                 &$class,
                 &handle,
                 // Args should be
