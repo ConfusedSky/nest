@@ -54,13 +54,10 @@ impl<'wren> UserData<'wren> {
 #[macro_export]
 macro_rules! call_test_case {
         ($type:ty, $vm:ident { $class:ident.$method:ident$(($($args:expr),*))? } == $res:expr) => {
-            call_test_case!(@call $type, $vm, $class, &($($(&$args),*)?), $res, $method$(($($args),*))?);
-        };
-        (@call $type:ty, $vm: ident, $class:ident, $args:expr, $res: expr, $($signature:tt)*) => {
-            let slice = wren_macros::to_signature!($($signature)*);
+            let slice = wren_macros::to_signature!($method$(($($args),*))?);
             let handle = $vm.make_call_handle_slice(slice).unwrap();
             // println!("{:?}, {}", handle, line!());
-            let res = $vm.call::<$type, _>(&$class, &handle, $args);
+            let res = $vm.call::<$type, _>(&$class, &handle, &($($(&$args),*)?));
             assert_eq!( res, $res );
         };
     }
