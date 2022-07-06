@@ -2,6 +2,8 @@
 #![warn(clippy::pedantic, clippy::nursery)]
 #![warn(unsafe_code)]
 
+mod modules;
+mod wren;
 use modules::{scheduler::Scheduler, Modules};
 use std::{env, ffi::CStr, fs, path::PathBuf};
 use wren::context::{self, Location};
@@ -12,18 +14,25 @@ type ForeignMethod<'wren> = crate::wren::ForeignMethod<'wren, MyUserData<'wren>>
 
 macro_rules! create_trait_alias {
     ($name:ident, $($bounds:tt)*) => {
-        pub trait $name<'wren, L: Location>: $($bounds)* {}
-        impl <'wren, L: Location, T: $($bounds)* > $name<'wren, L> for T {}
+        pub trait $name: $($bounds)* {}
+        impl <T: $($bounds)* > $name for T {}
+    };
+    ($name:ident<$( $gen:tt $(: $bound:tt),* ),+>, $($bounds:tt)*) => {
+        pub trait $name<$($gen $(: $bound),*),+>: $($bounds)* {}
+        impl <$($gen $(: $bound),*),+, T: $($bounds)*> $name<$($gen),+> for T {}
     };
 }
 
-create_trait_alias!(WrenGet, crate::wren::GetValue<'wren, L>);
-create_trait_alias!(WrenSet, crate::wren::SetValue<'wren, L>);
-create_trait_alias!(WrenGetArgs, crate::wren::GetArgs<'wren, L>);
-create_trait_alias!(WrenSetArgs, crate::wren::SetArgs<'wren, L>);
-
-mod modules;
-mod wren;
+create_trait_alias!(WrenGet<'wren, L: Location>, crate::wren::GetValue<'wren, L>);
+create_trait_alias!(WrenSet<'wren, L: Location>, crate::wren::SetValue<'wren, L>);
+create_trait_alias!(
+    WrenGetArgs<'wren, L: Location>,
+    crate::wren::GetArgs<'wren, L>
+);
+create_trait_alias!(
+    WrenSetArgs<'wren, L: Location>,
+    crate::wren::SetArgs<'wren, L>
+);
 
 pub struct MyUserData<'wren> {
     scheduler: Option<Scheduler<'wren>>,
