@@ -1,20 +1,17 @@
 use criterion::{black_box, criterion_group, criterion_main, Criterion};
-use wren::{context::Native, test::create_test_vm, CallHandle, Handle};
+use wren::{context::Native, test::create_test_vm, CallHandle, GetValue, Handle};
 use wren_sys as ffi;
 
-fn raw_ffi(context: &mut wren::test::Context<Native>, test: &Handle, add_three: &CallHandle) {
+fn raw_ffi(context: *mut ffi::WrenVM, test: *mut ffi::WrenHandle, add_three: *mut ffi::WrenHandle) {
     unsafe {
-        let test_ptr = test.as_ptr();
-        let context_ptr = context.as_ptr();
-        let add_three_ptr = add_three.as_ptr();
-        ffi::wrenEnsureSlots(context_ptr, 4);
+        ffi::wrenEnsureSlots(context, 4);
 
-        ffi::wrenSetSlotHandle(context_ptr, 0, test_ptr);
-        ffi::wrenSetSlotDouble(context_ptr, 1, black_box(1.0_f64));
-        ffi::wrenSetSlotDouble(context_ptr, 2, black_box(2.0_f64));
-        ffi::wrenSetSlotDouble(context_ptr, 3, black_box(3.0_f64));
+        ffi::wrenSetSlotHandle(context, 0, test);
+        ffi::wrenSetSlotDouble(context, 1, black_box(1.0_f64));
+        ffi::wrenSetSlotDouble(context, 2, black_box(2.0_f64));
+        ffi::wrenSetSlotDouble(context, 3, black_box(3.0_f64));
 
-        let result = ffi::wrenCall(context_ptr, add_three_ptr);
+        let result = ffi::wrenCall(context, add_three);
 
         match result {
             ffi::WrenInterpretResult_WREN_RESULT_SUCCESS => (),
@@ -22,7 +19,7 @@ fn raw_ffi(context: &mut wren::test::Context<Native>, test: &Handle, add_three: 
         }
 
         let mut len = std::mem::MaybeUninit::uninit();
-        let res = ffi::wrenGetSlotBytes(context_ptr, 0, len.as_mut_ptr()).cast();
+        let res = ffi::wrenGetSlotBytes(context, 0, len.as_mut_ptr()).cast();
         let len = len.assume_init().try_into().unwrap();
         let slice = std::slice::from_raw_parts(res, len);
         let str = String::from_utf8_lossy(slice).to_string();
@@ -82,8 +79,12 @@ pub fn criterion_benchmark(c: &mut Criterion) {
 
     let mut group = c.benchmark_group("Call");
 
+    let context_ptr = context.as_ptr();
+    let test_ptr = test.as_ptr();
+    let add_three_ptr = add_three.as_ptr();
+
     group.bench_function("Raw FFI", |b| {
-        b.iter(|| raw_ffi(context, &test, &add_three));
+        b.iter(|| raw_ffi(context_ptr, test_ptr, add_three_ptr));
     });
 
     group.bench_function("Unchecked", |b| {
