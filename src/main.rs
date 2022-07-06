@@ -13,9 +13,10 @@ type Handle<'wren> = crate::wren::Handle<'wren>;
 type ForeignMethod<'wren> = crate::wren::ForeignMethod<'wren, MyUserData<'wren>>;
 
 macro_rules! create_trait_alias {
-    ($name:ident$(<$( $gen:tt $(: $bound:tt $(+ $additional_bounds:tt)*)? ),+>)?, $($bounds:tt)*) => {
-        pub trait $name$(<$($gen $(: $bound $(+ $additional_bounds)*)?),+>)?: $($bounds)* {}
-        impl <$($($gen $(: $bound $(+ $additional_bounds)*)?),+,)? T: $($bounds)*> $name<$($($gen),+)?> for T {}
+    ($name:ident$(<$( $gen:tt $(: $bound:tt $(+ $additional_bounds:tt)*)? ),+>)?, $($bounds_to_alias:tt)*) => {
+        pub trait $name$(<$($gen $(: $bound $(+ $additional_bounds)*)?),+>)?: $($bounds_to_alias)* {}
+        #[allow(non_camel_case_types)]
+        impl <$($($gen $(: $bound $(+ $additional_bounds)*)?),+,)? __ALIASED_TYPE__: $($bounds_to_alias)*> $name<$($($gen),+)?> for __ALIASED_TYPE__ {}
     };
 }
 
