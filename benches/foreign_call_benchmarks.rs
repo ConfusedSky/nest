@@ -1,5 +1,6 @@
 use criterion::{
-    criterion_group, criterion_main, measurement::WallTime, BenchmarkGroup, Criterion, Throughput,
+    criterion_group, criterion_main, measurement::WallTime, AxisScale, BenchmarkGroup, BenchmarkId,
+    Criterion, PlotConfiguration, Throughput,
 };
 use wren::{
     context::{Foreign, Native},
@@ -63,15 +64,9 @@ fn setup<'wren>(
         "class Test {
             static add_three() { add_three_(1, 2, 3) == \"6\" }
             static add_three_wrapped() { add_three_wrapper(1, 2, 3) == \"6\" }
-            static add_three_multi() {
-                for (i in 0..100) {
-                    add_three_(i+1, i+2, i+3)
-                }
-                return true
-            }
-            static add_three_multi_wrapped() {
-                for (i in 0..1000) {
-                    add_three_wrapper(i+1, i+2, i+3)
+            static add_three_multi(count) {
+                for (i in 0..count) {
+                    add_three_(1, 2, 3)
                 }
                 return true
             }
@@ -88,17 +83,31 @@ fn setup<'wren>(
     let context = vm.get_context();
     let add_three = context.make_call_handle(wren::cstr!("add_three()"));
     let add_three_wrapped = context.make_call_handle(wren::cstr!("add_three_wrapped()"));
-    let _add_three_multi_wrapped =
-        context.make_call_handle(wren::cstr!("add_three_multi_wrapped()"));
-    let add_three_multi = context.make_call_handle(wren::cstr!("add_three_multi()"));
+    let add_three_multi = context.make_call_handle(wren::cstr!("add_three_multi(_)"));
 
     if is_multi {
-        group.bench_function(&(name.to_string() + " Multi"), |b| {
-            b.iter(|| callback(context, &test, &add_three_multi))
-        });
-        // group.bench_function(&(name.to_string() + " Multi Wrapped"), |b| {
-        // b.iter(|| callback(context, &test, &add_three_multi_wrapped))
-        // });
+        // let counts = &[
+        // 1_u64,
+        // 10_u64,
+        // 10_u64.pow(2),
+        // 10_u64.pow(3),
+        // 10_u64.pow(4),
+        // 10_u64.pow(5),
+        // ];
+        let base = 10;
+        let counts = &[1, 2, 4, 8, base, base * 2, base * 4, base * 8];
+
+        for count in counts {
+            group.throughput(Throughput::Elements(*count));
+            let id = BenchmarkId::new(name.to_string() + " Multi", count);
+            group.bench_with_input(id, count, |b, count| {
+                b.iter(|| {
+                    context
+                        .call::<(), _>(&test, &add_three_multi, &(&(*count as f64)))
+                        .unwrap();
+                })
+            });
+        }
     } else {
         group.bench_function(name, |b| b.iter(|| callback(context, &test, &add_three)));
         group.bench_function(&(name.to_string() + " Wrapped"), |b| {
@@ -117,9 +126,11 @@ pub fn foreign_call(c: &mut Criterion) {
 
 pub fn foreign_call_multi(c: &mut Criterion) {
     let mut group = c.benchmark_group("Foreign Call Multi");
-    setup(&mut group, "Raw FFI", raw_ffi, true);
+    let _plot_config = PlotConfiguration::default().summary_scale(AxisScale::Logarithmic);
+    // group.plot_config(plot_config);
+    // setup(&mut group, "Raw FFI", raw_ffi, true);
     setup(&mut group, "Unchecked Raw", unchecked_raw, true);
-    setup(&mut group, "Unchecked", unchecked, true);
+    // setup(&mut group, "Unchecked", unchecked, true);
     setup(&mut group, "Checked", checked, true);
 }
 
