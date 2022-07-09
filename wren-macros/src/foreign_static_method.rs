@@ -33,6 +33,12 @@
 //! - Have good error messages
 //!   Make sure the context is always the first item in the argument list [ ] [ ]
 //!   Have errors saying which argument has an invalid type [ ] [ ]
+//!
+//! - Use Result<T: SetValue, String> as a shorthand to be able to abort the calling fiber [ ] [ ]
+//!
+//! - Add a trait that modules can implement that allows them to be accessed by the VM
+//!   so we can support instance methods for modules [ ] [ ]
+//!
 
 use proc_macro2::{Ident, Span, TokenStream};
 use proc_macro_crate::{crate_name, FoundCrate};
@@ -88,7 +94,7 @@ pub fn foreign_static_method(mut input: ItemFn) -> syn::Result<TokenStream> {
     Ok(quote!(
         #input
 
-        unsafe fn #name<'wren, V: #wren_crate::VmUserData<'wren, V>>(
+        fn #name<'wren, V: #wren_crate::VmUserData<'wren, V>>(
             mut context: #wren_crate::Context<
                 'wren,
                 V,
@@ -96,9 +102,11 @@ pub fn foreign_static_method(mut input: ItemFn) -> syn::Result<TokenStream> {
             >
         ) {
             use #wren_crate::{GetValue, SetValue};
-            #(#arg_get_slot)*
-            #original_function_name(#(#arg_names),*)
-                .set_slot(&mut context, 0);
+            unsafe {
+                #(#arg_get_slot)*
+                #original_function_name(#(#arg_names),*)
+                    .set_slot(&mut context, 0);
+            }
         }
     ))
 }

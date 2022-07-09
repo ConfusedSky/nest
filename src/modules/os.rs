@@ -1,5 +1,6 @@
 use crate::Context;
 use wren::VERSION;
+use wren_macros::foreign_static_method;
 
 use super::{source_file, Class, Module};
 use std::env::args;
@@ -27,13 +28,14 @@ pub fn init_module<'wren>() -> Module<'wren> {
     module
 }
 
-fn is_posix(mut vm: Context) {
-    vm.set_return_value(&std::env::consts::OS);
+#[foreign_static_method]
+fn is_posix() -> bool {
+    std::env::consts::FAMILY == "unix"
 }
 
-fn name(mut vm: Context) {
-    let value = std::env::consts::FAMILY == "unix";
-    vm.set_return_value(&(value));
+#[foreign_static_method]
+const fn name() -> &'static str {
+    std::env::consts::OS
 }
 
 fn home_path(mut vm: Context) {
@@ -45,15 +47,14 @@ fn home_path(mut vm: Context) {
     }
 }
 
-fn all_arguments(mut vm: Context) {
-    let arguments = args().collect::<Vec<String>>();
-    vm.set_return_value(&arguments);
+#[foreign_static_method]
+fn all_arguments() -> Vec<String> {
+    args().collect()
 }
 
-fn version(mut vm: Context) {
-    let version = std::ffi::CString::from_vec_with_nul(VERSION.to_vec())
-        .expect("Version string should be valid");
-    vm.set_return_value(&version);
+#[foreign_static_method]
+fn version() -> std::ffi::CString {
+    std::ffi::CString::from_vec_with_nul(VERSION.to_vec()).expect("Version string should be valid")
 }
 
 fn cwd(mut vm: Context) {
@@ -66,8 +67,9 @@ fn cwd(mut vm: Context) {
     }
 }
 
-fn pid(mut vm: Context) {
-    vm.set_return_value(&(f64::from(std::process::id())));
+#[foreign_static_method]
+fn pid() -> f64 {
+    f64::from(std::process::id())
 }
 
 fn ppid(mut vm: Context) {
