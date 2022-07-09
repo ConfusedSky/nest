@@ -141,7 +141,6 @@ impl<'wren> Deref for Fiber<'wren> {
 // }
 
 impl<'wren, L: Location> SetValue<'wren, L> for Fiber<'wren> {
-    const REQUIRED_SLOTS: super::Slot = 1;
     unsafe fn set_slot(&self, vm: &mut Raw<'wren, L>, slot: super::Slot) {
         self.handle.set_slot(vm, slot);
     }

@@ -84,8 +84,8 @@ unsafe fn store_slot<'wren, L: Location>(
 }
 
 pub trait SetValue<'wren, L: Location> {
-    /// Number of additional slots that need to be allocated to use this
-    const REQUIRED_SLOTS: Slot;
+    /// Number of slots that need to be allocated to set a value of this type
+    const REQUIRED_SLOTS: Slot = 1;
     /// Set a slot in the wren stack to a value of this type
     /// # Safety
     /// Trying to set a slot that hasn't been "allocated" by `ensure_slots`
@@ -150,7 +150,6 @@ pub trait GetValue<'wren, L: Location> {
 // () is implemented to allow skipping slots
 // and to set send null to the vm
 impl<'wren, L: Location> SetValue<'wren, L> for () {
-    const REQUIRED_SLOTS: Slot = 1;
     unsafe fn set_slot(&self, vm: &mut RawContext<'wren, L>, slot: Slot) {
         ffi::wrenSetSlotNull(vm.as_ptr(), slot);
     }
@@ -189,7 +188,6 @@ impl<'wren, L: Location, T: SetValue<'wren, L>> SetValue<'wren, L> for &T {
 }
 
 impl<'wren, L: Location> SetValue<'wren, L> for Handle<'wren> {
-    const REQUIRED_SLOTS: Slot = 1;
     unsafe fn set_slot(&self, vm: &mut RawContext<'wren, L>, slot: Slot) {
         ffi::wrenSetSlotHandle(vm.as_ptr(), slot, self.as_ptr());
     }
@@ -307,7 +305,6 @@ impl<'wren, L: Location, T: SetValue<'wren, L>> SetValue<'wren, L> for [T] {
 }
 
 impl<'wren, L: Location> SetValue<'wren, L> for CString {
-    const REQUIRED_SLOTS: Slot = 1;
     unsafe fn set_slot(&self, vm: &mut RawContext<'wren, L>, slot: Slot) {
         ffi::wrenSetSlotString(vm.as_ptr(), slot, self.as_ptr());
     }
@@ -329,7 +326,6 @@ unsafe fn send_string_to_vm<S: AsRef<str>, L: Location>(
 }
 
 impl<'wren, L: Location> SetValue<'wren, L> for &str {
-    const REQUIRED_SLOTS: Slot = 1;
     unsafe fn set_slot(&self, vm: &mut RawContext<'wren, L>, slot: Slot) {
         send_string_to_vm(vm, self, slot);
     }
@@ -355,7 +351,6 @@ unsafe fn generic_get_string<L: Location>(
 }
 
 impl<'wren, L: Location> SetValue<'wren, L> for String {
-    const REQUIRED_SLOTS: Slot = 1;
     unsafe fn set_slot(&self, vm: &mut RawContext<'wren, L>, slot: Slot) {
         send_string_to_vm(vm, self, slot);
     }
@@ -397,7 +392,6 @@ impl<'wren> GetValue<'wren, Foreign> for String {
 }
 
 impl<'wren, L: Location> SetValue<'wren, L> for f64 {
-    const REQUIRED_SLOTS: Slot = 1;
     unsafe fn set_slot(&self, vm: &mut RawContext<'wren, L>, slot: Slot) {
         ffi::wrenSetSlotDouble(vm.as_ptr(), slot, *self);
     }
@@ -419,7 +413,6 @@ impl<'wren, L: Location> GetValue<'wren, L> for f64 {
 }
 
 impl<'wren, L: Location> SetValue<'wren, L> for bool {
-    const REQUIRED_SLOTS: Slot = 1;
     unsafe fn set_slot(&self, vm: &mut RawContext<'wren, L>, slot: Slot) {
         ffi::wrenSetSlotBool(vm.as_ptr(), slot, *self);
     }
