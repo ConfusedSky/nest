@@ -139,7 +139,7 @@ pub trait GetValue<'wren, L: Location> {
             Ok(Self::get_slot_unchecked(vm, slot, slot_type))
         } else {
             Err(TryGetError::IncompatibleType(if get_handle {
-                Some(Handle::get_slot(vm, slot))
+                Some(Handle::get_slot_unchecked(vm, slot, slot_type))
             } else {
                 None
             }))
@@ -544,6 +544,11 @@ impl_set_args!(T0 = 0, T1 = 1, T2 = 2, T3 = 3, T4 = 4, T5 = 5, T6 = 6);
 pub trait GetArgs<'wren, L: Location> {
     type TryGetTarget;
 
+    /// Gets the values contained on the stack as rust values
+    /// # Panics
+    /// If the values aren't convertable to rust values
+    /// # Safety
+    /// If there aren't enough slots available this is undefined behavior
     unsafe fn get_slots(vm: &mut RawContext<'wren, L>) -> Self;
     fn try_get_slots(vm: &mut RawContext<'wren, L>, get_handles: bool) -> Self::TryGetTarget;
 }
@@ -563,7 +568,6 @@ impl<'wren, L: Location, T: GetValue<'wren, L>> GetArgs<'wren, L> for T {
                 return Err(TryGetError::NoAvailableSlot);
             }
 
-            let slot_type = unsafe { vm.get_slot_type(0) };
             unsafe { T::try_get_slot(vm, 0, get_handles) }
         }
     }

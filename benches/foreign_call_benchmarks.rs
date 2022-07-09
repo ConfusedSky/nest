@@ -33,7 +33,7 @@ unsafe fn unchecked_raw(mut context: wren::test::Context<Foreign>) {
 }
 
 unsafe fn unchecked(mut context: wren::test::Context<Foreign>) {
-    let (_, a, b, c) = context.get_stack_unchecked::<((), f64, f64, f64)>();
+    let (_, a, b, c) = context.get_stack::<((), f64, f64, f64)>();
 
     context.set_return_value(&(a + b + c).to_string());
 }

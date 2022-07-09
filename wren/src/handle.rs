@@ -88,15 +88,20 @@ impl<'wren> CallHandle<'wren> {
         self.argument_count
     }
 
-    // TODO: make most of our handles with a macro
-    // that creates a signature with call_signature!
-    // and this function. Since that has no runtime cost
+    /// Create a new call handle with `signature` that takes `argument_count`
+    /// # Safety
+    /// `argument_count` must match `signature` otherwise this CallHandle might behave badly
+    /// # Todo
+    /// make most of our handles with a macro
+    /// that creates a signature with call_signature!
+    /// and this function. Since that has no runtime cost
     pub unsafe fn new_unchecked<L: Location, V>(
         vm: &mut Context<'wren, V, L>,
         signature: &CStr,
         argument_count: usize,
     ) -> Self {
-        // SAFETY: this function is always safe to call but may be unsafe to use the handle it returns
+        // Safety
+        // this function is always safe to call but may be unsafe to use the handle it returns
         // as that handle might not be valid and safe to use
         let ptr = ffi::wrenMakeCallHandle(vm.as_ptr(), signature.as_ptr());
         let handle = Handle::new_unchecked(vm, NonNull::new_unchecked(ptr));

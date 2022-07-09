@@ -217,10 +217,13 @@ impl<'wren, T> Context<'wren, T, Native> {
     /// subject is usually a class or an object, but all calls require a subject
     /// otherwise it's UB
     /// Arguments must be set up correctly as well
+    /// # Panics
+    /// This function can panic if return value isn't able to be converted from
+    /// the wren value
     /// # Safety
     /// This does not check the number of arguments passed which can cause UB if
     /// the wrong number of args are passed
-    pub unsafe fn call_unchecked<G: GetValue<'wren, Native>, Args: SetArgs<'wren, Native>>(
+    pub unsafe fn call<G: GetValue<'wren, Native>, Args: SetArgs<'wren, Native>>(
         &mut self,
         subject: &Handle<'wren>,
         method: &CallHandle<'wren>,
@@ -236,7 +239,13 @@ impl<'wren, T> Context<'wren, T, Native> {
     /// subject is usually a class or an object, but all calls require a subject
     /// otherwise it's UB
     /// Arguments must be set up correctly as well
-    pub unsafe fn call_raw<G: GetValue<'wren, Native>, Args: SetArgs<'wren, Native>>(
+    /// # Panics
+    /// This function can panic if `assume_slot_type` can't be converted to a value of type `G`
+    /// # Safety
+    /// This function assumes that you pass the correct number of arguments and that `assume_slot_type`
+    /// is the type that is returned from `method`
+    /// Otherwise this is undefined behavior
+    pub unsafe fn call_unchecked<G: GetValue<'wren, Native>, Args: SetArgs<'wren, Native>>(
         &mut self,
         subject: &Handle<'wren>,
         method: &CallHandle<'wren>,
@@ -335,7 +344,13 @@ impl<'wren, L: Location> Context<'wren, NoTypeInfo, L> {
         CallHandle::new_from_signature(self.as_unknown_mut(), signature)
     }
 
-    pub unsafe fn get_stack_unchecked<Args: GetArgs<'wren, L>>(&mut self) -> Args {
+    /// Gets values off the stack matching the types passed in for `Args`
+    /// # Panics
+    /// If a value on the wren stack isn't convertable to a value in `Args`
+    /// # Safety
+    /// Calling this function when the number of slots hasn't been ensured is
+    /// undefined behavior
+    pub unsafe fn get_stack<Args: GetArgs<'wren, L>>(&mut self) -> Args {
         Args::get_slots(self)
     }
 
@@ -353,6 +368,12 @@ impl<'wren, L: Location> Context<'wren, NoTypeInfo, L> {
         unsafe { Args::get_slot(self, 0) }
     }
 
+    /// Gets the value currently in slot 0 in the wren stack and assumes it's of type `ty`
+    /// # Panics
+    /// if `ty` can't be converted to `Args`
+    /// # Safety
+    /// If there are no slots on the stack or if `ty` is a different type to what
+    /// is on the wren stack it is undefined behavior
     pub unsafe fn get_return_value_unchecked<Args: GetValue<'wren, L>>(
         &mut self,
         ty: WrenType,

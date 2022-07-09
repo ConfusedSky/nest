@@ -44,7 +44,7 @@ fn raw<'wren, G: GetValue<'wren, Native> + 'static>(
 ) {
     unsafe {
         context
-            .call_raw::<G, _>(
+            .call_unchecked::<G, _>(
                 test,
                 add_three,
                 &(
@@ -65,7 +65,7 @@ fn unchecked<'wren, G: GetValue<'wren, Native>>(
 ) {
     unsafe {
         context
-            .call_unchecked::<G, _>(
+            .call::<G, _>(
                 test,
                 add_three,
                 &(
