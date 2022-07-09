@@ -30,17 +30,32 @@
 //!   Make sure the context is always the first item in the argument list [ ] [ ]
 //!   Have errors saying which argument has an invalid type [ ] [ ]
 
-use proc_macro2::TokenStream;
+use proc_macro2::{Ident, Span, TokenStream};
+use proc_macro_crate::{crate_name, FoundCrate};
+use quote::quote;
 use syn::ItemFn;
 
-pub fn foreign_static_method(input: ItemFn) -> syn::Result<TokenStream> {
+pub fn foreign_static_method(mut input: ItemFn) -> syn::Result<TokenStream> {
     let name = input.sig.ident;
-    Ok(quote::quote!(
-        unsafe fn #name<'wren, V: wren::VmUserData<'wren, V>>(
-            context: wren::Context<
+    let new_name = quote::format_ident!("__wren_internal_{}", name);
+    input.sig.ident = new_name;
+
+    let wren_crate = {
+        let crate_name = crate_name("wren").expect("wren must be present for this macro");
+        match crate_name {
+            FoundCrate::Itself => Ident::new("crate", Span::call_site()),
+            FoundCrate::Name(name) => Ident::new(&name, Span::call_site()),
+        }
+    };
+
+    Ok(quote!(
+        #input
+
+        unsafe fn #name<'wren, V: #wren_crate::VmUserData<'wren, V>>(
+            context: #wren_crate::Context<
                 'wren,
                 V,
-                wren::context::Foreign
+                #wren_crate::context::Foreign
             >
         ) {
 

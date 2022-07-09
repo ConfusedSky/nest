@@ -1,3 +1,5 @@
+//! This is the simplest happy path
+
 use wren::test::{call_test_case, create_test_vm};
 use wren_macros::foreign_static_method;
 

@@ -15,6 +15,7 @@ path = "tests/main.rs"
 quote = {version = "1.0.20"}
 syn = {version = "1.0.98", features=["full", "extra-traits"]}
 proc-macro2 = "1.0"
+proc-macro-crate = "1.1.3"
 
 [dev-dependencies]
 trybuild = {version = "1.0", features = ["diff"]}
