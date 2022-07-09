@@ -1,5 +1,7 @@
+mod foreign_static_method;
 mod generate_tests;
 mod to_signature;
+
 use syn::parse_macro_input;
 use to_signature::{create_signature, ToSignatureInput};
 
