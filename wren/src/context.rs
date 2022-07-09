@@ -218,8 +218,8 @@ impl<'wren, T> Context<'wren, T, Native> {
     /// otherwise it's UB
     /// Arguments must be set up correctly as well
     /// # Safety
-    /// This does not check the number of arguments passed nor does it check to make sure the
-    /// return value is of the expected type and can cause UB
+    /// This does not check the number of arguments passed which can cause UB if
+    /// the wrong number of args are passed
     pub unsafe fn call_unchecked<G: GetValue<'wren, Native>, Args: SetArgs<'wren, Native>>(
         &mut self,
         subject: &Handle<'wren>,
@@ -229,7 +229,7 @@ impl<'wren, T> Context<'wren, T, Native> {
         self._call(subject, method, args)?;
 
         // This should be safe as long as the type is set correctly
-        Ok(self.as_raw_mut().get_return_value_unchecked::<G>())
+        Ok(self.as_raw_mut().get_return_value::<G>())
     }
 
     /// Call [method] on a [subject] with [args] on the vm
@@ -248,7 +248,7 @@ impl<'wren, T> Context<'wren, T, Native> {
         // This should be safe as long as the type is set correctly
         Ok(self
             .as_raw_mut()
-            .get_return_value_raw::<G>(assume_slot_type))
+            .get_return_value_unchecked::<G>(assume_slot_type))
     }
 
     /// Checks a handle to see if it is a valid fiber, if it is return the handle as a fiber
@@ -302,15 +302,17 @@ impl<'wren, L: Location> Context<'wren, NoTypeInfo, L> {
             {
                 None
             } else {
-                self.ensure_slots(1);
+                self.ensure_slots(slot);
                 Some(self.get_variable_unchecked(module.as_c_str(), name.as_c_str(), slot))
             }
         }
     }
 
-    /// SAFETY: this is always non null but will segfault if an invalid slot
+    /// # Safety
+    /// this is always non null but will segfault if an invalid slot
     /// is asked for
-    /// MAYBE: Will seg fault if the variable does not exist?
+    /// # Maybe
+    /// Will seg fault if the variable does not exist?
     /// Still need to set up module resolution
     pub unsafe fn get_variable_unchecked(
         &mut self,
@@ -319,7 +321,7 @@ impl<'wren, L: Location> Context<'wren, NoTypeInfo, L> {
         slot: Slot,
     ) -> Handle<'wren> {
         ffi::wrenGetVariable(self.as_ptr(), module.as_ptr(), name.as_ptr(), slot);
-        Handle::get_slot_unchecked(self, slot)
+        Handle::get_slot(self, slot)
     }
 
     pub fn make_call_handle_slice(
@@ -334,15 +336,28 @@ impl<'wren, L: Location> Context<'wren, NoTypeInfo, L> {
     }
 
     pub unsafe fn get_stack_unchecked<Args: GetArgs<'wren, L>>(&mut self) -> Args {
-        Args::get_slots_unchecked(self)
+        Args::get_slots(self)
     }
 
-    pub unsafe fn get_return_value_unchecked<Args: GetValue<'wren, L>>(&mut self) -> Args {
-        Args::get_slots_unchecked(self)
+    // Gets the value currently in slot 0 in the wren stack
+    // # Panics
+    // If the wrong return type is specified this may panic
+    // or if called in a context where there is no values on the wren stack
+    pub fn get_return_value<Args: GetValue<'wren, L>>(&mut self) -> Args {
+        if self.get_slot_count() < 1 {
+            panic!("get_return_value called in a context where there are no vm slots!");
+        }
+        // Safety
+        // If the return value isn't what is expected then this should panic
+        // or return an invalid value because unchecked at least checks the types
+        unsafe { Args::get_slot(self, 0) }
     }
 
-    pub unsafe fn get_return_value_raw<Args: GetValue<'wren, L>>(&mut self, ty: WrenType) -> Args {
-        Args::get_slot_raw(self, 0, ty)
+    pub unsafe fn get_return_value_unchecked<Args: GetValue<'wren, L>>(
+        &mut self,
+        ty: WrenType,
+    ) -> Args {
+        Args::get_slot_unchecked(self, 0, ty)
     }
 
     pub fn try_get_stack<Args: GetArgs<'wren, L>>(&mut self) -> Args::TryGetTarget {
@@ -363,10 +378,15 @@ impl<'wren, L: Location> Context<'wren, NoTypeInfo, L> {
 
     /// It is unclear how safe this one is now, since increasing the
     /// slots seems to have lead to a bug
+    /// # Safety
+    /// Not sure why this isn't safe, but calling it too often with too large
+    /// a number can cause memory corruption
     pub unsafe fn ensure_slots(&mut self, num_slots: Slot) {
         wren_sys::wrenEnsureSlots(self.as_ptr(), num_slots);
     }
 
+    /// # Safety
+    /// This is unsafe to call on an invalid slot
     pub(super) unsafe fn get_slot_type(&self, slot: Slot) -> WrenType {
         let t = ffi::wrenGetSlotType(self.as_ptr(), slot);
         WrenType::from(t)
@@ -376,23 +396,6 @@ impl<'wren, L: Location> Context<'wren, NoTypeInfo, L> {
         // This call should always be safe, since it doesn't
         // modify any state
         unsafe { ffi::wrenGetSlotCount(self.as_ptr()) }
-    }
-
-    // Note this is only valid till the &mut call so
-    // it is represented as a immutable reference
-    // That way the vm can't be used while a reference is held
-    // to the types
-    pub fn get_stack_types(&self) -> Vec<WrenType> {
-        unsafe {
-            let slot_count = self.get_slot_count();
-            let mut stack_values = Vec::new();
-
-            for i in 0..slot_count {
-                stack_values.push(self.get_slot_type(i));
-            }
-
-            stack_values
-        }
     }
 }
 

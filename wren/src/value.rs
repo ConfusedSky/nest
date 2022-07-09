@@ -75,7 +75,7 @@ unsafe fn store_slot<'wren, L: Location>(
     vm.ensure_slots(slot + 1);
     // Here we are just storing a handle so we don't care too much
     // where it comes from
-    let handle = Handle::get_slot_raw(vm, slot, WrenType::Unknown);
+    let handle = Handle::get_slot_unchecked(vm, slot, WrenType::Unknown);
     SlotStorage {
         vm: vm.clone(),
         slot,
@@ -86,36 +86,60 @@ unsafe fn store_slot<'wren, L: Location>(
 pub trait SetValue<'wren, L: Location> {
     /// Number of additional slots that need to be allocated to use this
     const REQUIRED_SLOTS: Slot;
+    /// Set a slot in the wren stack to a value of this type
+    /// # Safety
+    /// Trying to set a slot that hasn't been "allocated" by `ensure_slots`
+    /// is undefined behavior
     unsafe fn set_slot(&self, vm: &mut RawContext<'wren, L>, slot: Slot);
 }
 
 pub trait GetValue<'wren, L: Location> {
     const COMPATIBLE_TYPES: BitFlags<WrenType>;
-    /// NOTE THE IMPLEMENTATION OF GET FROM VM SHOULD BE SAFE REGARDLESS
-    /// OF WHAT IS IN THE SLOT
-    /// `get_from_vm` is unsafe because it's not guarenteed that
-    /// the slot is a valid slot
-    unsafe fn get_slot_raw(vm: &mut RawContext<'wren, L>, slot: Slot, slot_type: WrenType) -> Self;
-    unsafe fn get_slot_unchecked(vm: &mut RawContext<'wren, L>, slot: Slot) -> Self
-    where
-        Self: Sized,
-    {
-        Self::get_slot_raw(vm, slot, vm.get_slot_type(slot))
-    }
-    unsafe fn try_get_slot_raw(
+    /// Gets the value in a `slot` as this type where the value is assumed to be
+    /// of type `slot_type` on the wren side
+    /// # Panics
+    /// This call can panic if the slot_type can't be converted into this type
+    /// # Safety
+    /// This is unsafe to call if a slot doesn't exist on the wren stack
+    /// or if slot_type isn't the type that is actually on the wren stack
+    /// which can cause a value to be interpretted incorrectly by the runtime
+    unsafe fn get_slot_unchecked(
         vm: &mut RawContext<'wren, L>,
         slot: Slot,
         slot_type: WrenType,
+    ) -> Self;
+    /// Gets the value in a `slot` as this type without any assertion on what that value is
+    /// on the wren side
+    /// # Panics
+    /// This call can panic if the value in the slot can't be converted to this type
+    /// # Safety
+    /// This is unsafe to call if the slot doesn't exist on the wren stack
+    unsafe fn get_slot(vm: &mut RawContext<'wren, L>, slot: Slot) -> Self
+    where
+        Self: Sized,
+    {
+        Self::get_slot_unchecked(vm, slot, vm.get_slot_type(slot))
+    }
+    /// Gets the value in a `slot` as this type without any assertion on what that value is
+    /// on the wren side
+    /// Returns an error if the type on the wren side isn't compatible with the type on the rust side
+    /// if `get_handle` is true then the IncompatibleType varient contains a handle to that value
+    /// # Safety
+    /// This is unsafe to call if the slot doesn't exist on the wren stack
+    unsafe fn try_get_slot(
+        vm: &mut RawContext<'wren, L>,
+        slot: Slot,
         get_handle: bool,
     ) -> TryGetResult<'wren, Self>
     where
         Self: Sized,
     {
+        let slot_type = vm.get_slot_type(slot);
         if Self::COMPATIBLE_TYPES.contains(slot_type) {
-            Ok(Self::get_slot_raw(vm, slot, slot_type))
+            Ok(Self::get_slot_unchecked(vm, slot, slot_type))
         } else {
             Err(TryGetError::IncompatibleType(if get_handle {
-                Some(Handle::get_slot_unchecked(vm, slot))
+                Some(Handle::get_slot(vm, slot))
             } else {
                 None
             }))
@@ -134,21 +158,20 @@ impl<'wren, L: Location> SetValue<'wren, L> for () {
 
 impl<'wren, L: Location> GetValue<'wren, L> for () {
     const COMPATIBLE_TYPES: BitFlags<WrenType> = BitFlags::ALL;
-    unsafe fn get_slot_raw(
+    unsafe fn get_slot_unchecked(
         _vm: &mut RawContext<'wren, L>,
         _slot: Slot,
         _slot_type: WrenType,
     ) -> Self {
     }
-    unsafe fn get_slot_unchecked(_vm: &mut RawContext<'wren, L>, _slot: Slot) -> Self
+    unsafe fn get_slot(_vm: &mut RawContext<'wren, L>, _slot: Slot) -> Self
     where
         Self: Sized,
     {
     }
-    unsafe fn try_get_slot_raw(
+    unsafe fn try_get_slot(
         _vm: &mut RawContext<'wren, L>,
         _slot: Slot,
-        _slot_type: WrenType,
         _get_handle: bool,
     ) -> TryGetResult<'wren, Self>
     where
@@ -174,7 +197,7 @@ impl<'wren, L: Location> SetValue<'wren, L> for Handle<'wren> {
 impl<'wren, L: Location> GetValue<'wren, L> for Handle<'wren> {
     const COMPATIBLE_TYPES: BitFlags<WrenType> = BitFlags::ALL;
     // We are always able to Get<'wren> a handle from wren
-    unsafe fn get_slot_raw(
+    unsafe fn get_slot_unchecked(
         vm: &mut RawContext<'wren, L>,
         slot: Slot,
         _slot_type: WrenType,
@@ -182,11 +205,21 @@ impl<'wren, L: Location> GetValue<'wren, L> for Handle<'wren> {
         let handle = ffi::wrenGetSlotHandle(vm.as_ptr(), slot);
         Self::new_unchecked(vm, NonNull::new_unchecked(handle))
     }
-    unsafe fn get_slot_unchecked(vm: &mut RawContext<'wren, L>, slot: Slot) -> Self
+    unsafe fn get_slot(vm: &mut RawContext<'wren, L>, slot: Slot) -> Self
     where
         Self: Sized,
     {
-        Self::get_slot_raw(vm, slot, WrenType::Unknown)
+        Self::get_slot_unchecked(vm, slot, WrenType::Unknown)
+    }
+    unsafe fn try_get_slot(
+        vm: &mut RawContext<'wren, L>,
+        slot: Slot,
+        _get_handle: bool,
+    ) -> TryGetResult<'wren, Self>
+    where
+        Self: Sized,
+    {
+        Ok(Self::get_slot_unchecked(vm, slot, WrenType::Unknown))
     }
 }
 
@@ -202,7 +235,7 @@ unsafe fn send_iterator_to_vm<'wren, L: Location, T: SetValue<'wren, L>, I: Iter
     let (_store, item_slot) = if slot == 0 {
         //  We should store the list in a handle as well just
         // in case send_to_vm overwrites [slot]
-        list = Some(Handle::get_slot_unchecked(vm, slot));
+        list = Some(Handle::get_slot(vm, slot));
         (Some(store_slot(vm, slot + 1)), slot + 1)
     } else {
         (None, slot - 1)
@@ -230,7 +263,11 @@ impl<'wren, L: Location, T: SetValue<'wren, L>> SetValue<'wren, L> for Vec<T> {
 
 impl<'wren, L: Location, T: GetValue<'wren, L>> GetValue<'wren, L> for Vec<T> {
     const COMPATIBLE_TYPES: BitFlags<WrenType> = make_bitflags!(WrenType::{List});
-    unsafe fn get_slot_raw(vm: &mut RawContext<'wren, L>, slot: Slot, slot_type: WrenType) -> Self {
+    unsafe fn get_slot_unchecked(
+        vm: &mut RawContext<'wren, L>,
+        slot: Slot,
+        slot_type: WrenType,
+    ) -> Self {
         // Store the next slot so we don't overwrite it's value
         // Or use the previous slot instead of juggling slots
         let (_store, item_slot) = if slot == 0 {
@@ -242,21 +279,18 @@ impl<'wren, L: Location, T: GetValue<'wren, L>> GetValue<'wren, L> for Vec<T> {
 
         let mut vec = vec![];
 
-        // TODO: Handle this better than just returning an empty vec
-        // if cfg!(debug_assertions) {
-        // assert!(ty == WrenType::List, "Unable to get non list value as Vec");
-        // }
+        if slot_type != WrenType::List {
+            panic!("Value in slot {} is not deserializable as a Vec", slot);
+        }
 
-        if slot_type == WrenType::List {
-            let count = ffi::wrenGetListCount(vm.as_ptr(), slot);
+        let count = ffi::wrenGetListCount(vm.as_ptr(), slot);
 
-            for i in 0..count {
-                ffi::wrenGetListElement(vm.as_ptr(), slot, i, item_slot);
-                // Wren arrays can be mixed items
-                // So this will default a couple of the items presumably
-                let item_type = vm.get_slot_type(item_slot);
-                vec.push(T::get_slot_raw(vm, item_slot, item_type));
-            }
+        for i in 0..count {
+            ffi::wrenGetListElement(vm.as_ptr(), slot, i, item_slot);
+            // Wren arrays can be mixed items
+            // So this will default a couple of the items presumably
+            let item_type = vm.get_slot_type(item_slot);
+            vec.push(T::get_slot_unchecked(vm, item_slot, item_type));
         }
 
         vec
@@ -329,7 +363,7 @@ impl<'wren, L: Location> SetValue<'wren, L> for String {
 
 impl<'wren> GetValue<'wren, Native> for String {
     const COMPATIBLE_TYPES: BitFlags<WrenType> = BitFlags::ALL;
-    unsafe fn get_slot_raw(
+    unsafe fn get_slot_unchecked(
         vm: &mut RawContext<'wren, Native>,
         slot: Slot,
         slot_type: WrenType,
@@ -338,7 +372,7 @@ impl<'wren> GetValue<'wren, Native> for String {
             // Fall back to calling to string on the returned object
             // ONLY WORKS IN NATIVE CODE
             let system_methods = vm.get_system_methods();
-            let handle = Handle::get_slot_raw(vm, slot, WrenType::Unknown);
+            let handle = Handle::get_slot_unchecked(vm, slot, WrenType::Unknown);
             let to_string = &system_methods.object_to_string;
 
             // NOTE: this might break the native stack so it might need to be
@@ -353,7 +387,7 @@ impl<'wren> GetValue<'wren, Native> for String {
 
 impl<'wren> GetValue<'wren, Foreign> for String {
     const COMPATIBLE_TYPES: BitFlags<WrenType> = make_bitflags!(WrenType::{Bool | Null | String});
-    unsafe fn get_slot_raw(
+    unsafe fn get_slot_unchecked(
         vm: &mut RawContext<'wren, Foreign>,
         slot: Slot,
         slot_type: WrenType,
@@ -371,7 +405,11 @@ impl<'wren, L: Location> SetValue<'wren, L> for f64 {
 
 impl<'wren, L: Location> GetValue<'wren, L> for f64 {
     const COMPATIBLE_TYPES: BitFlags<WrenType> = make_bitflags!(WrenType::{Num});
-    unsafe fn get_slot_raw(vm: &mut RawContext<'wren, L>, slot: Slot, slot_type: WrenType) -> Self {
+    unsafe fn get_slot_unchecked(
+        vm: &mut RawContext<'wren, L>,
+        slot: Slot,
+        slot_type: WrenType,
+    ) -> Self {
         if WrenType::Num == slot_type {
             ffi::wrenGetSlotDouble(vm.as_ptr(), slot)
         } else {
@@ -389,7 +427,11 @@ impl<'wren, L: Location> SetValue<'wren, L> for bool {
 
 impl<'wren, L: Location> GetValue<'wren, L> for bool {
     const COMPATIBLE_TYPES: BitFlags<WrenType> = BitFlags::ALL;
-    unsafe fn get_slot_raw(vm: &mut RawContext<'wren, L>, slot: Slot, slot_type: WrenType) -> Self {
+    unsafe fn get_slot_unchecked(
+        vm: &mut RawContext<'wren, L>,
+        slot: Slot,
+        slot_type: WrenType,
+    ) -> Self {
         match slot_type {
             WrenType::Bool => ffi::wrenGetSlotBool(vm.as_ptr(), slot),
             WrenType::Null => false,
@@ -401,18 +443,13 @@ impl<'wren, L: Location> GetValue<'wren, L> for bool {
 pub trait SetArgs<'wren, L: Location> {
     const COUNT: usize;
     const TOTAL_REQUIRED_SLOTS: Slot;
+    /// # Safety
+    /// This should always be safe as long as we can verify that we have at least
+    /// `TOTAL_REQUIRED_SLOTS + offset` available to us. It shouldn't put us in an invalid
+    /// state
     unsafe fn set_slots(&self, vm: &mut RawContext<'wren, L>, offset: u16);
     /// This fn should probably never be used directly since it only existed
     /// before required slots was a constant
-    unsafe fn set_wren_stack_unchecked(
-        &self,
-        vm: &mut RawContext<'wren, L>,
-        num_slots: Slot,
-        offset: u16,
-    ) {
-        vm.ensure_slots(num_slots + Slot::from(offset));
-        self.set_slots(vm, offset);
-    }
     /// Sets the values on the [vm]'s stack
     /// also accepts a [offset] parameter that allows the items to be shifted up
     /// to allow other items to be passed beforehand
@@ -420,7 +457,8 @@ pub trait SetArgs<'wren, L: Location> {
         // This is guarenteed to be safe because we ensured that we had enough
         // slots for T using TOTAL_REQUIRED_SLOTS
         unsafe {
-            self.set_wren_stack_unchecked(vm, Self::TOTAL_REQUIRED_SLOTS, offset);
+            vm.ensure_slots(Self::TOTAL_REQUIRED_SLOTS + Slot::from(offset));
+            self.set_slots(vm, offset);
         }
     }
 }
@@ -506,27 +544,27 @@ impl_set_args!(T0 = 0, T1 = 1, T2 = 2, T3 = 3, T4 = 4, T5 = 5, T6 = 6);
 pub trait GetArgs<'wren, L: Location> {
     type TryGetTarget;
 
-    unsafe fn get_slots_unchecked(vm: &mut RawContext<'wren, L>) -> Self;
+    unsafe fn get_slots(vm: &mut RawContext<'wren, L>) -> Self;
     fn try_get_slots(vm: &mut RawContext<'wren, L>, get_handles: bool) -> Self::TryGetTarget;
 }
 
 impl<'wren, L: Location, T: GetValue<'wren, L>> GetArgs<'wren, L> for T {
     type TryGetTarget = TryGetResult<'wren, T>;
-    unsafe fn get_slots_unchecked(vm: &mut RawContext<'wren, L>) -> Self {
-        T::get_slot_unchecked(vm, 0)
+    unsafe fn get_slots(vm: &mut RawContext<'wren, L>) -> Self {
+        T::get_slot(vm, 0)
     }
     fn try_get_slots(vm: &mut RawContext<'wren, L>, get_handles: bool) -> Self::TryGetTarget {
         // Hack to make sure () does nothing
         // Should compile out since it's a const function on a type
         if std::mem::size_of::<T>() == 0 {
-            unsafe { T::try_get_slot_raw(vm, 0, WrenType::Unknown, false) }
+            unsafe { T::try_get_slot(vm, 0, false) }
         } else {
             if vm.get_slot_count() < 1 {
                 return Err(TryGetError::NoAvailableSlot);
             }
 
             let slot_type = unsafe { vm.get_slot_type(0) };
-            unsafe { T::try_get_slot_raw(vm, 0, slot_type, get_handles) }
+            unsafe { T::try_get_slot(vm, 0, get_handles) }
         }
     }
 }
@@ -535,23 +573,23 @@ macro_rules! impl_get_args_meta {
     ($location:ty, $( $xs:ident = $i:tt ), *) => {
         impl<'wren, $( $xs: GetValue<'wren, $location>, )*> GetArgs<'wren, $location> for ($( $xs, )*) {
             type TryGetTarget = ($(TryGetResult<'wren, $xs>),*);
-            unsafe fn get_slots_unchecked(vm: &mut RawContext<'wren, $location>) -> Self {
+            unsafe fn get_slots(vm: &mut RawContext<'wren, $location>) -> Self {
                 (
                     // Expansion happens in forward order so
                     // Previous slots can be reused for reads
-                    $( $xs::get_slot_unchecked(vm, $i) ), *
+                    $( $xs::get_slot(vm, $i) ), *
                 )
             }
             fn try_get_slots(vm: &mut RawContext<'wren, $location>, get_handles: bool) -> Self::TryGetTarget {
-                let stack_types = vm.get_stack_types();
+                let stack_len = vm.get_slot_count();
 
                 (
                     $({
-                        if stack_types.len() < $i + 1 {
+                        if stack_len < $i + 1 {
                             Err(TryGetError::NoAvailableSlot)
                         } else {
                             unsafe {
-                                $xs::try_get_slot_raw(vm, $i, stack_types[$i], get_handles)
+                                $xs::try_get_slot(vm, $i, get_handles)
                             }
                         }
                     }), *

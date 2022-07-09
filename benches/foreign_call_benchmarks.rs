@@ -25,9 +25,9 @@ unsafe fn raw_ffi(context: wren::test::Context<Foreign>) {
 }
 
 unsafe fn unchecked_raw(mut context: wren::test::Context<Foreign>) {
-    let a = f64::get_slot_raw(&mut context, 1, wren::WrenType::Num);
-    let b = f64::get_slot_raw(&mut context, 2, wren::WrenType::Num);
-    let c = f64::get_slot_raw(&mut context, 3, wren::WrenType::Num);
+    let a = f64::get_slot_unchecked(&mut context, 1, wren::WrenType::Num);
+    let b = f64::get_slot_unchecked(&mut context, 2, wren::WrenType::Num);
+    let c = f64::get_slot_unchecked(&mut context, 3, wren::WrenType::Num);
 
     context.set_return_value(&(a + b + c).to_string());
 }
