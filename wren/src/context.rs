@@ -193,9 +193,11 @@ impl<'wren, T> Context<'wren, T, Native> {
         Ok(())
     }
 
-    /// Call [method] on a [subject] with [args] on the vm
+    /// Call `method` on a `subject` with `args` on the vm
     /// subject is usually a class or an object, but all calls require a subject
-    pub fn call<G: GetValue<'wren, Native>, Args: SetArgs<'wren, Native>>(
+    /// This will return a result that returns errors if there is an incorrect number
+    /// of arguments, an incorrect return value type or the standard interpret result
+    pub fn try_call<G: GetValue<'wren, Native>, Args: SetArgs<'wren, Native>>(
         &mut self,
         subject: &Handle<'wren>,
         method: &CallHandle<'wren>,
@@ -204,7 +206,7 @@ impl<'wren, T> Context<'wren, T, Native> {
         if method.get_argument_count() == Args::COUNT {
             unsafe {
                 self._call(subject, method, args)?;
-                self.as_raw_mut().get_return_value().map_err(Into::into)
+                self.as_raw_mut().try_get_return_value().map_err(Into::into)
             }
         } else {
             Err(InterpretResultErrorKind::IncorrectNumberOfArgsPassed.into())
@@ -215,6 +217,9 @@ impl<'wren, T> Context<'wren, T, Native> {
     /// subject is usually a class or an object, but all calls require a subject
     /// otherwise it's UB
     /// Arguments must be set up correctly as well
+    /// # Safety
+    /// This does not check the number of arguments passed nor does it check to make sure the
+    /// return value is of the expected type and can cause UB
     pub unsafe fn call_unchecked<G: GetValue<'wren, Native>, Args: SetArgs<'wren, Native>>(
         &mut self,
         subject: &Handle<'wren>,
@@ -340,11 +345,11 @@ impl<'wren, L: Location> Context<'wren, NoTypeInfo, L> {
         Args::get_slot_raw(self, 0, ty)
     }
 
-    pub fn get_stack<Args: GetArgs<'wren, L>>(&mut self) -> Args::TryGetTarget {
+    pub fn try_get_stack<Args: GetArgs<'wren, L>>(&mut self) -> Args::TryGetTarget {
         Args::try_get_slots(self, false)
     }
 
-    pub fn get_return_value<Args: GetValue<'wren, L>>(&mut self) -> TryGetResult<'wren, Args> {
+    pub fn try_get_return_value<Args: GetValue<'wren, L>>(&mut self) -> TryGetResult<'wren, Args> {
         Args::try_get_slots(self, false)
     }
 

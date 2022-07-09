@@ -63,7 +63,7 @@ impl<'wren> Methods<'wren> {
     ) -> TryGetResult<'wren, Fiber<'wren>> {
         let is_fiber: bool = {
             let is = &vm.get_system_methods().object_is;
-            vm.call(&raw_handle, is, &(&self.fiber_class))
+            vm.try_call(&raw_handle, is, &(&self.fiber_class))
                 .expect("is should never fail for a valid wren handle")
         };
 
@@ -96,7 +96,7 @@ impl<'wren> Fiber<'wren> {
         context: &mut RawNativeContext<'wren>,
     ) -> CallResult<'wren, G> {
         let transfer = &self.methods.transfer;
-        context.call(&self, transfer, &())
+        context.try_call(&self, transfer, &())
     }
     pub fn transfer_with_arg<G: GetValue<'wren, Native>, S: SetValue<'wren, Native>>(
         self,
@@ -104,7 +104,7 @@ impl<'wren> Fiber<'wren> {
         additional_argument: S,
     ) -> CallResult<'wren, G> {
         let transfer = &self.methods.transfer_with_arg;
-        context.call(&self, transfer, &(&additional_argument))
+        context.try_call(&self, transfer, &(&additional_argument))
     }
 
     pub fn transfer_error<S, G>(
@@ -118,7 +118,7 @@ impl<'wren> Fiber<'wren> {
     {
         let transfer_error = &self.methods.transfer_error;
         let error = error.as_ref();
-        context.call(&self, transfer_error, &(&error))
+        context.try_call(&self, transfer_error, &(&error))
     }
 }
 
@@ -207,26 +207,26 @@ mod test {
         let returnTest = context.make_call_handle(cstr!("returnTest"));
 
         // We should not be able to convert any other value but a fiber to a fiber
-        let true_handle: Handle = context.call(&Test, &returnTrue, &()).unwrap();
+        let true_handle: Handle = context.try_call(&Test, &returnTrue, &()).unwrap();
         let true_fiber = fiber_methods.construct(context, true_handle);
         assert!(true_fiber.is_err());
 
-        let test_handle: Handle = context.call(&Test, &returnTest, &()).unwrap();
+        let test_handle: Handle = context.try_call(&Test, &returnTest, &()).unwrap();
         let test_fiber = fiber_methods.construct(context, test_handle);
         assert!(test_fiber.is_err());
 
-        let fiber_handle: Handle = context.call(&Test, &returnFiber, &()).unwrap();
+        let fiber_handle: Handle = context.try_call(&Test, &returnFiber, &()).unwrap();
         let fiber = fiber_methods.construct(context, fiber_handle);
         assert!(fiber.is_ok());
 
         // Test getting directly from vm
-        let true_fiber = context.call::<Fiber, _>(&Test, &returnTrue, &());
+        let true_fiber = context.try_call::<Fiber, _>(&Test, &returnTrue, &());
         assert!(true_fiber.is_err());
 
-        let test_fiber = context.call::<Fiber, _>(&Test, &returnTest, &());
+        let test_fiber = context.try_call::<Fiber, _>(&Test, &returnTest, &());
         assert!(test_fiber.is_err());
 
-        let fiber = context.call::<Fiber, _>(&Test, &returnFiber, &());
+        let fiber = context.try_call::<Fiber, _>(&Test, &returnFiber, &());
         assert!(fiber.is_ok());
     }
 
@@ -234,7 +234,7 @@ mod test {
     #[allow(non_snake_case)]
     fn test_transfer() {
         fn test_await(mut vm: Context<context::Foreign>) {
-            let (_, fiber) = vm.get_stack::<((), Handle)>();
+            let (_, fiber) = vm.try_get_stack::<((), Handle)>();
             vm.get_user_data_mut().handle = fiber.ok();
         }
 
@@ -258,7 +258,7 @@ mod test {
 
         assert!(context.get_user_data().get_output().is_empty());
         #[allow(clippy::let_unit_value)]
-        context.call::<(), _>(&Test, &test_resume, &()).unwrap();
+        context.try_call::<(), _>(&Test, &test_resume, &()).unwrap();
         assert_eq!(context.get_user_data().get_output(), "Test\n");
         let handle = context
             .get_user_data_mut()

@@ -345,7 +345,7 @@ impl<'wren> GetValue<'wren, Native> for String {
             // saved off first
             // Note this shouldn't recurse because the second call
             // will always be called on a "real" string
-            vm.call(&handle, to_string, &())
+            vm.try_call(&handle, to_string, &())
                 .expect("toString should never fail on a valid wren handle")
         })
     }

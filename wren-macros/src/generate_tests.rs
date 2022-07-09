@@ -15,7 +15,7 @@ pub fn generate_tests() -> syn::Result<TokenStream> {
         let script = "scripts/test/".to_string() + file;
         let name = file.split('.').next().unwrap();
 
-        let file_identifier = syn::Ident::new(&name, Span::call_site());
+        let file_identifier = syn::Ident::new(name, Span::call_site());
         let fun = quote::quote!(
             #[test]
             fn #file_identifier() -> Result<(), Box<dyn std::error::Error>> {

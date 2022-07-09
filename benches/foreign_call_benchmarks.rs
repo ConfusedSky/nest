@@ -39,7 +39,7 @@ unsafe fn unchecked(mut context: wren::test::Context<Foreign>) {
 }
 
 fn checked(mut context: wren::test::Context<Foreign>) {
-    let (_, a, b, c) = context.get_stack::<((), f64, f64, f64)>();
+    let (_, a, b, c) = context.try_get_stack::<((), f64, f64, f64)>();
     let (a, b, c) = (a.unwrap(), b.unwrap(), c.unwrap());
 
     context.set_return_value(&(a + b + c).to_string());
@@ -50,7 +50,7 @@ fn callback<'wren>(
     test: &Handle<'wren>,
     add_three: &CallHandle<'wren>,
 ) {
-    let result = context.call::<bool, _>(test, add_three, &()).unwrap();
+    let result = context.try_call::<bool, _>(test, add_three, &()).unwrap();
     assert!(result);
 }
 
@@ -103,7 +103,7 @@ fn setup<'wren>(
             group.bench_with_input(id, count, |b, count| {
                 b.iter(|| {
                     context
-                        .call::<(), _>(&test, &add_three_multi, &(&(*count as f64)))
+                        .try_call::<(), _>(&test, &add_three_multi, &(&(*count as f64)))
                         .unwrap();
                 })
             });

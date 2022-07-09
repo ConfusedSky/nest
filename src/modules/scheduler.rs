@@ -165,14 +165,14 @@ impl<'wren> Scheduler<'wren> {
     fn resume_waiting(&mut self, vm: &mut RawContext<'wren>) {
         self.has_waiting_fibers = false;
 
-        vm.call::<(), _>(&self.class, &self.resume_waiting, &())
+        vm.try_call::<(), _>(&self.class, &self.resume_waiting, &())
             .unwrap();
     }
     fn has_next(&mut self, vm: &mut RawContext<'wren>) -> bool {
-        vm.call(&self.class, &self.has_next, &()).unwrap()
+        vm.try_call(&self.class, &self.has_next, &()).unwrap()
     }
     fn run_next_scheduled(&mut self, vm: &mut RawContext<'wren>) {
-        vm.call::<(), _>(&self.class, &self.run_next_scheduled, &())
+        vm.try_call::<(), _>(&self.class, &self.run_next_scheduled, &())
             .unwrap();
     }
 }

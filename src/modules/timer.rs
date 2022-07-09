@@ -25,7 +25,7 @@ fn start(mut vm: Context) {
     // fiber we create is genuine to prevent any UB
     // let (_, ms, fiber) = unsafe { vm.get_stack_unchecked::<((), f64, Handle)>() };
     // But now we can be 100% safe and use safe functions
-    let (_, ms, fiber) = vm.get_stack::<((), f64, Handle)>();
+    let (_, ms, fiber) = vm.try_get_stack::<((), f64, Handle)>();
     let ms = ms.expect("Invalid number passed to Timer.start_(_,_) for ms");
     let fiber = fiber.expect("Invalid handle passed to Timer.start_(_,_) for fiber");
 

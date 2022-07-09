@@ -84,7 +84,7 @@ fn checked<'wren, G: GetValue<'wren, Native>>(
     add_three: &CallHandle<'wren>,
 ) {
     context
-        .call::<G, _>(
+        .try_call::<G, _>(
             test,
             add_three,
             &(

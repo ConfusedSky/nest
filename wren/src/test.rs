@@ -76,7 +76,7 @@ macro_rules! call_test_case {
     ) => {
         // We need this here since type is optional and it's not a repeated argument
         macro_rules! call_test_case_helper {
-            ($c: expr, $h: expr, $a: expr) => {$vm.call$(::<$type, _>)?($c, $h, $a)}
+            ($c: expr, $h: expr, $a: expr) => {$vm.try_call$(::<$type, _>)?($c, $h, $a)}
         }
         $({
             let slice = wren_macros::to_signature!(
