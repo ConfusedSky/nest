@@ -1191,6 +1191,7 @@ dependencies = [
  "quote",
  "syn",
  "trybuild",
+ "wren",
 ]
 
 [[package]]
