@@ -2,7 +2,7 @@
 //! Note here the first checkbox here is implementation and the second one is tested
 //!
 //! - Create a wrapper around a function that makes get_slot calls to get
-//!     the returned values [ ] [ ]
+//!     the returned values [x] [x]
 //!
 //! - Make sure all foreign methods for a module are implemented at compile time
 //!     IE: Have it be a compiler error if there are any foreign methods that haven't
