@@ -24,6 +24,10 @@
 //!   Otherwise it should be have the same type as the context passed in [ ] [ ]
 //!   Make sure to check that it is a foreign context and error if it isn't [ ] [ ]
 //!
+//! - Generate better errors for bad return values
+//!   Make sure the error appears at the return value [ ] [ ]
+//!   Create a custom error message for a bad return value type [ ] [ ]
+//!
 //! - Make sure to respect visibility [ ] [ ]
 //!
 //! - Have good error messages
@@ -32,13 +36,13 @@
 
 use proc_macro2::{Ident, Span, TokenStream};
 use proc_macro_crate::{crate_name, FoundCrate};
-use quote::quote;
-use syn::ItemFn;
+use quote::{quote, quote_spanned};
+use syn::{spanned::Spanned, ItemFn, LitInt};
 
 pub fn foreign_static_method(mut input: ItemFn) -> syn::Result<TokenStream> {
     let name = input.sig.ident;
-    let new_name = quote::format_ident!("__wren_internal_{}", name);
-    input.sig.ident = new_name;
+    let original_function_name = quote::format_ident!("__wren_internal_{}", name);
+    input.sig.ident = original_function_name.clone();
 
     let wren_crate = {
         let crate_name = crate_name("wren").expect("wren must be present for this macro");
@@ -48,17 +52,53 @@ pub fn foreign_static_method(mut input: ItemFn) -> syn::Result<TokenStream> {
         }
     };
 
+    let args = input.sig.inputs.clone();
+    let args = args
+        .into_iter()
+        .enumerate()
+        .map(|(i, argument)| {
+            if let syn::FnArg::Typed(pattern) = argument {
+                let arg_name = pattern.pat.clone();
+                let arg_type = &pattern.ty;
+                // Start at 1 instead of 0 to make sure that we read the arguments
+                // rather than the Class
+                let i = LitInt::new(&(i + 1).to_string(), Span::call_site());
+
+                let get_slot = quote_spanned!(
+                    pattern.span() =>
+                        let #arg_name =
+                            #arg_type::get_slot(
+                                &mut context,
+                                #i
+                            );
+                );
+
+                Ok((arg_name, get_slot))
+            } else {
+                Err(syn::Error::new(
+                    argument.span(),
+                    "This macro doesn't support instance methods",
+                ))
+            }
+        })
+        .collect::<syn::Result<Vec<_>>>()?;
+    let arg_names = args.iter().map(|x| &x.0);
+    let arg_get_slot = args.iter().map(|x| &x.1);
+
     Ok(quote!(
         #input
 
         unsafe fn #name<'wren, V: #wren_crate::VmUserData<'wren, V>>(
-            context: #wren_crate::Context<
+            mut context: #wren_crate::Context<
                 'wren,
                 V,
                 #wren_crate::context::Foreign
             >
         ) {
-
+            use #wren_crate::{GetValue, SetValue};
+            #(#arg_get_slot)*
+            #original_function_name(#(#arg_names),*)
+                .set_slot(&mut context, 0);
         }
     ))
 }

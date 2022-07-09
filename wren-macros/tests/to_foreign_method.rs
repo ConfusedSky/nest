@@ -4,7 +4,7 @@ use wren::test::{call_test_case, create_test_vm};
 use wren_macros::foreign_static_method;
 
 #[foreign_static_method]
-fn foreign_test(a: f32, b: f32, c: f32) -> f32 {
+fn foreign_test(a: f64, b: f64, c: f64) -> f64 {
     a + b + c
 }
 
