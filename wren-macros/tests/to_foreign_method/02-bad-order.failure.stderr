@@ -1,0 +1,5 @@
+error: Context argument must be first argument
+ --> tests/to_foreign_method/02-bad-order.failure.rs:4:41
+  |
+4 | fn foreign_test<V, L: Location>(a: f64, context: &mut Context<V, L>, b: f64, c: f64) -> f64 {
+  |                                         ^^^^^^^

@@ -18,21 +18,22 @@
 //!
 //! - Optionally support results for the `try_get` methods [ ] [ ]
 //!
-//! - Allow the user to leave off the context in their arguments [ ] [ ]
+//! - Allow the user to leave off the context in their arguments [x] [x]
 //!   If they leave off the context from their arguments then the
 //!     context user data should be a generic [ ] [ ]
 //!   Otherwise it should be have the same type as the context passed in [ ] [ ]
 //!   Make sure to check that it is a foreign context and error if it isn't [ ] [ ]
 //!
-//! - Generate better errors for bad return values
-//!   Make sure the error appears at the return value [ ] [ ]
-//!   Create a custom error message for a bad return value type [ ] [ ]
-//!
 //! - Make sure to respect visibility [ ] [ ]
 //!
 //! - Have good error messages
-//!   Make sure the context is always the first item in the argument list [ ] [ ]
+//!   Make sure the context is always the first item in the argument list [x] [x]
+//!   Make sure to check to make sure vm argument is a reference [x] [x]
 //!   Have errors saying which argument has an invalid type [ ] [ ]
+//!
+//! - Generate better errors for bad return values
+//!   Make sure the error appears at the return value [ ] [ ]
+//!   Create a custom error message for a bad return value type [ ] [ ]
 //!
 //! - Use `Result<T: SetValue, String>` as a shorthand to be able to abort the calling fiber [ ] [ ]
 //!
@@ -98,10 +99,22 @@ impl TryFrom<&Punctuated<FnArg, Token![,]>> for Arguments {
             .filter_map(|(i, argument)| {
                 if let syn::FnArg::Typed(pattern) = argument {
                     if let Type::Reference(ref ty) = &*pattern.ty {
-                        if type_is_context(&*pattern.ty) {
+                        if type_is_context(&*ty.elem) {
+                            if i != 0 {
+                                return Some(Err(syn::Error::new(
+                                    argument.span(),
+                                    "Context argument must be first argument",
+                                )));
+                            }
+
                             context_type = Some((i, ty.clone()));
                             return None;
                         }
+                    } else if type_is_context(&*pattern.ty) {
+                        return Some(Err(syn::Error::new(
+                            argument.span(),
+                            "Context argument must be a reference",
+                        )));
                     }
 
                     Some(Ok(pattern.clone()))
