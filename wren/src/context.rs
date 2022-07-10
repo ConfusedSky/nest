@@ -183,7 +183,7 @@ impl<'wren, T> Context<'wren, T, Native> {
         subject: &Handle<'wren>,
         method: &CallHandle<'wren>,
         args: &Args,
-    ) -> CallResult<'wren, ()> {
+    ) -> Result<()> {
         let slot_count =
             <Handle as SetValue<'wren, Native>>::REQUIRED_SLOTS + Args::TOTAL_REQUIRED_SLOTS;
 
@@ -208,6 +208,7 @@ impl<'wren, T> Context<'wren, T, Native> {
 
     /// Call `method` on a `subject` with `args` on the vm
     /// subject is usually a class or an object, but all calls require a subject
+    /// # Errors
     /// This will return a result that returns errors if there is an incorrect number
     /// of arguments, an incorrect return value type or the standard interpret result
     pub fn try_call<G: GetValue<'wren, Native>, Args: SetArgs<'wren, Native>>(
@@ -226,10 +227,12 @@ impl<'wren, T> Context<'wren, T, Native> {
         }
     }
 
-    /// Call [method] on a [subject] with [args] on the vm
+    /// Call 'method' on a 'subject' with 'args' on the vm
     /// subject is usually a class or an object, but all calls require a subject
     /// otherwise it's UB
     /// Arguments must be set up correctly as well
+    /// # Errors
+    /// Returns the standard interpret error see `context.interpret`
     /// # Panics
     /// This function can panic if return value isn't able to be converted from
     /// the wren value
@@ -241,17 +244,19 @@ impl<'wren, T> Context<'wren, T, Native> {
         subject: &Handle<'wren>,
         method: &CallHandle<'wren>,
         args: &Args,
-    ) -> CallResult<'wren, G> {
+    ) -> Result<G> {
         self._call(subject, method, args)?;
 
         // This should be safe as long as the type is set correctly
         Ok(self.as_raw_mut().get_return_value::<G>())
     }
 
-    /// Call [method] on a [subject] with [args] on the vm
+    /// Call 'method' on a 'subject' with 'args' on the vm
     /// subject is usually a class or an object, but all calls require a subject
     /// otherwise it's UB
     /// Arguments must be set up correctly as well
+    /// # Errors
+    /// Returns the standard interpret error see `context.interpret`
     /// # Panics
     /// This function can panic if `assume_slot_type` can't be converted to a value of type `G`
     /// # Safety
@@ -264,7 +269,7 @@ impl<'wren, T> Context<'wren, T, Native> {
         method: &CallHandle<'wren>,
         args: &Args,
         assume_slot_type: WrenType,
-    ) -> CallResult<'wren, G> {
+    ) -> Result<G> {
         self._call(subject, method, args)?;
 
         // This should be safe as long as the type is set correctly
@@ -275,6 +280,9 @@ impl<'wren, T> Context<'wren, T, Native> {
 
     /// Checks a handle to see if it is a valid fiber, if it is return the handle as a fiber
     /// in the ok varient, otherwise returns the original handle
+    /// # Errors
+    /// Return a `TryGetResult` which returns `TryGetError::IncompatibleType(Some)` if
+    /// `handle` isn't a fiber
     pub fn check_fiber(&mut self, handle: Handle<'wren>) -> TryGetResult<'wren, Fiber<'wren>> {
         Fiber::try_from_handle(self, handle)
     }
@@ -302,6 +310,9 @@ impl<'wren, L: Location> Context<'wren, NoTypeInfo, L> {
         }
     }
 
+    /// Returns a handle to a wren variable if a variable `name` exists in `module`
+    /// # Panics
+    /// This function can panic if `module` or `name` have internal NUL values
     pub fn get_variable<Module, Name>(
         &mut self,
         module: Module,
@@ -314,7 +325,7 @@ impl<'wren, L: Location> Context<'wren, NoTypeInfo, L> {
     {
         let module = CString::new(module.as_ref()).unwrap();
         let name = CString::new(name.as_ref()).unwrap();
-        // SAFETY wrenGetVariable is definitely safe if wrenHasModule and wrenHasVariable
+        // Safety: wrenGetVariable is definitely safe if wrenHasModule and wrenHasVariable
         // are called beforehand
         // wrenHasVariable is safe if wrenHasModule has been called
         // and wrenHasModule is always safe to call
@@ -346,6 +357,9 @@ impl<'wren, L: Location> Context<'wren, NoTypeInfo, L> {
         Handle::get_slot(self, slot)
     }
 
+    /// # Errors
+    /// If passed in slice has interior NUL bytes or isn't null terminated
+    /// this will return a `FromBytesWithNulError`
     pub fn make_call_handle_slice(
         &mut self,
         signature: &[u8],
@@ -367,14 +381,15 @@ impl<'wren, L: Location> Context<'wren, NoTypeInfo, L> {
         Args::get_slots(self)
     }
 
-    // Gets the value currently in slot 0 in the wren stack
-    // # Panics
-    // If the wrong return type is specified this may panic
-    // or if called in a context where there is no values on the wren stack
+    /// Gets the value currently in slot 0 in the wren stack
+    /// # Panics
+    /// If the wrong return type is specified this may panic
+    /// or if called in a context where there is no values on the wren stack
     pub fn get_return_value<Args: GetValue<'wren, L>>(&mut self) -> Args {
-        if self.get_slot_count() < 1 {
-            panic!("get_return_value called in a context where there are no vm slots!");
-        }
+        assert!(
+            self.get_slot_count() > 0,
+            "get_return_value called in a context where there are no vm slots!"
+        );
         // Safety
         // If the return value isn't what is expected then this should panic
         // or return an invalid value because unchecked at least checks the types
@@ -398,6 +413,8 @@ impl<'wren, L: Location> Context<'wren, NoTypeInfo, L> {
         Args::try_get_slots(self, false)
     }
 
+    /// # Errors
+    /// Can return an error if the value at slot 0 isn't convertable to `args`
     pub fn try_get_return_value<Args: GetValue<'wren, L>>(&mut self) -> TryGetResult<'wren, Args> {
         Args::try_get_slots(self, false)
     }
@@ -426,6 +443,7 @@ impl<'wren, L: Location> Context<'wren, NoTypeInfo, L> {
         WrenType::from(t)
     }
 
+    #[must_use]
     pub fn get_slot_count(&self) -> Slot {
         // This call should always be safe, since it doesn't
         // modify any state
