@@ -38,6 +38,7 @@ impl<'wren> VmUserData<'wren, Self> for UserData<'wren> {
 }
 
 impl<'wren> UserData<'wren> {
+    #[must_use]
     pub const fn get_output(&self) -> &String {
         &self.output
     }

@@ -98,10 +98,10 @@ pub trait GetValue<'wren, L: Location> {
     /// Gets the value in a `slot` as this type where the value is assumed to be
     /// of type `slot_type` on the wren side
     /// # Panics
-    /// This call can panic if the slot_type can't be converted into this type
+    /// This call can panic if the `slot_type` can't be converted into this type
     /// # Safety
     /// This is unsafe to call if a slot doesn't exist on the wren stack
-    /// or if slot_type isn't the type that is actually on the wren stack
+    /// or if `slot_type` isn't the type that is actually on the wren stack
     /// which can cause a value to be interpretted incorrectly by the runtime
     unsafe fn get_slot_unchecked(
         vm: &mut RawContext<'wren, L>,
@@ -122,8 +122,9 @@ pub trait GetValue<'wren, L: Location> {
     }
     /// Gets the value in a `slot` as this type without any assertion on what that value is
     /// on the wren side
+    /// # Errors
     /// Returns an error if the type on the wren side isn't compatible with the type on the rust side
-    /// if `get_handle` is true then the IncompatibleType varient contains a handle to that value
+    /// if `get_handle` is true then the `IncompatibleType` varient contains a handle to that value
     /// # Safety
     /// This is unsafe to call if the slot doesn't exist on the wren stack
     unsafe fn try_get_slot(
@@ -277,9 +278,11 @@ impl<'wren, L: Location, T: GetValue<'wren, L>> GetValue<'wren, L> for Vec<T> {
 
         let mut vec = vec![];
 
-        if slot_type != WrenType::List {
-            panic!("Value in slot {} is not deserializable as a Vec", slot);
-        }
+        assert!(
+            !(slot_type != WrenType::List),
+            "Value in slot {} is not deserializable as a Vec",
+            slot
+        );
 
         let count = ffi::wrenGetListCount(vm.as_ptr(), slot);
 

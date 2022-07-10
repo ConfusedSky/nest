@@ -81,6 +81,9 @@ pub struct Fiber<'wren> {
 }
 
 impl<'wren> Fiber<'wren> {
+    /// # Errors
+    /// Return a `TryGetResult` which returns `TryGetError::IncompatibleType(Some)` if
+    /// `handle` isn't a fiber
     pub fn try_from_handle<V>(
         vm: &mut Context<'wren, V, Native>,
         handle: Handle<'wren>,
@@ -91,6 +94,8 @@ impl<'wren> Fiber<'wren> {
             .construct(vm.as_raw_mut(), handle)
     }
 
+    /// # Errors
+    /// Standard `CallResult` response like `context.try_call`
     pub fn transfer<G: GetValue<'wren, Native>>(
         self,
         context: &mut RawNativeContext<'wren>,
@@ -98,6 +103,9 @@ impl<'wren> Fiber<'wren> {
         let transfer = &self.methods.transfer;
         context.try_call(&self, transfer, &())
     }
+
+    /// # Errors
+    /// Standard `CallResult` response like `context.try_call`
     pub fn transfer_with_arg<G: GetValue<'wren, Native>, S: SetValue<'wren, Native>>(
         self,
         context: &mut RawNativeContext<'wren>,
@@ -107,6 +115,8 @@ impl<'wren> Fiber<'wren> {
         context.try_call(&self, transfer, &(&additional_argument))
     }
 
+    /// # Errors
+    /// Standard `CallResult` response like `context.try_call`
     pub fn transfer_error<S, G>(
         self,
         context: &mut RawNativeContext<'wren>,

@@ -45,6 +45,7 @@ impl<'wren> Handle<'wren> {
         }
     }
 
+    #[must_use]
     pub const fn as_ptr(&self) -> *mut WrenHandle {
         self.pointer.as_ptr()
     }
@@ -84,16 +85,17 @@ impl<'wren> Drop for CallHandle<'wren> {
 impl<'wren> CallHandle<'wren> {
     /// NOTE this could probably become a constant with
     /// some macro trickery, but for now this is fine
+    #[must_use]
     pub const fn get_argument_count(&self) -> usize {
         self.argument_count
     }
 
     /// Create a new call handle with `signature` that takes `argument_count`
     /// # Safety
-    /// `argument_count` must match `signature` otherwise this CallHandle might behave badly
+    /// `argument_count` must match `signature` otherwise this `CallHandle` might behave badly
     /// # Todo
     /// make most of our handles with a macro
-    /// that creates a signature with call_signature!
+    /// that creates a signature with `call_signature`!
     /// and this function. Since that has no runtime cost
     pub unsafe fn new_unchecked<L: Location, V>(
         vm: &mut Context<'wren, V, L>,
@@ -130,6 +132,9 @@ impl<'wren> CallHandle<'wren> {
         unsafe { Self::new_unchecked(vm, signature, argument_count) }
     }
 
+    /// # Errors
+    /// If passed in slice has interior NUL bytes or isn't null terminated
+    /// this will return a `FromBytesWithNulError`
     pub fn new_from_slice<L: Location, V>(
         vm: &mut Context<'wren, V, L>,
         signature: &[u8],
