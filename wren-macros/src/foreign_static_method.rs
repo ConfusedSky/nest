@@ -43,7 +43,61 @@
 use proc_macro2::{Ident, Span, TokenStream};
 use proc_macro_crate::{crate_name, FoundCrate};
 use quote::{quote, quote_spanned};
-use syn::{spanned::Spanned, ItemFn, LitInt};
+use syn::{punctuated::Punctuated, spanned::Spanned, FnArg, ItemFn, LitInt, Pat, PatType, Token};
+
+struct Arguments {
+    args: Vec<PatType>,
+    context_type: Option<PatType>,
+}
+
+impl Arguments {
+    fn names(&self) -> impl Iterator<Item = &Box<Pat>> {
+        self.args.iter().map(|arg| &arg.pat)
+    }
+
+    fn get_slot(&self) -> impl Iterator<Item = TokenStream> + '_ {
+        self.args.iter().enumerate().map(|(i, pattern)| {
+            let arg_name = &pattern.pat;
+            let arg_type = &pattern.ty;
+            // Start at 1 instead of 0 to make sure that we read the arguments
+            // rather than the Class
+            let i = LitInt::new(&(i + 1).to_string(), Span::call_site());
+
+            quote_spanned!(
+                pattern.span() =>
+                    let #arg_name =
+                        #arg_type::get_slot(
+                            &mut context,
+                            #i
+                        );
+            )
+        })
+    }
+}
+
+impl TryFrom<&Punctuated<FnArg, Token![,]>> for Arguments {
+    type Error = syn::Error;
+    fn try_from(args: &Punctuated<FnArg, Token![,]>) -> syn::Result<Self> {
+        let args = args
+            .into_iter()
+            .map(|argument| {
+                if let syn::FnArg::Typed(pattern) = argument {
+                    Ok(pattern.clone())
+                } else {
+                    Err(syn::Error::new(
+                        argument.span(),
+                        "This macro doesn't support instance methods",
+                    ))
+                }
+            })
+            .collect::<syn::Result<_>>()?;
+
+        Ok(Self {
+            args,
+            context_type: None,
+        })
+    }
+}
 
 pub fn foreign_static_method(mut input: ItemFn) -> syn::Result<TokenStream> {
     let name = input.sig.ident;
@@ -58,38 +112,9 @@ pub fn foreign_static_method(mut input: ItemFn) -> syn::Result<TokenStream> {
         }
     };
 
-    let args = input.sig.inputs.clone();
-    let args = args
-        .into_iter()
-        .enumerate()
-        .map(|(i, argument)| {
-            if let syn::FnArg::Typed(pattern) = argument {
-                let arg_name = pattern.pat.clone();
-                let arg_type = &pattern.ty;
-                // Start at 1 instead of 0 to make sure that we read the arguments
-                // rather than the Class
-                let i = LitInt::new(&(i + 1).to_string(), Span::call_site());
-
-                let get_slot = quote_spanned!(
-                    pattern.span() =>
-                        let #arg_name =
-                            #arg_type::get_slot(
-                                &mut context,
-                                #i
-                            );
-                );
-
-                Ok((arg_name, get_slot))
-            } else {
-                Err(syn::Error::new(
-                    argument.span(),
-                    "This macro doesn't support instance methods",
-                ))
-            }
-        })
-        .collect::<syn::Result<Vec<_>>>()?;
-    let arg_names = args.iter().map(|x| &x.0);
-    let arg_get_slot = args.iter().map(|x| &x.1);
+    let args = Arguments::try_from(&input.sig.inputs)?;
+    let arg_names = args.names();
+    let arg_get_slot = args.get_slot();
 
     Ok(quote!(
         #input
