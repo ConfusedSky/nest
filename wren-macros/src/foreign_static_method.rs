@@ -149,10 +149,8 @@ impl TryFrom<&Punctuated<FnArg, Token![,]>> for Arguments {
     }
 }
 
-pub fn foreign_static_method(mut input: ItemFn) -> syn::Result<TokenStream> {
-    let name = input.sig.ident;
-    let original_function_name = quote::format_ident!("__wren_internal_{}", name);
-    input.sig.ident = original_function_name.clone();
+pub fn foreign_static_method(input: &ItemFn) -> syn::Result<TokenStream> {
+    let name = &input.sig.ident;
 
     let wren_crate = {
         let crate_name = crate_name("wren").expect("wren must be present for this macro");
@@ -192,10 +190,12 @@ pub fn foreign_static_method(mut input: ItemFn) -> syn::Result<TokenStream> {
         quote!()
     };
 
+    let internal_function_name = internal_function_name(name);
+
     Ok(quote!(
         #input
 
-        fn #name #generics(
+        fn #internal_function_name #generics(
             mut context: #context_type
         ) {
             use #wren_crate::{GetValue, SetValue};
@@ -203,9 +203,13 @@ pub fn foreign_static_method(mut input: ItemFn) -> syn::Result<TokenStream> {
 
             unsafe {
                 #(#arg_get_slot)*
-                #original_function_name(#context_ref #(#arg_names),*)
+                #name(#context_ref #(#arg_names),*)
                     .set_slot(&mut context, 0);
             }
         }
     ))
+}
+
+pub fn internal_function_name(name: &Ident) -> Ident {
+    quote::format_ident!("__wren_internal_{}", name)
 }

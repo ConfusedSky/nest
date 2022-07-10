@@ -1,6 +1,6 @@
 use crate::Context;
 use wren::VERSION;
-use wren_macros::foreign_static_method;
+use wren_macros::{foreign, foreign_static_method};
 
 use super::{source_file, Class, Module};
 use std::env::args;
@@ -8,17 +8,21 @@ use std::env::current_dir;
 
 pub fn init_module<'wren>() -> Module<'wren> {
     let mut platform_class = Class::new();
-    platform_class.static_methods.insert("isPosix", is_posix);
-    platform_class.static_methods.insert("name", name);
+    platform_class
+        .static_methods
+        .insert("isPosix", foreign!(is_posix));
+    platform_class.static_methods.insert("name", foreign!(name));
     platform_class.static_methods.insert("homePath", home_path);
 
     let mut process_class = Class::new();
     process_class
         .static_methods
-        .insert("allArguments", all_arguments);
-    process_class.static_methods.insert("version", version);
+        .insert("allArguments", foreign!(all_arguments));
+    process_class
+        .static_methods
+        .insert("version", foreign!(version));
     process_class.static_methods.insert("cwd", cwd);
-    process_class.static_methods.insert("pid", pid);
+    process_class.static_methods.insert("pid", foreign!(pid));
     process_class.static_methods.insert("ppid", ppid);
 
     let mut module = Module::new(source_file!("os.wren"));
