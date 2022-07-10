@@ -51,10 +51,28 @@ use syn::{
 
 struct Arguments {
     args: Vec<PatType>,
-    context_type: Option<(usize, TypeReference)>,
+    context_type: Option<(Span, TypeReference)>,
 }
 
 impl Arguments {
+    fn context_inner_type(&self) -> Option<&Type> {
+        self.context_type.as_ref().map(|(_, ty)| &*ty.elem)
+    }
+
+    fn context_ref(&self) -> TokenStream {
+        if let Some((span, ty)) = &self.context_type {
+            let ref_type = if ty.mutability.is_some() {
+                quote!(&mut)
+            } else {
+                quote!(&)
+            };
+
+            quote_spanned!(*span=> #ref_type context,)
+        } else {
+            TokenStream::new()
+        }
+    }
+
     fn names(&self) -> impl Iterator<Item = &Box<Pat>> {
         self.args.iter().map(|arg| &arg.pat)
     }
@@ -107,7 +125,7 @@ impl TryFrom<&Punctuated<FnArg, Token![,]>> for Arguments {
                                 )));
                             }
 
-                            context_type = Some((i, ty.clone()));
+                            context_type = Some((argument.span(), ty.clone()));
                             return None;
                         }
                     } else if type_is_context(&*pattern.ty) {
@@ -147,21 +165,34 @@ pub fn foreign_static_method(mut input: ItemFn) -> syn::Result<TokenStream> {
     let args = Arguments::try_from(&input.sig.inputs)?;
     let arg_names = args.names();
     let arg_get_slot = args.get_slot();
-
-    Ok(quote!(
-        #input
-
-        fn #name<'wren, V: #wren_crate::VmUserData<'wren, V>>(
-            mut context: #wren_crate::Context<
+    let context_ref = args.context_ref();
+    let generics = if args.context_type.is_some() {
+        quote!()
+    } else {
+        quote!(<'wren, V: #wren_crate::VmUserData<'wren, V>>)
+    };
+    let context_type = if let Some(inner_type) = &args.context_inner_type() {
+        quote!(#inner_type)
+    } else {
+        quote!(
+            #wren_crate::Context<
                 'wren,
                 V,
                 #wren_crate::context::Foreign
             >
+        )
+    };
+
+    Ok(quote!(
+        #input
+
+        fn #name #generics(
+            mut context: #context_type
         ) {
             use #wren_crate::{GetValue, SetValue};
             unsafe {
                 #(#arg_get_slot)*
-                #original_function_name(#(#arg_names),*)
+                #original_function_name(#context_ref #(#arg_names),*)
                     .set_slot(&mut context, 0);
             }
         }

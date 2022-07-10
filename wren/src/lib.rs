@@ -1,4 +1,8 @@
+#![deny(clippy::all)]
+#![warn(clippy::pedantic, clippy::nursery)]
 #![allow(unsafe_code)]
+#![allow(clippy::module_name_repetitions)]
+#![allow(clippy::option_if_let_else)]
 
 pub mod context;
 mod fiber;

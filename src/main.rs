@@ -1,6 +1,8 @@
 #![deny(clippy::all)]
 #![warn(clippy::pedantic, clippy::nursery)]
 #![warn(unsafe_code)]
+#![allow(clippy::module_name_repetitions)]
+#![allow(clippy::option_if_let_else)]
 
 mod modules;
 
