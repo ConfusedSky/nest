@@ -59,7 +59,7 @@ impl ToSignatureInput {
     }
 }
 
-pub fn create_signature(data: ToSignatureInput) -> proc_macro::TokenStream {
+pub fn create_signature(data: &ToSignatureInput) -> proc_macro::TokenStream {
     let mut ident = data.ident.to_string();
     if data.has_params {
         ident += "(";

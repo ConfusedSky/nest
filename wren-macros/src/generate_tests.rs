@@ -1,6 +1,7 @@
 use proc_macro2::{Span, TokenStream};
 use std::path::PathBuf;
 
+#[allow(clippy::unnecessary_wraps)]
 pub fn generate_tests() -> syn::Result<TokenStream> {
     let manifest_dir =
         std::env::var("CARGO_MANIFEST_DIR").expect("WE SHOULD HAVE ACCESS TO THE MANIFEST DIR");
@@ -23,7 +24,7 @@ pub fn generate_tests() -> syn::Result<TokenStream> {
             }
         );
 
-        output.extend(fun)
+        output.extend(fun);
     }
 
     Ok(output)

@@ -1,7 +1,7 @@
 //! # Goals
 //! Note here the first checkbox here is implementation and the second one is tested
 //!
-//! - Create a wrapper around a function that makes get_slot calls to get
+//! - Create a wrapper around a function that makes `get_slot` calls to get
 //!     the returned values [x] [x]
 //!
 //! - Make sure all foreign methods for a module are implemented at compile time
@@ -13,10 +13,10 @@
 //!     Since we can't really do that on the rust side. [ ] [ ]
 //!
 //! - Have two modes strict and dynamic where depending on the type the function
-//!     calls get_slot or get_slot_unchecked and the wren end user has to be more
+//!     calls `get_slot` or `get_slot_unchecked` and the wren end user has to be more
 //!     careful respectively [ ] [ ]
 //!
-//! - Optionally support results for the try_get methods [ ] [ ]
+//! - Optionally support results for the `try_get` methods [ ] [ ]
 //!
 //! - Allow the user to leave off the context in their arguments [ ] [ ]
 //!   If they leave off the context from their arguments then the
@@ -34,7 +34,7 @@
 //!   Make sure the context is always the first item in the argument list [ ] [ ]
 //!   Have errors saying which argument has an invalid type [ ] [ ]
 //!
-//! - Use Result<T: SetValue, String> as a shorthand to be able to abort the calling fiber [ ] [ ]
+//! - Use `Result<T: SetValue, String>` as a shorthand to be able to abort the calling fiber [ ] [ ]
 //!
 //! - Add a trait that modules can implement that allows them to be accessed by the VM
 //!   so we can support instance methods for modules [ ] [ ]
@@ -43,11 +43,14 @@
 use proc_macro2::{Ident, Span, TokenStream};
 use proc_macro_crate::{crate_name, FoundCrate};
 use quote::{quote, quote_spanned};
-use syn::{punctuated::Punctuated, spanned::Spanned, FnArg, ItemFn, LitInt, Pat, PatType, Token};
+use syn::{
+    punctuated::Punctuated, spanned::Spanned, FnArg, ItemFn, LitInt, Pat, PatType, Token, Type,
+    TypeReference,
+};
 
 struct Arguments {
     args: Vec<PatType>,
-    context_type: Option<PatType>,
+    context_type: Option<(usize, TypeReference)>,
 }
 
 impl Arguments {
@@ -75,27 +78,43 @@ impl Arguments {
     }
 }
 
+fn type_is_context(path: &Type) -> bool {
+    if let Type::Path(ref pat) = path {
+        if pat.path.segments[0].ident == "Context" {
+            return true;
+        }
+    }
+
+    false
+}
+
 impl TryFrom<&Punctuated<FnArg, Token![,]>> for Arguments {
     type Error = syn::Error;
     fn try_from(args: &Punctuated<FnArg, Token![,]>) -> syn::Result<Self> {
+        let mut context_type = None;
         let args = args
             .into_iter()
-            .map(|argument| {
+            .enumerate()
+            .filter_map(|(i, argument)| {
                 if let syn::FnArg::Typed(pattern) = argument {
-                    Ok(pattern.clone())
+                    if let Type::Reference(ref ty) = &*pattern.ty {
+                        if type_is_context(&*pattern.ty) {
+                            context_type = Some((i, ty.clone()));
+                            return None;
+                        }
+                    }
+
+                    Some(Ok(pattern.clone()))
                 } else {
-                    Err(syn::Error::new(
+                    Some(Err(syn::Error::new(
                         argument.span(),
                         "This macro doesn't support instance methods",
-                    ))
+                    )))
                 }
             })
             .collect::<syn::Result<_>>()?;
 
-        Ok(Self {
-            args,
-            context_type: None,
-        })
+        Ok(Self { args, context_type })
     }
 }
 
