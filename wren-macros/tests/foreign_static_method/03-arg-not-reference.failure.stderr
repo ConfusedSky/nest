@@ -1,5 +1,5 @@
 error: Context argument must be a reference
- --> tests/to_foreign_method/03-arg-not-reference.failure.rs:4:33
+ --> tests/foreign_static_method/03-arg-not-reference.failure.rs:4:33
   |
 4 | fn foreign_test<V, L: Location>(context: Context<V, L>, b: f64, c: f64) -> f64 {
   |                                 ^^^^^^^

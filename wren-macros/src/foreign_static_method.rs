@@ -182,6 +182,15 @@ pub fn foreign_static_method(mut input: ItemFn) -> syn::Result<TokenStream> {
             >
         )
     };
+    // TODO: Figure out how to get the span for this correct
+    let type_assertion = if let Some((span, _)) = &args.context_type {
+        quote_spanned!(*span =>
+            fn __assert_is_foreign<_V>(_: &mut #wren_crate::Context<_V, #wren_crate::context::Foreign>) {}
+            __assert_is_foreign(&mut context);
+        )
+    } else {
+        quote!()
+    };
 
     Ok(quote!(
         #input
@@ -190,6 +199,8 @@ pub fn foreign_static_method(mut input: ItemFn) -> syn::Result<TokenStream> {
             mut context: #context_type
         ) {
             use #wren_crate::{GetValue, SetValue};
+            #type_assertion
+
             unsafe {
                 #(#arg_get_slot)*
                 #original_function_name(#context_ref #(#arg_names),*)

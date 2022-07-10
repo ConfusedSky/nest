@@ -5,8 +5,8 @@ fn to_signature() {
 }
 
 #[test]
-fn to_foreign_method() {
+fn foreign_static_method() {
     let t = trybuild::TestCases::new();
-    t.pass("tests/to_foreign_method/*.success.rs");
-    t.compile_fail("tests/to_foreign_method/*.failure.rs");
+    t.pass("tests/foreign_static_method/*.success.rs");
+    t.compile_fail("tests/foreign_static_method/*.failure.rs");
 }

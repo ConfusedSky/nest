@@ -16,7 +16,7 @@ fn foreign_test2(a: String, b: String, c: String) -> String {
 
 #[foreign_static_method]
 fn foreign_test3(context: &mut Context<'_, Foreign>, a: f64) -> f64 {
-    context.get_user_data_mut().get_output();
+    assert!(context.get_user_data_mut().get_output().is_empty());
 
     a
 }
