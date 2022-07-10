@@ -40,21 +40,27 @@ impl<'wren, V, L: Location> Context<'wren, V, L> {
     // NOTE THESE ARE ALL DOWNCASTS SO THIS IS SAFE
     // Foreign is more restrictive than native
     // Raw is more restrictive than typed
+    #[must_use]
     pub const fn as_unknown(&self) -> &Context<'wren, V, UnknownLocation> {
         unsafe { self.transmute::<V, UnknownLocation>() }
     }
 
+    #[must_use]
     pub fn as_unknown_mut(&mut self) -> &mut Context<'wren, V, UnknownLocation> {
         unsafe { self.transmute_mut::<V, UnknownLocation>() }
     }
 
+    #[must_use]
     pub const fn as_raw(&self) -> &Context<'wren, NoTypeInfo, L> {
         unsafe { self.transmute::<NoTypeInfo, L>() }
     }
+
+    #[must_use]
     pub fn as_raw_mut(&mut self) -> &mut Context<'wren, NoTypeInfo, L> {
         unsafe { self.transmute_mut::<NoTypeInfo, L>() }
     }
 
+    #[must_use]
     pub const fn as_ptr(&self) -> *mut WrenVM {
         self.0.as_ptr()
     }
@@ -71,6 +77,7 @@ impl<'wren, V, L: Location> Context<'wren, V, L> {
 
 // Type information is needed to get user data
 impl<'wren, V: VmUserData<'wren, V>, L: Location> Context<'wren, V, L> {
+    #[must_use]
     pub fn get_user_data(&self) -> &V {
         // SAFETY this is called from a typed context
         unsafe { &foreign::get_system_user_data(self.as_ptr()).user_data }
@@ -147,8 +154,14 @@ impl<'wren> From<TryGetError<'wren>> for CallError<'wren> {
 
 pub type CallResult<'wren, T> = std::result::Result<T, CallError<'wren>>;
 
-// Calling can only happen from a native context
+/// Calling can only happen from a native context
 impl<'wren, T> Context<'wren, T, Native> {
+    /// Interprets some `source` code as as module named `module`
+    /// # Errors
+    /// Can return an `InterpretResultErrorKind` if the source was invalid or it produced a
+    /// runtime error when it was interpretted
+    /// # Panics
+    /// This function can panic if `module` or `source` have internal NUL values
     pub fn interpret<M, S>(&self, module: M, source: S) -> Result<()>
     where
         M: AsRef<str>,
