@@ -17,3 +17,10 @@
 - [x] Be able to run tests on both the rust side and the wren side
 - [ ] Compiler doesn't warn when there are mutliple vm's trying to share a handle
 - [ ] Make sure ForeignMethods must be of the same type of their context
+- [ ] Use some methods that aren't in the public api to make better abstractions?
+      Looks like it's possible to do typechecking in foreign functions after all
+      It's just not possible with the current public API
+      [mirror](https://github.com/joshgoebel/wren-essentials/blob/main/src/modules/mirror.c)
+- [ ] Look into removing location dependency for GetValue and SetValue since it looks like
+      it could be possible to do runtime typechecking and conversion without needing to call
+      back into the vm
