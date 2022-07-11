@@ -451,6 +451,35 @@ impl<'wren, L: Location> Context<'wren, NoTypeInfo, L> {
     }
 }
 
+pub trait ForeignCallOutput: Sized {
+    type Output;
+    fn to_output<T>(self, context: &mut Context<T, Foreign>) -> Option<Self::Output>;
+}
+
+impl<'wren, S: AsRef<str>, G: GetValue<'wren, Foreign>> ForeignCallOutput
+    for std::result::Result<G, S>
+{
+    type Output = G;
+
+    fn to_output<T>(self, context: &mut Context<T, Foreign>) -> Option<Self::Output> {
+        match self {
+            Ok(v) => Some(v),
+            Err(s) => {
+                context.as_raw_mut().abort_fiber(s);
+                None
+            }
+        }
+    }
+}
+
+impl<'wren, G: GetValue<'wren, Foreign>> ForeignCallOutput for G {
+    type Output = G;
+
+    fn to_output<T>(self, _context: &mut Context<T, Foreign>) -> Option<Self::Output> {
+        Some(self)
+    }
+}
+
 #[derive(Clone)]
 pub struct NoTypeInfo;
 

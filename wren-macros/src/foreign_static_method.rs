@@ -21,8 +21,8 @@
 //! - Allow the user to leave off the context in their arguments [x] [x]
 //!   If they leave off the context from their arguments then the
 //!     context user data should be a generic [ ] [ ]
-//!   Otherwise it should be have the same type as the context passed in [ ] [ ]
-//!   Make sure to check that it is a foreign context and error if it isn't [ ] [ ]
+//!   Otherwise it should be have the same type as the context passed in [x] [x]
+//!   Make sure to check that it is a foreign context and error if it isn't [x] [x]
 //!
 //! - Make sure to respect visibility [ ] [ ]
 //!
@@ -39,6 +39,7 @@
 //!
 //! - Add a trait that modules can implement that allows them to be accessed by the VM
 //!   so we can support instance methods for modules [ ] [ ]
+//!   Also that way we don't have to expose the context to foreign functions really at all
 //!
 
 use proc_macro2::{Ident, Span, TokenStream};
@@ -181,15 +182,19 @@ pub fn foreign_static_method(input: &ItemFn) -> syn::Result<TokenStream> {
         )
     };
     // TODO: Figure out how to get the span for this correct
-    let type_assertion = if let Some((span, _)) = &args.context_type {
-        quote_spanned!(*span =>
-            fn __assert_is_foreign<_V>(_: &mut #wren_crate::Context<_V, #wren_crate::context::Foreign>) {}
-            __assert_is_foreign(&mut context);
-        )
-    } else {
-        quote!()
-    };
+    // This makes sure the errors from to_output are spanned to the context arg if it
+    // exists, and allows type assertions without having a specific assertion
+    let to_output = {
+        let span = if let Some((span, _)) = &args.context_type {
+            *span
+        } else {
+            Span::call_site()
+        };
 
+        quote_spanned!(span =>
+            .to_output(&mut context);
+        )
+    };
     let internal_function_name = internal_function_name(name);
 
     Ok(quote!(
@@ -198,13 +203,15 @@ pub fn foreign_static_method(input: &ItemFn) -> syn::Result<TokenStream> {
         fn #internal_function_name #generics(
             mut context: #context_type
         ) {
-            use #wren_crate::{GetValue, SetValue};
-            #type_assertion
+            use #wren_crate::{GetValue, SetValue, context::ForeignCallOutput};
 
             unsafe {
                 #(#arg_get_slot)*
-                #name(#context_ref #(#arg_names),*)
-                    .set_slot(&mut context, 0);
+                let output = &#name(#context_ref #(#arg_names),*)#to_output
+
+                if let Some(output) = output {
+                    output.set_slot(&mut context, 0);
+                }
             }
         }
     ))

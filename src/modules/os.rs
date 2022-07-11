@@ -21,7 +21,7 @@ pub fn init_module<'wren>() -> Module<'wren> {
     process_class
         .static_methods
         .insert("version", foreign!(version));
-    process_class.static_methods.insert("cwd", cwd);
+    process_class.static_methods.insert("cwd", foreign!(cwd));
     process_class.static_methods.insert("pid", foreign!(pid));
     process_class.static_methods.insert("ppid", ppid);
 
@@ -61,14 +61,11 @@ fn version() -> std::ffi::CString {
     std::ffi::CString::from_vec_with_nul(VERSION.to_vec()).expect("Version string should be valid")
 }
 
-fn cwd(mut vm: Context) {
+#[foreign_static_method]
+fn cwd<'a>() -> Result<&'a str, &'a str> {
     let dir = current_dir();
-
-    if let Ok(dir) = dir {
-        vm.set_return_value(&dir.to_string_lossy().as_ref());
-    } else {
-        vm.abort_fiber("Cannot get current working directory.");
-    }
+    dir.map(|dir| dir.to_string_lossy().as_ref())
+        .map_err(|_| "Cannot get current working directory.")
 }
 
 #[foreign_static_method]

@@ -21,19 +21,33 @@ fn foreign_test3(context: &mut Context<'_, Foreign>, a: f64) -> f64 {
     a
 }
 
+#[foreign_static_method]
+fn foreign_test4<'a>() -> Result<String, &'a str> {
+    Err("This thing failed or something")
+}
+
 fn main() {
     let (mut vm, test) = create_test_vm(
         "class Test {
         foreign static foreignTest(a, b, c)
         foreign static foreignTest2(a, b, c)
         foreign static foreignTest3(a)
+        foreign static foreignTest4()
         static useForeignTest() { foreignTest(1, 2, 3) }
         static useForeignTest2() { foreignTest2(\"One\", \"Two\", \"Three\") }
+        static useForeignTest4() {
+            var result = Fiber.new {
+                foreignTest4()
+            }.try()
+
+            return result
+        }
     }",
         |f| {
             f.set_static_foreign_method("foreignTest(_,_,_)", foreign!(foreign_test));
             f.set_static_foreign_method("foreignTest2(_,_,_)", foreign!(foreign_test2));
             f.set_static_foreign_method("foreignTest3(_)", foreign!(foreign_test3));
+            f.set_static_foreign_method("foreignTest4()", foreign!(foreign_test4));
         },
     );
 
@@ -43,5 +57,6 @@ fn main() {
         test.useForeignTest() == Ok(6.0)
         test.useForeignTest2() == Ok("OneTwoThree".to_string())
         test.foreignTest3(1.0) == Ok(1.0)
+        test.useForeignTest4() == Ok("This thing failed or something".to_string())
     });
 }
