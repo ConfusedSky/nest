@@ -8,7 +8,9 @@
 - [ ] Figure out a way to allow calling back into wren from a foreign method
   - That is by default illegal but we want to be able to call wren methods when we are
     validating our methods
-  - Currently this can be done by
+    - This may not be true anymore, if we can use reflection from the C API this should not be a huge deal
+  - Currently this can be done by using the scheduler without a
+    promise
 - [x] Create try_get for safe access of values
 - [x] Add unknown location because abort fiber is only usable from within a foreign context
 - [ ] Test at compile time that all foreign methods and classes are defined and hooked up
