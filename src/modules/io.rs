@@ -1,21 +1,21 @@
-use crate::Context;
+use wren_macros::{foreign, foreign_static_method};
 
 use super::{source_file, Class, Module};
 use std::io::{stdout, Write};
 
 pub fn init_module<'wren>() -> Module<'wren> {
     let mut stdout_class = Class::new();
-    stdout_class.static_methods.insert("flush()", flush);
+    stdout_class
+        .static_methods
+        .insert("flush()", foreign!(flush));
 
-    let mut timer_module = Module::new(source_file!("io.wren"));
-    timer_module.classes.insert("Stdout", stdout_class);
+    let mut io_module = Module::new(source_file!("io.wren"));
+    io_module.classes.insert("Stdout", stdout_class);
 
-    timer_module
+    io_module
 }
 
-fn flush(mut vm: Context) {
-    match stdout().flush() {
-        Ok(_) => vm.set_return_value(&()),
-        Err(_) => vm.abort_fiber("Stdout failed to flush"),
-    }
+#[foreign_static_method]
+fn flush() -> Result<(), &'static str> {
+    stdout().flush().map_err(|_| "Stdout failed to flush")
 }

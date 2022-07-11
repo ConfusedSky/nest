@@ -35,7 +35,7 @@
 //!   Make sure the error appears at the return value [ ] [ ]
 //!   Create a custom error message for a bad return value type [ ] [ ]
 //!
-//! - Use `Result<T: SetValue, String>` as a shorthand to be able to abort the calling fiber [ ] [ ]
+//! - Use `Result<T: SetValue, String>` as a shorthand to be able to abort the calling fiber [x] [x]
 //!
 //! - Add a trait that modules can implement that allows them to be accessed by the VM
 //!   so we can support instance methods for modules [ ] [ ]
@@ -46,8 +46,8 @@ use proc_macro2::{Ident, Span, TokenStream};
 use proc_macro_crate::{crate_name, FoundCrate};
 use quote::{quote, quote_spanned};
 use syn::{
-    punctuated::Punctuated, spanned::Spanned, FnArg, ItemFn, LitInt, Pat, PatType, Token, Type,
-    TypeReference,
+    punctuated::Punctuated, spanned::Spanned, FnArg, ItemFn, LitInt, Pat, PatType, PathArguments,
+    Token, Type, TypeReference,
 };
 
 struct Arguments {
@@ -81,10 +81,21 @@ impl Arguments {
     fn get_slot(&self) -> impl Iterator<Item = TokenStream> + '_ {
         self.args.iter().enumerate().map(|(i, pattern)| {
             let arg_name = &pattern.pat;
-            let arg_type = &pattern.ty;
+            let mut arg_type = *pattern.ty.clone();
             // Start at 1 instead of 0 to make sure that we read the arguments
             // rather than the Class
             let i = LitInt::new(&(i + 1).to_string(), Span::call_site());
+
+            // Change type parameters to use turbofish when calling
+            // get_slot because it is in the expression position
+            if let Type::Path(ref pat) = &arg_type {
+                let ident = &pat.path.segments[0].ident;
+                let arguments = &pat.path.segments[0].arguments;
+
+                if *arguments != PathArguments::None {
+                    arg_type = syn::parse_quote!(#ident::#arguments);
+                }
+            }
 
             quote_spanned!(
                 pattern.span() =>
@@ -166,7 +177,8 @@ pub fn foreign_static_method(input: &ItemFn) -> syn::Result<TokenStream> {
     let arg_get_slot = args.get_slot();
     let context_ref = args.context_ref();
     let generics = if args.context_type.is_some() {
-        quote!()
+        let (input_generics, _, _) = input.sig.generics.split_for_impl();
+        quote!(#input_generics)
     } else {
         quote!(<'wren, V: #wren_crate::VmUserData<'wren, V>>)
     };
