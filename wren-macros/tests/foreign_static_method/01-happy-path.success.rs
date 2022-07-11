@@ -22,8 +22,13 @@ fn foreign_test3(context: &mut Context<'_, Foreign>, a: f64) -> f64 {
 }
 
 #[foreign_static_method]
-fn foreign_test4<'a>() -> Result<String, &'a str> {
+fn foreign_test4<'a>() -> Result<&'a str, &'a str> {
     Err("This thing failed or something")
+}
+
+#[foreign_static_method]
+fn foreign_test5<'a>() -> &'a str {
+    "This is a test str, since this was failing as well"
 }
 
 fn main() {

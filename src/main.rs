@@ -22,7 +22,7 @@ macro_rules! create_trait_alias {
     };
 }
 
-create_trait_alias!(WrenGet<'wren, L: Location>, wren::GetValue<'wren, L>);
+create_trait_alias!(WrenGet<'wren, L: Location>, wren::SetValue<'wren, L>);
 create_trait_alias!(WrenSet<'wren, L: Location>, wren::SetValue<'wren, L>);
 create_trait_alias!(WrenGetArgs<'wren, L: Location>, wren::GetArgs<'wren, L>);
 create_trait_alias!(WrenSetArgs<'wren, L: Location>, wren::SetArgs<'wren, L>);

@@ -62,10 +62,10 @@ fn version() -> std::ffi::CString {
 }
 
 #[foreign_static_method]
-fn cwd<'a>() -> Result<&'a str, &'a str> {
-    let dir = current_dir();
-    dir.map(|dir| dir.to_string_lossy().as_ref())
-        .map_err(|_| "Cannot get current working directory.")
+fn cwd<'a>() -> Result<String, &'a str> {
+    let dir = current_dir().map_err(|_| "Cannot get current working directory.")?;
+
+    Ok(dir.to_string_lossy().to_string())
 }
 
 #[foreign_static_method]

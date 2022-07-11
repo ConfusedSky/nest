@@ -456,12 +456,12 @@ pub trait ForeignCallOutput: Sized {
     fn to_output<T>(self, context: &mut Context<T, Foreign>) -> Option<Self::Output>;
 }
 
-impl<'wren, S: AsRef<str>, G: GetValue<'wren, Foreign>> ForeignCallOutput
-    for std::result::Result<G, S>
+impl<'wren, S: AsRef<str>, Set: SetValue<'wren, Foreign>> ForeignCallOutput
+    for std::result::Result<Set, S>
 {
-    type Output = G;
+    type Output = Set;
 
-    fn to_output<T>(self, context: &mut Context<T, Foreign>) -> Option<Self::Output> {
+    fn to_output<'a, T>(self, context: &mut Context<T, Foreign>) -> Option<Self::Output> {
         match self {
             Ok(v) => Some(v),
             Err(s) => {
@@ -472,8 +472,8 @@ impl<'wren, S: AsRef<str>, G: GetValue<'wren, Foreign>> ForeignCallOutput
     }
 }
 
-impl<'wren, G: GetValue<'wren, Foreign>> ForeignCallOutput for G {
-    type Output = G;
+impl<'wren, S: SetValue<'wren, Foreign>> ForeignCallOutput for S {
+    type Output = S;
 
     fn to_output<T>(self, _context: &mut Context<T, Foreign>) -> Option<Self::Output> {
         Some(self)
