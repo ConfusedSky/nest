@@ -71,13 +71,19 @@ impl<'wren> wren::VmUserData<'wren, MyUserData<'wren>> for MyUserData<'wren> {
     }
 }
 
+// This function exists so that we don't abort early when we want to return an exit code
+// this way everything still unwinds and we get to return an exit code
 fn main() {
+    std::process::exit(program_main());
+}
+
+fn program_main() -> i32 {
     // There is always the executables name which we can skip
     let module: Option<String> = env::args().nth(1);
 
     if module.is_none() {
         eprintln!("Please pass in the name of a script file to get started");
-        return;
+        return 1;
     }
 
     let module = module.unwrap();
@@ -92,7 +98,7 @@ fn main() {
             "Ensure `{}` is a valid UTF-8 text file to continue",
             &module
         );
-        return;
+        return 1;
     }
     let mut source = source.unwrap();
 
@@ -141,4 +147,6 @@ fn main() {
         let mut buf = String::new();
         stdin().read_line(&mut buf).unwrap();
     }
+
+    0
 }
