@@ -86,8 +86,20 @@ fn main() {
         module_path.set_extension("wren");
     }
 
-    let source = fs::read_to_string(&module_path)
+    let mut source = fs::read_to_string(&module_path)
         .unwrap_or_else(|_| panic!("Ensure {} is a valid module name to continue", &module));
+
+    let mut lines = source.lines();
+    // Add shebang support without breaking existing attributes
+    if let Some(first_line) = lines.next() {
+        // We want to check for the shebang but also we want to check for / characters
+        // so we can differentiate between a valid attribute and a shebang statement
+        if first_line.starts_with("#!") && first_line.contains('/') {
+            // If the first line is a shebang then drop (which we did by calling next on line 94)
+            // the first line and only take the rest
+            source = lines.collect();
+        }
+    }
 
     let user_data = MyUserData::default();
     let mut vm = wren::Vm::new(user_data);
