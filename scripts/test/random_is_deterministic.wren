@@ -5,7 +5,7 @@ import "random" for Random
 // value
 var random = Random.new([12, 345, 7])
 System.print(random.float(0))     // expect: 0
-System.print(random.float(100))   // expect:  58.0689036433
+System.print(random.float(100))   // expect: 58.0689036433
 System.print(random.float(-100))  // expect: -96.948249553706
 
 random = Random.new([12, 345, 7])

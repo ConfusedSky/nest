@@ -49,3 +49,25 @@ class Example {
 }
 
 Example.test()
+
+// expect: {
+// expect:   null: {
+// expect:     test: [null, null, value]
+// expect:   },
+// expect:   group: {
+// expect:     test: [null, value]
+// expect:   }
+// expect: }
+// expect: {
+// expect:   static testCall(_,_,_,_): {
+// expect:     export: {
+// expect:       name: [test_call],
+// expect:       arg: [&str, &str, &str, &str]
+// expect:     }
+// expect:   },
+// expect:   method(): {
+// expect:     null: {
+// expect:       test: [value]
+// expect:     }
+// expect:   }
+// expect: }

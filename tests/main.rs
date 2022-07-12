@@ -1,4 +1,5 @@
 use assert_cmd::prelude::*; // Add methods on commands
+use itertools::Itertools;
 use predicates::prelude::*; // Used for writing assertions
 use std::{borrow::Cow, fs::read_to_string, path::Path, process::Command}; // Run programs
 
@@ -43,8 +44,7 @@ fn test_script(script: &str) -> Result<(), Box<dyn std::error::Error>> {
     ordered_expectations.extend(raw_expectations);
     let expectations: Vec<String> = ordered_expectations
         .into_iter()
-        .filter_map(|x| x.split(": ").nth(1).map(str::to_string))
-        .map(|s| s.trim().to_string())
+        .map(|x| x.split(": ").skip(1).join(": "))
         .collect();
     let mut expectations = expectations.join("\n");
     if !expectations.is_empty() {

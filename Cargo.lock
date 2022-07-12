@@ -739,6 +739,7 @@ dependencies = [
  "assert_cmd",
  "criterion",
  "dirs",
+ "itertools",
  "predicates",
  "tokio",
  "wren",
