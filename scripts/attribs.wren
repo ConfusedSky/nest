@@ -12,32 +12,33 @@ class Example {
 
     static printObject(o, depth) {
         if (o is Map) {
-            this.pprint(o, depth+1)
+            return pprint(o, depth+1)
         } else {
-            System.write(o)
+            return o.toString
         }
     }
 
     static pprint(map, depth) {
-        System.print("{")
+        var output = "{\n"
 
         for (entry in map) {
-            System.write("  "*(depth + 1) + entry.key.toString + ": ")
-            this.printObject(entry.value, depth)
-            System.print(",")
+            output = output + "  "*(depth + 1) + entry.key.toString + ": "
+            output = output + printObject(entry.value, depth)
+            output = output + ",\n"
         }
 
-        System.write("  "*depth + "}")
+        return output + "  "*depth + "}"
     }
 
     static pprint(map) { 
-        this.pprint(map, 0)
-        System.print()
+        return pprint(map, 0)
     }
 
     static test() {
-        this.pprint(attributes.self)
-        this.pprint(attributes.methods)
+        var self = pprint(attributes.self)
+        var methods = pprint(attributes.methods)
+        System.print(self)
+        System.print(methods)
     }
 
     //!place_generated
