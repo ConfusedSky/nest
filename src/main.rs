@@ -76,7 +76,7 @@ fn main() {
     let module: Option<String> = env::args().nth(1);
 
     if module.is_none() {
-        println!("Please pass in the name of a script file to get started");
+        eprintln!("Please pass in the name of a script file to get started");
         return;
     }
 
@@ -86,8 +86,15 @@ fn main() {
         module_path.set_extension("wren");
     }
 
-    let mut source = fs::read_to_string(&module_path)
-        .unwrap_or_else(|_| panic!("Ensure {} is a valid module name to continue", &module));
+    let source = fs::read_to_string(&module_path);
+    if source.is_err() {
+        eprintln!(
+            "Ensure `{}` is a valid UTF-8 text file to continue",
+            &module
+        );
+        return;
+    }
+    let mut source = source.unwrap();
 
     let mut lines = source.lines();
     // Add shebang support without breaking existing attributes
@@ -98,6 +105,9 @@ fn main() {
             // If the first line is a shebang then drop (which we did by calling next on line 94)
             // the first line and only take the rest
             source = lines.collect::<Vec<_>>().join("\n");
+            // Make sure the line number lines up with the source file
+            // to make debugging easier
+            source = "\n".to_string() + &source;
         }
     }
 
