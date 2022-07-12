@@ -1,3 +1,4 @@
+#!/usr/bin/env rust_wren
 #!test
 #!test
 #!test=value

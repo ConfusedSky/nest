@@ -97,7 +97,7 @@ fn main() {
         if first_line.starts_with("#!") && first_line.contains('/') {
             // If the first line is a shebang then drop (which we did by calling next on line 94)
             // the first line and only take the rest
-            source = lines.collect();
+            source = lines.collect::<Vec<_>>().join("\n");
         }
     }
 
