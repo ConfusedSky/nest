@@ -1,4 +1,4 @@
-#!/usr/bin/env rust_wren
+#!/usr/bin/env -S cargo run --release
 #!test
 #!test
 #!test=value
