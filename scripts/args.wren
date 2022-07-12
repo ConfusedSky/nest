@@ -7,7 +7,13 @@ System.print(Process.version)
 System.print(Process.cwd)
 System.print(Process.pid)
 
+var ppid = Fiber.new {
+    return Process.ppid
+}.try()
+System.print(ppid)
+
 System.print(Platform.isPosix)
 System.print(Platform.name)
 System.print(Platform.homePath)
+
 Stdout.flush()

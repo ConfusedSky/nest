@@ -71,6 +71,12 @@ fn pid() -> f64 {
 }
 
 #[foreign_static_method]
-const fn ppid() -> Result<(), &'static str> {
-    Err("Unimplemented!")
+fn ppid() -> Result<f64, &'static str> {
+    #[cfg(target_family = "unix")]
+    let result = Ok(std::os::unix::process::parent_id().into());
+
+    #[cfg(not(target_family = "unix"))]
+    let result = Err("PPID is not implemented outside of unix based operating systems!");
+
+    result
 }
