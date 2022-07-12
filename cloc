@@ -1,0 +1,2 @@
+cloc --fullpath --not-match-f target --by-file --include-ext=rs .
+
