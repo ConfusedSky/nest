@@ -26,13 +26,11 @@ class Example {
     }
 
     static pprint(map, depth) {
-        var output = "{\n"
-
         var mapper = Fn.new {|entry| printEntry(entry, depth)}
 
-        output = output + map.map(mapper).join(",\n") + "\n"
-
-        return output + spaces(depth) + "}"
+        return "{\n" +
+            map.map(mapper).join(",\n") + "\n" +
+            spaces(depth) + "}"
     }
 
     static pprint(map) { 
