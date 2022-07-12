@@ -18,16 +18,20 @@ class Example {
         }
     }
 
+    static spaces(depth) { "  "*depth }
+
+    static printEntry(entry, depth) { 
+        return spaces(depth+1) + entry.key.toString + ": " + printObject(entry.value, depth)
+    }
+
     static pprint(map, depth) {
         var output = "{\n"
 
-        for (entry in map) {
-            output = output + "  "*(depth + 1) + entry.key.toString + ": "
-            output = output + printObject(entry.value, depth)
-            output = output + ",\n"
-        }
+        var mapper = Fn.new {|entry| printEntry(entry, depth)}
 
-        return output + "  "*depth + "}"
+        output = output + map.map(mapper).join(",\n") + "\n"
+
+        return output + spaces(depth) + "}"
     }
 
     static pprint(map) { 
