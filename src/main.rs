@@ -86,6 +86,7 @@ fn program_main() -> i32 {
         return 1;
     }
 
+    // Note this wont panic becuase we checked `is_none` above
     let module = module.unwrap();
     let mut module_path = PathBuf::from(&module);
     if module_path.extension().is_none() {
@@ -100,6 +101,7 @@ fn program_main() -> i32 {
         );
         return 1;
     }
+    // Note this wont panic becuase we checked `is_err` above
     let mut source = source.unwrap();
 
     let mut lines = source.lines();
