@@ -178,14 +178,15 @@ impl<'wren> Scheduler<'wren> {
 }
 
 fn capture_methods<'wren>(mut vm: Context<'wren>) {
-    use wren::cstr;
     let class = vm
         .get_variable("scheduler", "Scheduler", 0)
         .expect("Scheduler variable hasn't been defined");
 
-    let resume_waiting = vm.make_call_handle(cstr!("resumeWaitingFibers_()"));
-    let has_next = vm.make_call_handle(cstr!("hasNext_"));
-    let run_next_scheduled = vm.make_call_handle(cstr!("runNextScheduled_()"));
+    // Panic Safety
+    // These shouldn't fail because they don't have interior nul bytes
+    let resume_waiting = vm.make_call_handle_str("resumeWaitingFibers_()").unwrap();
+    let has_next = vm.make_call_handle_str("hasNext_").unwrap();
+    let run_next_scheduled = vm.make_call_handle_str("runNextScheduled_()").unwrap();
 
     let scheduler: Scheduler<'wren> = Scheduler {
         queue: Vec::default(),

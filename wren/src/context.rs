@@ -1,5 +1,5 @@
 use std::{
-    ffi::{CStr, CString, FromBytesWithNulError},
+    ffi::{CStr, CString, FromBytesWithNulError, NulError},
     marker::PhantomData,
     ops::{Deref, DerefMut},
     ptr::NonNull,
@@ -369,6 +369,17 @@ impl<'wren, L: Location> Context<'wren, NoTypeInfo, L> {
 
     pub fn make_call_handle(&mut self, signature: &CStr) -> CallHandle<'wren> {
         CallHandle::new_from_signature(self.as_unknown_mut(), signature)
+    }
+
+    /// # Errors
+    /// If passed in string has interior NUL bytes
+    /// this will return a `NulError`
+    pub fn make_call_handle_str<S: AsRef<str>>(
+        &mut self,
+        signature: S,
+    ) -> std::result::Result<CallHandle<'wren>, NulError> {
+        let cstr = CString::new(signature.as_ref())?;
+        Ok(self.make_call_handle(&cstr))
     }
 
     /// Gets values off the stack matching the types passed in for `Args`
