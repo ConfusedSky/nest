@@ -230,5 +230,5 @@ pub fn foreign_static_method(input: &ItemFn) -> syn::Result<TokenStream> {
 }
 
 pub fn internal_function_name(name: &Ident) -> Ident {
-    quote::format_ident!("__wren_internal_{}", name)
+    quote::format_ident!("foreign_{}", name)
 }

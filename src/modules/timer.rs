@@ -1,5 +1,5 @@
 use tokio::time::{sleep, Duration};
-use wren_macros::{foreign, foreign_static_method};
+use wren_macros::foreign_static_method;
 
 use crate::Context;
 use wren;
@@ -11,7 +11,7 @@ pub fn init_module<'wren>() -> Module<'wren> {
     let mut timer_class = Class::new();
     timer_class
         .static_methods
-        .insert("startTimer_(_,_)", foreign!(start));
+        .insert("startTimer_(_,_)", foreign_start);
 
     let mut timer_module = Module::new(source_file!("timer.wren"));
     timer_module.classes.insert("Timer", timer_class);

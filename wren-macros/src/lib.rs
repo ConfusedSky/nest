@@ -8,8 +8,6 @@ mod foreign_static_method;
 mod generate_tests;
 mod to_signature;
 
-use foreign_static_method::internal_function_name;
-use quote::quote;
 use syn::{parse_macro_input, ItemFn};
 use to_signature::{create_signature, ToSignatureInput};
 
@@ -29,13 +27,6 @@ pub fn call_signature(input: proc_macro::TokenStream) -> proc_macro::TokenStream
 pub fn generate_tests(_input: proc_macro::TokenStream) -> proc_macro::TokenStream {
     let output = generate_tests::generate_tests().unwrap_or_else(syn::Error::into_compile_error);
     output.into()
-}
-
-#[proc_macro]
-pub fn foreign(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
-    let input = parse_macro_input!(input as syn::Ident);
-    let output = internal_function_name(&input);
-    quote!(#output).into()
 }
 
 #[proc_macro_attribute]

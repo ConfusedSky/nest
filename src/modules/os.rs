@@ -1,5 +1,5 @@
 use wren::VERSION;
-use wren_macros::{foreign, foreign_static_method};
+use wren_macros::foreign_static_method;
 
 use super::{source_file, Class, Module};
 use std::env::args;
@@ -9,22 +9,22 @@ pub fn init_module<'wren>() -> Module<'wren> {
     let mut platform_class = Class::new();
     platform_class
         .static_methods
-        .insert("isPosix", foreign!(is_posix));
-    platform_class.static_methods.insert("name", foreign!(name));
+        .insert("isPosix", foreign_is_posix);
+    platform_class.static_methods.insert("name", foreign_name);
     platform_class
         .static_methods
-        .insert("homePath", foreign!(home_path));
+        .insert("homePath", foreign_home_path);
 
     let mut process_class = Class::new();
     process_class
         .static_methods
-        .insert("allArguments", foreign!(all_arguments));
+        .insert("allArguments", foreign_all_arguments);
     process_class
         .static_methods
-        .insert("version", foreign!(version));
-    process_class.static_methods.insert("cwd", foreign!(cwd));
-    process_class.static_methods.insert("pid", foreign!(pid));
-    process_class.static_methods.insert("ppid", foreign!(ppid));
+        .insert("version", foreign_version);
+    process_class.static_methods.insert("cwd", foreign_cwd);
+    process_class.static_methods.insert("pid", foreign_pid);
+    process_class.static_methods.insert("ppid", foreign_ppid);
 
     let mut module = Module::new(source_file!("os.wren"));
     module.classes.insert("Process", process_class);

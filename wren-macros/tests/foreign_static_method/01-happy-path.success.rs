@@ -2,7 +2,7 @@
 
 use wren::context::Foreign;
 use wren::test::{call_test_case, create_test_vm, Context};
-use wren_macros::{foreign, foreign_static_method};
+use wren_macros::foreign_static_method;
 
 #[foreign_static_method]
 fn foreign_test(a: f64, b: f64, c: f64) -> f64 {
@@ -49,10 +49,10 @@ fn main() {
         }
     }",
         |f| {
-            f.set_static_foreign_method("foreignTest(_,_,_)", foreign!(foreign_test));
-            f.set_static_foreign_method("foreignTest2(_,_,_)", foreign!(foreign_test2));
-            f.set_static_foreign_method("foreignTest3(_)", foreign!(foreign_test3));
-            f.set_static_foreign_method("foreignTest4()", foreign!(foreign_test4));
+            f.set_static_foreign_method("foreignTest(_,_,_)", foreign_foreign_test);
+            f.set_static_foreign_method("foreignTest2(_,_,_)", foreign_foreign_test2);
+            f.set_static_foreign_method("foreignTest3(_)", foreign_foreign_test3);
+            f.set_static_foreign_method("foreignTest4()", foreign_foreign_test4);
         },
     );
 

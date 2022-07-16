@@ -1,13 +1,11 @@
-use wren_macros::{foreign, foreign_static_method};
+use wren_macros::foreign_static_method;
 
 use super::{source_file, Class, Module};
 use std::io::{stdout, Write};
 
 pub fn init_module<'wren>() -> Module<'wren> {
     let mut stdout_class = Class::new();
-    stdout_class
-        .static_methods
-        .insert("flush()", foreign!(flush));
+    stdout_class.static_methods.insert("flush()", foreign_flush);
 
     let mut io_module = Module::new(source_file!("io.wren"));
     io_module.classes.insert("Stdout", stdout_class);
