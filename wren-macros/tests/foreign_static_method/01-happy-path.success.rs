@@ -34,20 +34,20 @@ fn test5<'a>() -> &'a str {
 fn main() {
     let (mut vm, test) = create_test_vm(
         "class Test {
-        foreign static foreignTest(a, b, c)
-        foreign static foreignTest2(a, b, c)
-        foreign static foreignTest3(a)
-        foreign static foreignTest4()
-        static useForeignTest() { foreignTest(1, 2, 3) }
-        static useForeignTest2() { foreignTest2(\"One\", \"Two\", \"Three\") }
-        static useForeignTest4() {
-            var result = Fiber.new {
-                foreignTest4()
-            }.try()
+            foreign static foreignTest(a, b, c)
+            foreign static foreignTest2(a, b, c)
+            foreign static foreignTest3(a)
+            foreign static foreignTest4()
+            static useForeignTest() { foreignTest(1, 2, 3) }
+            static useForeignTest2() { foreignTest2(\"One\", \"Two\", \"Three\") }
+            static useForeignTest4() {
+                var result = Fiber.new {
+                    foreignTest4()
+                }.try()
 
-            return result
-        }
-    }",
+                return result
+            }
+        }",
         |f| {
             f.set_static_foreign_method("foreignTest(_,_,_)", foreign_test);
             f.set_static_foreign_method("foreignTest2(_,_,_)", foreign_test2);

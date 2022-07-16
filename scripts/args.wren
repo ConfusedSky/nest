@@ -1,3 +1,4 @@
+#!/usr/bin/env -S cargo run --release
 import "os" for Process, Platform
 import "io" for Stdout
 
