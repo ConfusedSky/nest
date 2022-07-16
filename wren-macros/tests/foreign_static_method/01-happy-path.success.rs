@@ -5,29 +5,29 @@ use wren::test::{call_test_case, create_test_vm, Context};
 use wren_macros::foreign_static_method;
 
 #[foreign_static_method]
-fn foreign_test(a: f64, b: f64, c: f64) -> f64 {
+fn test(a: f64, b: f64, c: f64) -> f64 {
     a + b + c
 }
 
 #[foreign_static_method]
-fn foreign_test2(a: String, b: String, c: String) -> String {
+fn test2(a: String, b: String, c: String) -> String {
     a + &b + &c
 }
 
 #[foreign_static_method]
-fn foreign_test3(context: &mut Context<'_, Foreign>, a: f64) -> f64 {
+fn test3(context: &mut Context<'_, Foreign>, a: f64) -> f64 {
     assert!(context.get_user_data_mut().get_output().is_empty());
 
     a
 }
 
 #[foreign_static_method]
-fn foreign_test4<'a>() -> Result<&'a str, &'a str> {
+fn test4<'a>() -> Result<&'a str, &'a str> {
     Err("This thing failed or something")
 }
 
 #[foreign_static_method]
-fn foreign_test5<'a>() -> &'a str {
+fn test5<'a>() -> &'a str {
     "This is a test str, since this was failing as well"
 }
 
@@ -49,10 +49,10 @@ fn main() {
         }
     }",
         |f| {
-            f.set_static_foreign_method("foreignTest(_,_,_)", foreign_foreign_test);
-            f.set_static_foreign_method("foreignTest2(_,_,_)", foreign_foreign_test2);
-            f.set_static_foreign_method("foreignTest3(_)", foreign_foreign_test3);
-            f.set_static_foreign_method("foreignTest4()", foreign_foreign_test4);
+            f.set_static_foreign_method("foreignTest(_,_,_)", foreign_test);
+            f.set_static_foreign_method("foreignTest2(_,_,_)", foreign_test2);
+            f.set_static_foreign_method("foreignTest3(_)", foreign_test3);
+            f.set_static_foreign_method("foreignTest4()", foreign_test4);
         },
     );
 
