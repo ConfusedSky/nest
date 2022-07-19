@@ -51,7 +51,7 @@ fn test_script(script: &str) -> Result<(), Box<dyn std::error::Error>> {
         expectations += "\n";
     }
 
-    let mut cmd = Command::cargo_bin("rust_wren")?;
+    let mut cmd = Command::cargo_bin("nest")?;
     cmd.arg(script);
     cmd.assert()
         .success()
