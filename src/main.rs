@@ -121,7 +121,7 @@ fn program_main() -> i32 {
     if source.is_err() {
         eprintln!(
             "Ensure `{}` is a valid UTF-8 text file to continue",
-            &module
+            &module_path.to_string_lossy()
         );
         return 1;
     }
