@@ -7,7 +7,8 @@ pub mod timer;
 
 use crate::ForeignMethod;
 use std::collections::HashMap;
-use std::ffi::CStr;
+use std::ffi::{CStr, CString};
+use std::fs;
 
 mod macros {
     #[macro_export]
@@ -51,6 +52,9 @@ impl<'wren> Module<'wren> {
 
 pub struct Modules<'wren> {
     hash_map: HashMap<&'static str, Module<'wren>>,
+    // This is the last CString that has been loaded
+    // we keep a reference to it so wren can compile it
+    last_loaded: Option<CString>,
 }
 
 impl<'wren> Modules<'wren> {
@@ -61,7 +65,10 @@ impl<'wren> Modules<'wren> {
         m.insert("os", os::init_module());
         m.insert("io", io::init_module());
 
-        Modules { hash_map: m }
+        Modules {
+            hash_map: m,
+            last_loaded: None,
+        }
     }
 
     pub fn get_module<S>(&self, name: S) -> Option<&Module<'wren>>
@@ -69,5 +76,16 @@ impl<'wren> Modules<'wren> {
         S: AsRef<str>,
     {
         self.hash_map.get(name.as_ref())
+    }
+
+    pub fn load_module(&mut self, name: &str) -> Option<&CStr> {
+        self.get_module(name)
+            .map(|module| &module.source)
+            .copied()
+            .or_else(|| {
+                let module = fs::read_to_string(name).ok()?;
+                self.last_loaded = CString::new(module).ok();
+                self.last_loaded.as_deref()
+            })
     }
 }

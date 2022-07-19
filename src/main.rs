@@ -7,7 +7,12 @@
 mod modules;
 
 use modules::{scheduler::Scheduler, Modules};
-use std::{env, ffi::CStr, fs, path::PathBuf};
+use std::{
+    env,
+    ffi::CStr,
+    fs,
+    path::{Path, PathBuf},
+};
 use wren::context::{self, Location};
 
 type Context<'wren> = wren::Context<'wren, MyUserData<'wren>, context::Foreign>;
@@ -42,17 +47,36 @@ impl<'wren> Default for MyUserData<'wren> {
 }
 
 impl<'wren> wren::VmUserData<'wren, MyUserData<'wren>> for MyUserData<'wren> {
+    fn resolve_module(&mut self, resolver: &str, name: &str) -> Option<std::ffi::CString> {
+        // If this is a relative import
+        if name.starts_with('.') || name.starts_with("..") {
+            let resolver = Path::new(resolver).parent()?;
+            let name = Path::new(name);
+            let mut full_path = resolver.join(name);
+            full_path.set_extension("wren");
+            if full_path.exists() {
+                full_path
+                    // Canonicalize here so that no matter where a file
+                    // is imported from it should be considered the same module
+                    .canonicalize()
+                    .ok()?
+                    .to_str()
+                    .and_then(|v| std::ffi::CString::new(v).ok())
+            } else {
+                None
+            }
+        } else {
+            std::ffi::CString::new(name).ok()
+        }
+    }
     fn on_error(&mut self, _: Context<'wren>, kind: wren::ErrorKind) {
         wren::user_data::on_error(kind);
     }
     fn on_write(&mut self, _: Context<'wren>, text: &str) {
         print!("{}", text);
     }
-    fn load_module(&mut self, name: &str) -> Option<&'wren CStr> {
-        self.modules
-            .get_module(name)
-            .map(|module| &module.source)
-            .copied()
+    fn load_module(&mut self, name: &str) -> Option<&CStr> {
+        self.modules.load_module(name)
     }
     fn bind_foreign_method(
         &mut self,

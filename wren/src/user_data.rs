@@ -6,9 +6,9 @@ use super::{context, Context, ErrorKind, ForeignMethod};
 // We define empty defaults here so that the user can define what they want
 pub trait UserData<'wren, T> {
     fn resolve_module(&mut self, resolver: &str, name: &str) -> Option<CString> {
-        CString::new(name.to_string()).ok()
+        CString::new(name).ok()
     }
-    fn load_module(&mut self, name: &str) -> Option<&'wren CStr> {
+    fn load_module(&mut self, name: &str) -> Option<&CStr> {
         None
     }
     fn bind_foreign_method(
