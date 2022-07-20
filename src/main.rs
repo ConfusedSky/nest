@@ -151,8 +151,16 @@ fn program_main() -> i32 {
 
     match result {
         Ok(()) => (),
-        Err(wren::InterpretResultErrorKind::Compile) => panic!("COMPILE_ERROR"),
-        Err(wren::InterpretResultErrorKind::Runtime) => panic!("RUNTIME_ERROR"),
+        Err(wren::InterpretResultErrorKind::Compile) => {
+            eprintln!("COMPILE_ERROR");
+            return 1;
+        }
+        Err(wren::InterpretResultErrorKind::Runtime) => {
+            eprintln!("RUNTIME_ERROR");
+            return 1;
+        }
+        // These two are exceptional circumstances so they should still
+        // be hard failures
         Err(wren::InterpretResultErrorKind::IncorrectNumberOfArgsPassed) => {
             panic!("INCORRECT_NUMBER_OF_ARGS_PASSED")
         }
