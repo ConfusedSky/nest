@@ -26,3 +26,4 @@
 - [ ] Look into removing location dependency for GetValue and SetValue since it looks like
       it could be possible to do runtime typechecking and conversion without needing to call
       back into the vm
+- [ ] Make relative imports canonicalize into paths relative to the cwd
