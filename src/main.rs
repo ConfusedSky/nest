@@ -147,7 +147,7 @@ fn program_main() -> i32 {
     let mut vm = wren::Vm::new(user_data);
     let context = vm.get_context();
 
-    let result = context.interpret(module, source);
+    let result = context.interpret(&module_path.to_string_lossy(), source);
 
     match result {
         Ok(()) => (),
