@@ -27,3 +27,4 @@
       it could be possible to do runtime typechecking and conversion without needing to call
       back into the vm
 - [ ] Make relative imports canonicalize into paths relative to the cwd
+      Right now they become absolute paths which makes stack traces harder to read

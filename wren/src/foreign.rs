@@ -3,7 +3,7 @@ use std::mem::MaybeUninit;
 use std::ptr::null;
 use std::{ffi::CStr, mem::transmute_copy};
 
-use ffi::WrenErrorType;
+use ffi::{WrenErrorType, WrenForeignClassMethods};
 use wren_sys as ffi;
 use wren_sys::WrenVM;
 
@@ -144,4 +144,22 @@ where
     config.bindForeignMethodFn = Some(bind_foreign_method::<V>);
 
     config
+}
+
+// We probably want to defer to T to make initialization more efficient here
+// For now we just require a default implementation
+// TODO: Make a trait for initialization and cleanup
+pub const fn default_foreign_class_methods<T: Default>() -> ffi::WrenForeignClassMethods {
+    unsafe extern "C" fn allocate<T: Default>(vm: *mut WrenVM) {
+        let data =
+            ffi::wrenSetSlotNewForeign(vm, 0, 0, std::mem::size_of::<T>().try_into().unwrap());
+        *data.cast() = T::default();
+    }
+    unsafe extern "C" fn finalize<T>(data: *mut std::ffi::c_void) {
+        std::ptr::drop_in_place(data);
+    }
+    ffi::WrenForeignClassMethods {
+        allocate: Some(allocate::<T>),
+        finalize: Some(finalize::<T>),
+    }
 }

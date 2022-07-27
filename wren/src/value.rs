@@ -1,6 +1,10 @@
 #![allow(clippy::module_name_repetitions)]
 
-use std::{ffi::CString, ptr::NonNull};
+use std::{
+    any::{Any, TypeId},
+    ffi::CString,
+    ptr::NonNull,
+};
 
 use wren_sys as ffi;
 
@@ -10,11 +14,16 @@ use super::{
 };
 use enumflags2::{bitflags, make_bitflags, BitFlags};
 
+mod foreign;
+pub use foreign::Foreign as ForeignClass;
+
 #[derive(Debug, PartialEq)]
 pub enum TryGetError<'wren> {
     // If type is incompatible there is still an option to
     // retreive the handle for another reason
     IncompatibleType(Option<Handle<'wren>>),
+    // It is the correct wren type but the foreign type is wrong
+    IncompatibleForeign,
     NoAvailableSlot,
 }
 
@@ -219,6 +228,60 @@ impl<'wren, L: Location> GetValue<'wren, L> for Handle<'wren> {
         Self: Sized,
     {
         Ok(Self::get_slot_unchecked(vm, slot, WrenType::Unknown))
+    }
+}
+
+impl<'wren, T: Any, L: Location> GetValue<'wren, L> for ForeignClass<'wren, T> {
+    const COMPATIBLE_TYPES: BitFlags<WrenType> = make_bitflags!(WrenType::{Foreign});
+
+    unsafe fn get_slot_unchecked(
+        vm: &mut RawContext<'wren, L>,
+        slot: Slot,
+        slot_type: WrenType,
+    ) -> Self {
+        assert!(slot_type == WrenType::Foreign);
+        let data = ffi::wrenGetSlotForeign(vm.as_ptr(), slot);
+        let data = NonNull::new_unchecked(data.cast());
+        Self::new(data)
+    }
+
+    unsafe fn get_slot(vm: &mut RawContext<'wren, L>, slot: Slot) -> Self
+    where
+        Self: Sized,
+    {
+        let foreign = Self::get_slot_unchecked(vm, slot, vm.get_slot_type(slot));
+
+        assert!((foreign.as_ref() as &dyn Any).is::<T>());
+
+        foreign
+    }
+
+    unsafe fn try_get_slot(
+        vm: &mut RawContext<'wren, L>,
+        slot: Slot,
+        get_handle: bool,
+    ) -> TryGetResult<'wren, Self>
+    where
+        Self: Sized,
+    {
+        let slot_type = vm.get_slot_type(slot);
+        if <Self as GetValue<'wren, L>>::COMPATIBLE_TYPES.contains(slot_type) {
+            let foreign = Self::get_slot_unchecked(vm, slot, slot_type);
+
+            let foreign_any = foreign.as_ref() as &dyn Any;
+
+            if foreign_any.is::<T>() {
+                Ok(foreign)
+            } else {
+                Err(TryGetError::IncompatibleForeign)
+            }
+        } else {
+            Err(TryGetError::IncompatibleType(if get_handle {
+                Some(Handle::get_slot_unchecked(vm, slot, slot_type))
+            } else {
+                None
+            }))
+        }
     }
 }
 
