@@ -1,8 +1,8 @@
 // TODO: replace and remove test when we have more foreign types
 import "bigint" for BigInt, Test
 
-System.print(BigInt.ONE) // expect: 1
 System.print(BigInt.ZERO) // expect: 0
+System.print(BigInt.ONE) // expect: 1
 System.print(BigInt.new(10)) // expect: 10
 var b = BigInt.new()
 b.setValue(10)

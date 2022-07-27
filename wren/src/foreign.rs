@@ -182,26 +182,31 @@ impl Default for ForeignClassMethods {
 
 impl ForeignClassMethods {
     #[must_use]
-    pub const fn new<T: 'static + Default>() -> Self {
+    pub const fn new<T: Any + Default>() -> Self {
         Self {
             methods: default_foreign_class_methods::<T>(),
         }
     }
 }
 
+/// # Safety assumes that the class object is already in slot 0
+pub unsafe fn create_new_foreign<T: Any>(vm: *mut WrenVM, value: T) {
+    let location = ffi::wrenSetSlotNewForeign(
+        vm,
+        0,
+        0,
+        std::mem::size_of::<Box<dyn Any>>().try_into().unwrap(),
+    );
+    let data: Box<dyn Any> = Box::new(value);
+    std::ptr::write(location.cast(), data);
+}
+
 // We probably want to defer to T to make initialization more efficient here
 // For now we just require a default implementation
 // TODO: Make a trait for initialization and cleanup
-const fn default_foreign_class_methods<T: 'static + Default>() -> ffi::WrenForeignClassMethods {
-    unsafe extern "C" fn allocate<T: 'static + Default>(vm: *mut WrenVM) {
-        let location = ffi::wrenSetSlotNewForeign(
-            vm,
-            0,
-            0,
-            std::mem::size_of::<Box<dyn Any>>().try_into().unwrap(),
-        );
-        let data: Box<dyn Any> = Box::new(T::default());
-        std::ptr::write(location.cast(), data);
+const fn default_foreign_class_methods<T: Any + Default>() -> ffi::WrenForeignClassMethods {
+    unsafe extern "C" fn allocate<T: Any + Default>(vm: *mut WrenVM) {
+        create_new_foreign(vm, T::default());
     }
     unsafe extern "C" fn finalize(data: *mut std::ffi::c_void) {
         std::ptr::drop_in_place(data.cast::<Box<dyn Any>>());
