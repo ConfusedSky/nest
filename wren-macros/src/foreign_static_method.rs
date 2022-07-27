@@ -41,6 +41,7 @@
 //!   so we can support instance methods for modules [ ] [ ]
 //!   Also that way we don't have to expose the context to foreign functions really at all
 //!
+//! - Allow non context arguments to be passed as references [ ] [ ]
 
 use proc_macro2::{Ident, Span, TokenStream};
 use proc_macro_crate::{crate_name, FoundCrate};
@@ -74,17 +75,36 @@ impl Arguments {
         }
     }
 
-    fn names(&self) -> impl Iterator<Item = &Box<Pat>> {
-        self.args.iter().map(|arg| &arg.pat)
+    fn names(&self) -> impl Iterator<Item = Box<Pat>> + '_ {
+        self.args.iter().map(|arg| {
+            let mut pat = arg.pat.clone();
+
+            // We just want the names here so we remove mutability specifiers
+            if let Pat::Ident(ref mut i) = *pat {
+                i.mutability = None;
+            }
+
+            pat
+        })
     }
 
-    fn get_slot(&self) -> impl Iterator<Item = TokenStream> + '_ {
-        self.args.iter().enumerate().map(|(i, pattern)| {
-            let arg_name = &pattern.pat;
+    fn get_slot(&self, is_static: bool) -> impl Iterator<Item = TokenStream> + '_ {
+        self.args.iter().enumerate().map(move |(i, pattern)| {
+            let mut arg_name = pattern.pat.clone();
             let mut arg_type = *pattern.ty.clone();
+
+            // We just want the names here so we remove mutability specifiers
+            if let Pat::Ident(ref mut pat) = *arg_name {
+                pat.mutability = None;
+            }
+
             // Start at 1 instead of 0 to make sure that we read the arguments
-            // rather than the Class
-            let i = LitInt::new(&(i + 1).to_string(), Span::call_site());
+            // rather than the Class for static methods
+            // otherwise start at 0
+            let i = LitInt::new(
+                &(i + if is_static { 1 } else { 0 }).to_string(),
+                Span::call_site(),
+            );
 
             // Change type parameters to use turbofish when calling
             // get_slot because it is in the expression position
@@ -161,7 +181,7 @@ impl TryFrom<&Punctuated<FnArg, Token![,]>> for Arguments {
     }
 }
 
-pub fn foreign_static_method(input: &ItemFn) -> syn::Result<TokenStream> {
+pub fn foreign_method(input: &ItemFn, is_static: bool) -> syn::Result<TokenStream> {
     let name = &input.sig.ident;
 
     let wren_crate = {
@@ -174,7 +194,7 @@ pub fn foreign_static_method(input: &ItemFn) -> syn::Result<TokenStream> {
 
     let args = Arguments::try_from(&input.sig.inputs)?;
     let arg_names = args.names();
-    let arg_get_slot = args.get_slot();
+    let arg_get_slot = args.get_slot(is_static);
     let context_ref = args.context_ref();
     let generics = if args.context_type.is_some() {
         let (input_generics, _, _) = input.sig.generics.split_for_impl();

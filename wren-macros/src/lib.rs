@@ -35,7 +35,18 @@ pub fn foreign_static_method(
     input: proc_macro::TokenStream,
 ) -> proc_macro::TokenStream {
     let input = parse_macro_input!(input as ItemFn);
-    foreign_static_method::foreign_static_method(&input)
+    foreign_static_method::foreign_method(&input, true)
+        .unwrap_or_else(syn::Error::into_compile_error)
+        .into()
+}
+
+#[proc_macro_attribute]
+pub fn foreign_method(
+    _args: proc_macro::TokenStream,
+    input: proc_macro::TokenStream,
+) -> proc_macro::TokenStream {
+    let input = parse_macro_input!(input as ItemFn);
+    foreign_static_method::foreign_method(&input, false)
         .unwrap_or_else(syn::Error::into_compile_error)
         .into()
 }

@@ -19,7 +19,7 @@ pub use fiber::Fiber;
 pub use foreign::ForeignClassMethods;
 pub use handle::{CallHandle, Handle};
 pub use user_data::UserData as VmUserData;
-pub use value::{GetArgs, GetValue, SetArgs, SetValue, WrenType};
+pub use value::{ForeignClass, GetArgs, GetValue, SetArgs, SetValue, WrenType};
 
 pub use wren_sys::WREN_VERSION_STRING as VERSION;
 

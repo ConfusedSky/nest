@@ -1,2 +1,2 @@
 import "bigint" for BigInt
-BigInt.new()
+var b = BigInt.new()
