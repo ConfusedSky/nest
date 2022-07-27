@@ -27,6 +27,7 @@ name = "foreign_call_benchmarks"
 harness = false
 
 [dependencies]
+num-bigint = "0.4"
 tokio = { version = "1.18.2", features = ["full"] }
 dirs = "4.0.0"
 wren = { path = "./wren" }

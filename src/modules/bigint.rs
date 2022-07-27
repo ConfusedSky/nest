@@ -1,7 +1,7 @@
-use wren::ForeignClassMethods;
+use wren::{ForeignClassMethods, WrenType};
 use wren_macros::foreign_method;
 
-use crate::source_file;
+use crate::{source_file, Context};
 
 use super::{Class, Module};
 use wren::ForeignClass;
@@ -9,36 +9,82 @@ use wren::ForeignClass;
 pub fn init_module<'wren>() -> Module<'wren> {
     let mut bigint_class = Class::new();
     bigint_class.foreign_class_methods = Some(ForeignClassMethods::new::<BigInt>());
-    bigint_class.methods.insert("data", foreign_get_data);
-    bigint_class.methods.insert("data=(_)", foreign_set_data);
+    bigint_class
+        .methods
+        .insert("setValue(_)", foreign_set_value);
+    bigint_class.methods.insert("toString", foreign_to_string);
+
+    let mut test_marker_class = Class::new();
+    test_marker_class.foreign_class_methods = Some(ForeignClassMethods::new::<TestMarker>());
 
     let mut module = Module::new(source_file!("bigint.wren"));
     module.classes.insert("BigInt", bigint_class);
+    module.classes.insert("Test", test_marker_class);
 
     module
 }
 
 #[derive(Default)]
+struct TestMarker(String);
+
+#[derive(Default)]
 struct BigInt {
-    marker_data: u8,
+    data: f64,
+}
+
+enum Data<'wren> {
+    BigInt(ForeignClass<'wren, BigInt>),
+    Number(f64),
 }
 
 #[foreign_method]
-#[allow(clippy::needless_pass_by_value)]
-fn get_data(this: ForeignClass<BigInt>) -> f64 {
-    this.marker_data.into()
+fn set_value(context: &mut Context, mut this: ForeignClass<BigInt>) -> Result<(), String> {
+    internal_set_value(context, &mut this, "setValue")
 }
 
-#[allow(clippy::only_used_in_recursion)]
 #[foreign_method]
-fn set_data(mut this: ForeignClass<BigInt>, new_data: f64) -> Result<f64, &'static str> {
-    if !(0.0_f64..=255.0_f64).contains(&new_data) {
-        return Err("Data must be between 0 and 255!");
+fn to_string(this: ForeignClass<BigInt>) -> String {
+    this.data.to_string()
+}
+
+#[allow(unsafe_code)]
+fn get_data<'wren>(context: &'wren mut Context, method: &'wren str) -> Result<Data<'wren>, String> {
+    use wren::GetValue;
+    // TODO: Implement better reflection so this error message is possible on the
+    // rust side
+    // "BigInt.%(method) expects a BigInt or an Integer got %(value): %(value.type)"
+    let error = format!("BigInt.{method} expects a BigInt or an Integer");
+    let slot_type = unsafe { context.get_slot_type(1) };
+    match slot_type {
+        WrenType::Num => {
+            let slot = unsafe { f64::get_slot_unchecked(context, 1, WrenType::Num) };
+            // We only take integers here
+            if (slot.trunc() - slot).abs() < f64::EPSILON {
+                Ok(Data::Number(slot))
+            } else {
+                Err(error)
+            }
+        }
+        WrenType::Foreign => {
+            let slot = unsafe { ForeignClass::<BigInt>::try_get_slot_unchecked(context, 1) };
+            let slot = slot.map_err(|_| error)?;
+            Ok(Data::BigInt(slot))
+        }
+        _ => Err(error),
     }
-    #[allow(clippy::cast_sign_loss)]
-    #[allow(clippy::cast_possible_truncation)]
-    {
-        this.marker_data = new_data as u8;
+}
+
+fn internal_set_value(
+    context: &mut Context,
+    this: &mut ForeignClass<BigInt>,
+    method: &str,
+) -> Result<(), String> {
+    let data = get_data(context, method)?;
+
+    match data {
+        Data::BigInt(i) => this.data = i.data,
+        Data::Number(i) => this.data = i,
     }
-    Ok(new_data)
+
+    Ok(())
 }

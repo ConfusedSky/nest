@@ -170,7 +170,12 @@ pub struct ForeignClassMethods {
 
 impl Default for ForeignClassMethods {
     fn default() -> Self {
-        unsafe { std::mem::zeroed() }
+        Self {
+            methods: ffi::WrenForeignClassMethods {
+                allocate: None,
+                finalize: None,
+            },
+        }
     }
 }
 

@@ -227,6 +227,29 @@ impl<'wren, L: Location> GetValue<'wren, L> for Handle<'wren> {
     }
 }
 
+impl<'wren, T: Any> ForeignClass<'wren, T> {
+    /// # Safety
+    /// must be called on a valid slot that is already known to
+    /// contain a foreign object
+    ///
+    /// # Errors
+    /// If the foreign contained in the slot is of a wrong type spring an error
+    pub unsafe fn try_get_slot_unchecked<L: Location>(
+        vm: &mut RawContext<'wren, L>,
+        slot: Slot,
+    ) -> TryGetResult<'wren, Self> {
+        let foreign = Self::get_slot_unchecked(vm, slot, WrenType::Foreign);
+
+        let foreign_any = foreign.as_ref() as &dyn Any;
+
+        if foreign_any.is::<T>() {
+            Ok(foreign)
+        } else {
+            Err(TryGetError::IncompatibleForeign)
+        }
+    }
+}
+
 impl<'wren, T: Any, L: Location> GetValue<'wren, L> for ForeignClass<'wren, T> {
     const COMPATIBLE_TYPES: BitFlags<WrenType> = make_bitflags!(WrenType::{Foreign});
 
@@ -262,15 +285,7 @@ impl<'wren, T: Any, L: Location> GetValue<'wren, L> for ForeignClass<'wren, T> {
     {
         let slot_type = vm.get_slot_type(slot);
         if <Self as GetValue<'wren, L>>::COMPATIBLE_TYPES.contains(slot_type) {
-            let foreign = Self::get_slot_unchecked(vm, slot, slot_type);
-
-            let foreign_any = foreign.as_ref() as &dyn Any;
-
-            if foreign_any.is::<T>() {
-                Ok(foreign)
-            } else {
-                Err(TryGetError::IncompatibleForeign)
-            }
+            Self::try_get_slot_unchecked(vm, slot)
         } else {
             Err(TryGetError::IncompatibleType(if get_handle {
                 Some(Handle::get_slot_unchecked(vm, slot, slot_type))

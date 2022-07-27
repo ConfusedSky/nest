@@ -4,6 +4,7 @@ use std::{
     ptr::NonNull,
 };
 
+#[derive(Clone, Copy)]
 pub struct Foreign<'wren, T> {
     data: NonNull<T>,
     // We don't actually own this data, the VM does

@@ -449,7 +449,8 @@ impl<'wren, L: Location> Context<'wren, NoTypeInfo, L> {
 
     /// # Safety
     /// This is unsafe to call on an invalid slot
-    pub(super) unsafe fn get_slot_type(&self, slot: Slot) -> WrenType {
+    #[must_use]
+    pub unsafe fn get_slot_type(&self, slot: Slot) -> WrenType {
         let t = ffi::wrenGetSlotType(self.as_ptr(), slot);
         WrenType::from(t)
     }
