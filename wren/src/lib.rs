@@ -16,6 +16,7 @@ pub mod user_data;
 mod value;
 
 pub use fiber::Fiber;
+pub use foreign::ForeignClassMethods;
 pub use handle::{CallHandle, Handle};
 pub use user_data::UserData as VmUserData;
 pub use value::{GetArgs, GetValue, SetArgs, SetValue, WrenType};

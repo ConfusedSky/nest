@@ -163,6 +163,7 @@ where
     config
 }
 
+#[derive(Copy, Clone)]
 pub struct ForeignClassMethods {
     methods: ffi::WrenForeignClassMethods,
 }
@@ -174,6 +175,7 @@ impl Default for ForeignClassMethods {
 }
 
 impl ForeignClassMethods {
+    #[must_use]
     pub const fn new<T: Default>() -> Self {
         Self {
             methods: default_foreign_class_methods::<T>(),

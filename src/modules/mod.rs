@@ -1,5 +1,6 @@
 #!allow(unsafe_code);
 
+pub mod bigint;
 pub mod io;
 pub mod os;
 pub mod scheduler;
@@ -9,6 +10,7 @@ use crate::ForeignMethod;
 use std::collections::HashMap;
 use std::ffi::{CStr, CString};
 use std::fs;
+use wren::ForeignClassMethods;
 
 mod macros {
     #[macro_export]
@@ -25,6 +27,7 @@ use macros::source_file;
 pub struct Class<'wren> {
     pub methods: HashMap<&'static str, ForeignMethod<'wren>>,
     pub static_methods: HashMap<&'static str, ForeignMethod<'wren>>,
+    pub foreign_class_methods: Option<ForeignClassMethods>,
 }
 
 impl<'wren> Class<'wren> {
@@ -32,6 +35,7 @@ impl<'wren> Class<'wren> {
         Self {
             methods: HashMap::new(),
             static_methods: HashMap::new(),
+            foreign_class_methods: None,
         }
     }
 }
@@ -64,6 +68,7 @@ impl<'wren> Modules<'wren> {
         m.insert("timer", timer::init_module());
         m.insert("os", os::init_module());
         m.insert("io", io::init_module());
+        m.insert("bigint", bigint::init_module());
 
         Modules {
             hash_map: m,

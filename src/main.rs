@@ -93,6 +93,20 @@ impl<'wren> wren::VmUserData<'wren, MyUserData<'wren>> for MyUserData<'wren> {
             class.methods.get(signature).copied()
         }
     }
+    fn bind_foreign_class(&mut self, module: &str, class_name: &str) -> wren::ForeignClassMethods {
+        fn helper(
+            user_data: &mut MyUserData,
+            module: &str,
+            class_name: &str,
+        ) -> Option<wren::ForeignClassMethods> {
+            let module = user_data.modules.get_module(module)?;
+            let class = module.classes.get(class_name)?;
+
+            class.foreign_class_methods
+        }
+
+        helper(self, module, class_name).unwrap_or_default()
+    }
 }
 
 // This function exists so that we don't abort early when we want to return an exit code
