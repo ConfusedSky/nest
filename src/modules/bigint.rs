@@ -24,10 +24,10 @@ pub fn init_module<'wren>() -> Module<'wren> {
     module
 }
 
-#[derive(Default)]
+#[derive(Default, Debug)]
 struct TestMarker(String);
 
-#[derive(Default)]
+#[derive(Default, Debug)]
 struct BigInt {
     data: f64,
 }

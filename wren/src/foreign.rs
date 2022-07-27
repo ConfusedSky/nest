@@ -1,3 +1,4 @@
+use std::any::Any;
 use std::borrow::Cow;
 use std::mem::MaybeUninit;
 use std::ptr::null;
@@ -181,7 +182,7 @@ impl Default for ForeignClassMethods {
 
 impl ForeignClassMethods {
     #[must_use]
-    pub const fn new<T: Default>() -> Self {
+    pub const fn new<T: 'static + Default>() -> Self {
         Self {
             methods: default_foreign_class_methods::<T>(),
         }
@@ -191,17 +192,22 @@ impl ForeignClassMethods {
 // We probably want to defer to T to make initialization more efficient here
 // For now we just require a default implementation
 // TODO: Make a trait for initialization and cleanup
-const fn default_foreign_class_methods<T: Default>() -> ffi::WrenForeignClassMethods {
-    unsafe extern "C" fn allocate<T: Default>(vm: *mut WrenVM) {
-        let data =
-            ffi::wrenSetSlotNewForeign(vm, 0, 0, std::mem::size_of::<T>().try_into().unwrap());
-        *data.cast() = T::default();
+const fn default_foreign_class_methods<T: 'static + Default>() -> ffi::WrenForeignClassMethods {
+    unsafe extern "C" fn allocate<T: 'static + Default>(vm: *mut WrenVM) {
+        let location = ffi::wrenSetSlotNewForeign(
+            vm,
+            0,
+            0,
+            std::mem::size_of::<Box<dyn Any>>().try_into().unwrap(),
+        );
+        let data: Box<dyn Any> = Box::new(T::default());
+        std::ptr::write(location.cast(), data);
     }
-    unsafe extern "C" fn finalize<T>(data: *mut std::ffi::c_void) {
-        std::ptr::drop_in_place(data.cast::<T>());
+    unsafe extern "C" fn finalize(data: *mut std::ffi::c_void) {
+        std::ptr::drop_in_place(data.cast::<Box<dyn Any>>());
     }
     ffi::WrenForeignClassMethods {
         allocate: Some(allocate::<T>),
-        finalize: Some(finalize::<T>),
+        finalize: Some(finalize),
     }
 }

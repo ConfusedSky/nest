@@ -15,16 +15,16 @@ System.print(b)
 System.print(Fiber.new {
     b.setValue(12.5)
 }.try())
-// expect: BigInt.setValue expects a BigInt or an Integer 
+// expect: BigInt.setValue expects a BigInt or an Integer
 
 System.print(Fiber.new {
     b.setValue(Test.new())
     System.print(b)
 }.try())
-// expect: BigInt.setValue expects a BigInt or an Integer 
+// expect: BigInt.setValue expects a BigInt or an Integer
 
 System.print(Fiber.new {
     b.setValue("This is a potato")
     System.print(b)
 }.try())
-// expect: BigInt.setValue expects a BigInt or an Integer 
+// expect: BigInt.setValue expects a BigInt or an Integer

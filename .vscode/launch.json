@@ -8,8 +8,8 @@
             "type": "lldb",
             "request": "launch",
             "name": "Debug",
-            "program": "${workspaceRoot}/target/debug/rust_wren",
-            "args": ["test_scheduler"],
+            "program": "${workspaceRoot}/target/debug/nest",
+            "args": ["scripts/test/bigint_smoke"],
             "cwd": "${workspaceRoot}",
             "sourceLanguages": [
                 "rust"

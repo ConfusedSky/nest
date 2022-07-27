@@ -238,12 +238,16 @@ impl<'wren, T: Any> ForeignClass<'wren, T> {
         vm: &mut RawContext<'wren, L>,
         slot: Slot,
     ) -> TryGetResult<'wren, Self> {
-        let foreign = Self::get_slot_unchecked(vm, slot, WrenType::Foreign);
+        let foreign: *mut Box<dyn Any> = ffi::wrenGetSlotForeign(vm.as_ptr(), slot).cast();
 
-        let foreign_any = foreign.as_ref() as &dyn Any;
+        // There are two levels of indirection here since we need to
+        // follow the pointer then follow the box
+        let foreign_any = &mut **foreign as &mut dyn Any;
+        let data = foreign_any.downcast_mut::<T>();
 
-        if foreign_any.is::<T>() {
-            Ok(foreign)
+        if let Some(data) = data {
+            let data = NonNull::new_unchecked(data);
+            Ok(Self::new(data))
         } else {
             Err(TryGetError::IncompatibleForeign)
         }
@@ -259,20 +263,7 @@ impl<'wren, T: Any, L: Location> GetValue<'wren, L> for ForeignClass<'wren, T> {
         slot_type: WrenType,
     ) -> Self {
         assert!(slot_type == WrenType::Foreign);
-        let data = ffi::wrenGetSlotForeign(vm.as_ptr(), slot);
-        let data = NonNull::new_unchecked(data.cast());
-        Self::new(data)
-    }
-
-    unsafe fn get_slot(vm: &mut RawContext<'wren, L>, slot: Slot) -> Self
-    where
-        Self: Sized,
-    {
-        let foreign = Self::get_slot_unchecked(vm, slot, vm.get_slot_type(slot));
-
-        assert!((foreign.as_ref() as &dyn Any).is::<T>());
-
-        foreign
+        Self::try_get_slot_unchecked(vm, slot).unwrap()
     }
 
     unsafe fn try_get_slot(
