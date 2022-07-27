@@ -3,7 +3,7 @@ use std::mem::MaybeUninit;
 use std::ptr::null;
 use std::{ffi::CStr, mem::transmute_copy};
 
-use ffi::{WrenErrorType, WrenForeignClassMethods};
+use ffi::WrenErrorType;
 use wren_sys as ffi;
 use wren_sys::WrenVM;
 
@@ -81,6 +81,22 @@ unsafe extern "C" fn bind_foreign_method<'wren, V: 'wren + VmUserData<'wren, V>>
     transmute_copy(&method)
 }
 
+unsafe extern "C" fn bind_foreign_class<'wren, V: 'wren + VmUserData<'wren, V>>(
+    vm: *mut WrenVM,
+    module: *const i8,
+    class_name: *const i8,
+) -> wren_sys::WrenForeignClassMethods {
+    let mut context: Context<V, context::Foreign> = Context::new_unchecked(vm);
+    let user_data = context.get_user_data_mut();
+
+    let module = CStr::from_ptr(module).to_string_lossy();
+    let class_name = CStr::from_ptr(class_name).to_string_lossy();
+
+    user_data
+        .bind_foreign_class(module.as_ref(), class_name.as_ref())
+        .methods
+}
+
 unsafe extern "C" fn write_fn<'wren, V: 'wren + VmUserData<'wren, V>>(
     vm: *mut WrenVM,
     text: *const i8,
@@ -142,21 +158,40 @@ where
     config.loadModuleFn = Some(load_module::<V>);
     config.resolveModuleFn = Some(resolve_module::<V>);
     config.bindForeignMethodFn = Some(bind_foreign_method::<V>);
+    config.bindForeignClassFn = Some(bind_foreign_class::<V>);
 
     config
+}
+
+pub struct ForeignClassMethods {
+    methods: ffi::WrenForeignClassMethods,
+}
+
+impl Default for ForeignClassMethods {
+    fn default() -> Self {
+        unsafe { std::mem::zeroed() }
+    }
+}
+
+impl ForeignClassMethods {
+    pub const fn new<T: Default>() -> Self {
+        Self {
+            methods: default_foreign_class_methods::<T>(),
+        }
+    }
 }
 
 // We probably want to defer to T to make initialization more efficient here
 // For now we just require a default implementation
 // TODO: Make a trait for initialization and cleanup
-pub const fn default_foreign_class_methods<T: Default>() -> ffi::WrenForeignClassMethods {
+const fn default_foreign_class_methods<T: Default>() -> ffi::WrenForeignClassMethods {
     unsafe extern "C" fn allocate<T: Default>(vm: *mut WrenVM) {
         let data =
             ffi::wrenSetSlotNewForeign(vm, 0, 0, std::mem::size_of::<T>().try_into().unwrap());
         *data.cast() = T::default();
     }
     unsafe extern "C" fn finalize<T>(data: *mut std::ffi::c_void) {
-        std::ptr::drop_in_place(data);
+        std::ptr::drop_in_place(data.cast::<T>());
     }
     ffi::WrenForeignClassMethods {
         allocate: Some(allocate::<T>),

@@ -1,5 +1,7 @@
 use std::ffi::{CStr, CString};
 
+use crate::foreign::ForeignClassMethods;
+
 use super::{context, Context, ErrorKind, ForeignMethod};
 
 #[allow(unused_variables)]
@@ -22,12 +24,8 @@ pub trait UserData<'wren, T> {
     }
     // Default behavior is to return a struct with fields nulled out
     // so this is fine
-    fn bind_foreign_class(
-        &mut self,
-        module: &str,
-        classname: &str,
-    ) -> wren_sys::WrenForeignClassMethods {
-        unsafe { std::mem::zeroed() }
+    fn bind_foreign_class(&mut self, module: &str, classname: &str) -> ForeignClassMethods {
+        ForeignClassMethods::default()
     }
     fn on_write(&mut self, vm: Context<'wren, T, context::Foreign>, text: &str) {}
     fn on_error(&mut self, vm: Context<'wren, T, context::Foreign>, kind: ErrorKind) {}

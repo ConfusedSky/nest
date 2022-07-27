@@ -1,10 +1,6 @@
 #![allow(clippy::module_name_repetitions)]
 
-use std::{
-    any::{Any, TypeId},
-    ffi::CString,
-    ptr::NonNull,
-};
+use std::{any::Any, ffi::CString, ptr::NonNull};
 
 use wren_sys as ffi;
 
