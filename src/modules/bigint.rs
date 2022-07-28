@@ -1,7 +1,5 @@
 #![allow(unsafe_code)]
 
-use std::ops::Add;
-
 use num_bigint::{BigInt, ToBigInt};
 use wren::{
     context::{Foreign, NoTypeInfo},
@@ -55,12 +53,20 @@ fn set_value<'wren>(
     internal_set_value(context, &mut this, "setValue")
 }
 
-fn add(mut context: Context) {
-    let this = unsafe { ForeignClass::<BigInt>::get_slot(&mut context, 0) };
+fn implement_operator<'wren, B, I>(
+    context: &mut Context<'wren>,
+    method: &'static str,
+    big_int_method: &B,
+    integer_method: &I,
+) where
+    B: Fn(&BigInt, &BigInt) -> BigInt,
+    I: Fn(&BigInt, i64) -> BigInt,
+{
+    let this = unsafe { ForeignClass::<'wren, BigInt>::get_slot(context, 0) };
     let result = {
-        match get_data(&mut context, "+(_)") {
-            Ok(Data::BigInt(i)) => (&*this).add(&*i),
-            Ok(Data::Integer(i)) => (&*this).add(i),
+        match get_data(context, method) {
+            Ok(Data::BigInt(i)) => big_int_method(&*this, &*i),
+            Ok(Data::Integer(i)) => integer_method(&*this, i),
             Err(s) => {
                 context.abort_fiber(s);
                 return;
@@ -68,39 +74,19 @@ fn add(mut context: Context) {
         }
     };
 
-    send_new_foreign(&mut context, result);
+    send_new_foreign(context, result);
+}
+
+fn add(mut context: Context) {
+    implement_operator(&mut context, "+(_)", &|a, b| a + b, &|a, b| a + b);
 }
 
 fn sub(mut context: Context) {
-    let this = unsafe { ForeignClass::<BigInt>::get_slot(&mut context, 0) };
-    let result = {
-        match get_data(&mut context, "-(_)") {
-            Ok(Data::BigInt(ref i)) => this.as_ref() - i.as_ref(),
-            Ok(Data::Integer(i)) => this.as_ref() - i,
-            Err(s) => {
-                context.abort_fiber(s);
-                return;
-            }
-        }
-    };
-
-    send_new_foreign(&mut context, result);
+    implement_operator(&mut context, "-(_)", &|a, b| a - b, &|a, b| a - b);
 }
 
 fn mul(mut context: Context) {
-    let this = unsafe { ForeignClass::<BigInt>::get_slot(&mut context, 0) };
-    let result = {
-        match get_data(&mut context, "*(_)") {
-            Ok(Data::BigInt(ref i)) => this.as_ref() * i.as_ref(),
-            Ok(Data::Integer(i)) => this.as_ref() * i,
-            Err(s) => {
-                context.abort_fiber(s);
-                return;
-            }
-        }
-    };
-
-    send_new_foreign(&mut context, result);
+    implement_operator(&mut context, "*(_)", &|a, b| a * b, &|a, b| a * b);
 }
 
 #[foreign_method]
