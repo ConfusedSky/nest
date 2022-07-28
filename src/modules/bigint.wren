@@ -13,6 +13,9 @@ foreign class BigInt {
     foreign -(value)
     foreign *(value)
     foreign setValue(value)
+
+    foreign static fib(n)
+    foreign static fastfib(n)
 }
 
 foreign class Test {

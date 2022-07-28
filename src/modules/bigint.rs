@@ -22,6 +22,8 @@ pub fn init_module<'wren>() -> Module<'wren> {
     bigint_class.methods.insert("+(_)", add);
     bigint_class.methods.insert("-(_)", sub);
     bigint_class.methods.insert("*(_)", mul);
+    bigint_class.static_methods.insert("fib(_)", fib);
+    bigint_class.static_methods.insert("fastfib(_)", fast_fib);
 
     let mut test_marker_class = Class::new();
     test_marker_class.foreign_class_methods = Some(ForeignClassMethods::new::<TestMarker>());
@@ -123,6 +125,79 @@ fn mul(mut context: Context) {
 #[foreign_method]
 fn to_string(this: ForeignClass<BigInt>) -> String {
     this.to_string()
+}
+
+fn fib(mut context: Context) {
+    let (_, n) = context.try_get_stack::<((), f64)>();
+    let n = match n {
+        #[allow(clippy::cast_possible_truncation)]
+        Ok(n) if (n.trunc() - n).abs() < f64::EPSILON && n > 0.0 => n as usize,
+        _ => {
+            context.abort_fiber("BigInt.fib needs to be passed a positive integer");
+            return;
+        }
+    };
+
+    let mut f0: BigInt = 0u64.to_bigint().unwrap();
+    let mut f1: BigInt = 1u64.to_bigint().unwrap();
+
+    for _ in 0..n {
+        let f2 = f0 + &f1;
+        f0 = std::mem::replace(&mut f1, f2);
+    }
+
+    let (user_data, context) = context.get_user_data_mut_with_context();
+    let class_handle = get_class_handle(context, user_data);
+    match &class_handle {
+        Some(data) => unsafe {
+            context.create_new_foreign(data, f0);
+        },
+        None => context.abort_fiber("Could not load the BigInt class"),
+    }
+}
+
+fn fast_fib(mut context: Context) {
+    #[allow(clippy::many_single_char_names)]
+    fn helper(n: usize) -> (BigInt, BigInt) {
+        if n == 0 {
+            let zero: BigInt = 0u64.to_bigint().unwrap();
+            let one: BigInt = 1u64.to_bigint().unwrap();
+            (zero, one)
+        } else {
+            let (a, b) = helper(n / 2);
+            let c = &a * (&b * 2 - &a);
+            let d = &a * &a + &b * &b;
+
+            if n % 2 == 0 {
+                (c, d)
+            } else {
+                let e = c + &d;
+                (d, e)
+            }
+        }
+    }
+
+    let (_, n) = context.try_get_stack::<((), f64)>();
+    let n = match n {
+        #[allow(clippy::cast_possible_truncation)]
+        #[allow(clippy::cast_sign_loss)]
+        Ok(n) if (n.trunc() - n).abs() < f64::EPSILON && n > 0.0 => n as usize,
+        _ => {
+            context.abort_fiber("BigInt.fastfib needs to be passed a positive integer");
+            return;
+        }
+    };
+
+    let result = helper(n).0;
+
+    let (user_data, context) = context.get_user_data_mut_with_context();
+    let class_handle = get_class_handle(context, user_data);
+    match &class_handle {
+        Some(data) => unsafe {
+            context.create_new_foreign(data, result);
+        },
+        None => context.abort_fiber("Could not load the BigInt class"),
+    }
 }
 
 fn get_data<'wren>(context: &mut Context<'wren>, method: &str) -> Result<Data<'wren>, String> {
