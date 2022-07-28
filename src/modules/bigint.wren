@@ -10,8 +10,8 @@ foreign class BigInt {
     }
     foreign toString
     foreign +(value)
-    // foreign -(value)
-    // foreign *(value)
+    foreign -(value)
+    foreign *(value)
     foreign setValue(value)
 }
 

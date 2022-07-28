@@ -20,6 +20,8 @@ pub fn init_module<'wren>() -> Module<'wren> {
         .insert("setValue(_)", foreign_set_value);
     bigint_class.methods.insert("toString", foreign_to_string);
     bigint_class.methods.insert("+(_)", add);
+    bigint_class.methods.insert("-(_)", sub);
+    bigint_class.methods.insert("*(_)", mul);
 
     let mut test_marker_class = Class::new();
     test_marker_class.foreign_class_methods = Some(ForeignClassMethods::new::<TestMarker>());
@@ -55,6 +57,52 @@ fn add(mut context: Context) {
         match get_data(&mut context, "+(_)") {
             Ok(Data::BigInt(ref i)) => this.as_ref() + i.as_ref(),
             Ok(Data::Integer(i)) => this.as_ref() + i,
+            Err(s) => {
+                context.abort_fiber(s);
+                return;
+            }
+        }
+    };
+
+    let (user_data, context) = context.get_user_data_mut_with_context();
+    let class_handle = get_class_handle(context, user_data);
+    match &class_handle {
+        Some(data) => unsafe {
+            context.create_new_foreign(data, result);
+        },
+        None => context.abort_fiber("Could not load the BigInt class"),
+    }
+}
+
+fn sub(mut context: Context) {
+    let this = unsafe { ForeignClass::<BigInt>::get_slot(&mut context, 0) };
+    let result = {
+        match get_data(&mut context, "-(_)") {
+            Ok(Data::BigInt(ref i)) => this.as_ref() - i.as_ref(),
+            Ok(Data::Integer(i)) => this.as_ref() - i,
+            Err(s) => {
+                context.abort_fiber(s);
+                return;
+            }
+        }
+    };
+
+    let (user_data, context) = context.get_user_data_mut_with_context();
+    let class_handle = get_class_handle(context, user_data);
+    match &class_handle {
+        Some(data) => unsafe {
+            context.create_new_foreign(data, result);
+        },
+        None => context.abort_fiber("Could not load the BigInt class"),
+    }
+}
+
+fn mul(mut context: Context) {
+    let this = unsafe { ForeignClass::<BigInt>::get_slot(&mut context, 0) };
+    let result = {
+        match get_data(&mut context, "*(_)") {
+            Ok(Data::BigInt(ref i)) => this.as_ref() * i.as_ref(),
+            Ok(Data::Integer(i)) => this.as_ref() * i,
             Err(s) => {
                 context.abort_fiber(s);
                 return;
