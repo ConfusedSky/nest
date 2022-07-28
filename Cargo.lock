@@ -506,6 +506,7 @@ dependencies = [
  "dirs",
  "itertools",
  "num-bigint",
+ "num-traits",
  "predicates",
  "tokio",
  "wren",

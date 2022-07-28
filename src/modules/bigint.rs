@@ -1,6 +1,7 @@
 #![allow(unsafe_code)]
 
 use num_bigint::{BigInt, ToBigInt};
+use num_traits::{One, Zero};
 use wren::{
     context::{Foreign, NoTypeInfo},
     ForeignClassMethods, GetValue, Handle, WrenType,
@@ -24,6 +25,8 @@ pub fn init_module<'wren>() -> Module<'wren> {
     bigint_class.methods.insert("*(_)", mul);
     bigint_class.static_methods.insert("fib(_)", fib);
     bigint_class.static_methods.insert("fastfib(_)", fast_fib);
+    bigint_class.static_methods.insert("ZERO", zero);
+    bigint_class.static_methods.insert("ONE", one);
 
     let mut test_marker_class = Class::new();
     test_marker_class.foreign_class_methods = Some(ForeignClassMethods::new::<TestMarker>());
@@ -89,6 +92,14 @@ fn mul(mut context: Context) {
     implement_operator(&mut context, "*(_)", &|a, b| a * b, &|a, b| a * b);
 }
 
+fn zero(mut context: Context) {
+    send_new_foreign(&mut context, Zero::zero());
+}
+
+fn one(mut context: Context) {
+    send_new_foreign(&mut context, One::one());
+}
+
 #[foreign_method]
 fn to_string(this: ForeignClass<BigInt>) -> String {
     this.to_string()
@@ -106,8 +117,8 @@ fn fib(mut context: Context) {
         }
     };
 
-    let mut f0: BigInt = 0u64.to_bigint().unwrap();
-    let mut f1: BigInt = 1u64.to_bigint().unwrap();
+    let mut f0: BigInt = Zero::zero();
+    let mut f1: BigInt = One::one();
 
     for _ in 0..n {
         let f2 = f0 + &f1;
@@ -121,8 +132,8 @@ fn fast_fib(mut context: Context) {
     #[allow(clippy::many_single_char_names)]
     fn helper(n: usize) -> (BigInt, BigInt) {
         if n == 0 {
-            let zero: BigInt = 0u64.to_bigint().unwrap();
-            let one: BigInt = 1u64.to_bigint().unwrap();
+            let zero: BigInt = Zero::zero();
+            let one: BigInt = One::one();
             (zero, one)
         } else {
             let (a, b) = helper(n / 2);

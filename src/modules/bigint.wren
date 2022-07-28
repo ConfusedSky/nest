@@ -1,6 +1,6 @@
 foreign class BigInt {
-    static ZERO { __ZERO || (__ZERO = BigInt.new(0)) }
-    static ONE { __ONE || (__ONE = BigInt.new(1)) }
+    foreign static ZERO
+    foreign static ONE
 
     construct new() {}
     static new(value) {
