@@ -1,5 +1,7 @@
 #![allow(unsafe_code)]
 
+use std::ops::Add;
+
 use num_bigint::{BigInt, ToBigInt};
 use wren::{
     context::{Foreign, NoTypeInfo},
@@ -57,8 +59,8 @@ fn add(mut context: Context) {
     let this = unsafe { ForeignClass::<BigInt>::get_slot(&mut context, 0) };
     let result = {
         match get_data(&mut context, "+(_)") {
-            Ok(Data::BigInt(ref i)) => this.as_ref() + i.as_ref(),
-            Ok(Data::Integer(i)) => this.as_ref() + i,
+            Ok(Data::BigInt(i)) => (&*this).add(&*i),
+            Ok(Data::Integer(i)) => (&*this).add(i),
             Err(s) => {
                 context.abort_fiber(s);
                 return;
