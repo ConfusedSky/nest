@@ -6,7 +6,7 @@
 
 mod modules;
 
-use modules::{scheduler::Scheduler, Modules};
+use modules::{bigint::BigIntModule, scheduler::Scheduler, Modules};
 use std::{
     env,
     ffi::CStr,
@@ -34,6 +34,7 @@ create_trait_alias!(WrenSetArgs<'wren, L: Location>, wren::SetArgs<'wren, L>);
 
 pub struct MyUserData<'wren> {
     scheduler: Option<Scheduler<'wren>>,
+    big_int_data: Option<BigIntModule<'wren>>,
     modules: Modules<'wren>,
 }
 
@@ -41,6 +42,7 @@ impl<'wren> Default for MyUserData<'wren> {
     fn default() -> Self {
         Self {
             scheduler: None,
+            big_int_data: None,
             modules: Modules::new(),
         }
     }

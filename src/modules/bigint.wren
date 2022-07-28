@@ -9,7 +9,7 @@ foreign class BigInt {
         return res
     }
     foreign toString
-    // foreign +(value)
+    foreign +(value)
     // foreign -(value)
     // foreign *(value)
     foreign setValue(value)

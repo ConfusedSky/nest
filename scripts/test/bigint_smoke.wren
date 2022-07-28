@@ -28,3 +28,19 @@ System.print(Fiber.new {
     System.print(b)
 }.try())
 // expect: BigInt.setValue expects a BigInt or an Integer
+
+var fib1 = Fn.new {|n|
+    var a = BigInt.ZERO
+    var b = BigInt.ONE
+
+    for (i in 0...n) {
+        var c = a
+        a = b
+        b = b + c
+    }
+
+    return a
+}
+
+System.print(fib1.call(200))
+// expect: 280571172992510140037611932413038677189525

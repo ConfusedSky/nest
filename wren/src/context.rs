@@ -1,4 +1,5 @@
 use std::{
+    any::Any,
     ffi::{CStr, CString, FromBytesWithNulError, NulError},
     marker::PhantomData,
     ops::{Deref, DerefMut},
@@ -6,6 +7,8 @@ use std::{
 };
 
 use wren_sys::{self as ffi, WrenVM};
+
+use crate::foreign::create_new_foreign;
 
 use super::{
     foreign,
@@ -436,6 +439,13 @@ impl<'wren, L: Location> Context<'wren, NoTypeInfo, L> {
 
     pub fn set_return_value<Args: SetValue<'wren, L>>(&mut self, arg: &Args) {
         arg.set_wren_stack(self, 0);
+    }
+
+    /// # Safety
+    /// this must be called with a corresponding T and class handle
+    pub unsafe fn create_new_foreign<T: Any>(&mut self, class_handle: &Handle<'wren>, value: T) {
+        class_handle.set_slot(self, 0);
+        create_new_foreign(self.as_ptr(), value);
     }
 
     /// It is unclear how safe this one is now, since increasing the
