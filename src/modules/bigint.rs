@@ -66,14 +66,7 @@ fn add(mut context: Context) {
         }
     };
 
-    let (user_data, context) = context.get_user_data_mut_with_context();
-    let class_handle = get_class_handle(context, user_data);
-    match &class_handle {
-        Some(data) => unsafe {
-            context.create_new_foreign(data, result);
-        },
-        None => context.abort_fiber("Could not load the BigInt class"),
-    }
+    send_new_foreign(&mut context, result);
 }
 
 fn sub(mut context: Context) {
@@ -89,14 +82,7 @@ fn sub(mut context: Context) {
         }
     };
 
-    let (user_data, context) = context.get_user_data_mut_with_context();
-    let class_handle = get_class_handle(context, user_data);
-    match &class_handle {
-        Some(data) => unsafe {
-            context.create_new_foreign(data, result);
-        },
-        None => context.abort_fiber("Could not load the BigInt class"),
-    }
+    send_new_foreign(&mut context, result);
 }
 
 fn mul(mut context: Context) {
@@ -112,14 +98,7 @@ fn mul(mut context: Context) {
         }
     };
 
-    let (user_data, context) = context.get_user_data_mut_with_context();
-    let class_handle = get_class_handle(context, user_data);
-    match &class_handle {
-        Some(data) => unsafe {
-            context.create_new_foreign(data, result);
-        },
-        None => context.abort_fiber("Could not load the BigInt class"),
-    }
+    send_new_foreign(&mut context, result);
 }
 
 #[foreign_method]
@@ -131,6 +110,7 @@ fn fib(mut context: Context) {
     let (_, n) = context.try_get_stack::<((), f64)>();
     let n = match n {
         #[allow(clippy::cast_possible_truncation)]
+        #[allow(clippy::cast_sign_loss)]
         Ok(n) if (n.trunc() - n).abs() < f64::EPSILON && n > 0.0 => n as usize,
         _ => {
             context.abort_fiber("BigInt.fib needs to be passed a positive integer");
@@ -146,14 +126,7 @@ fn fib(mut context: Context) {
         f0 = std::mem::replace(&mut f1, f2);
     }
 
-    let (user_data, context) = context.get_user_data_mut_with_context();
-    let class_handle = get_class_handle(context, user_data);
-    match &class_handle {
-        Some(data) => unsafe {
-            context.create_new_foreign(data, f0);
-        },
-        None => context.abort_fiber("Could not load the BigInt class"),
-    }
+    send_new_foreign(&mut context, f0);
 }
 
 fn fast_fib(mut context: Context) {
@@ -190,14 +163,7 @@ fn fast_fib(mut context: Context) {
 
     let result = helper(n).0;
 
-    let (user_data, context) = context.get_user_data_mut_with_context();
-    let class_handle = get_class_handle(context, user_data);
-    match &class_handle {
-        Some(data) => unsafe {
-            context.create_new_foreign(data, result);
-        },
-        None => context.abort_fiber("Could not load the BigInt class"),
-    }
+    send_new_foreign(&mut context, result);
 }
 
 fn get_data<'wren>(context: &mut Context<'wren>, method: &str) -> Result<Data<'wren>, String> {
@@ -241,6 +207,17 @@ fn internal_set_value<'wren>(
     }
 
     Ok(())
+}
+
+fn send_new_foreign(context: &mut Context, data: BigInt) {
+    let (user_data, context) = context.get_user_data_mut_with_context();
+    let class_handle = get_class_handle(context, user_data);
+    match &class_handle {
+        Some(handle) => unsafe {
+            context.create_new_foreign(handle, data);
+        },
+        None => context.abort_fiber("Could not load the BigInt class"),
+    }
 }
 
 fn get_class_handle<'wren, 'a>(
