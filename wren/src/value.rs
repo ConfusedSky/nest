@@ -11,6 +11,7 @@ use super::{
 use enumflags2::{bitflags, make_bitflags, BitFlags};
 
 mod foreign;
+mod numeric;
 pub use foreign::Foreign as ForeignClass;
 
 #[derive(Debug, PartialEq)]
@@ -396,27 +397,6 @@ impl<'wren> GetValue<'wren, Foreign> for String {
         slot_type: WrenType,
     ) -> Self {
         generic_get_string(vm, slot, slot_type).expect("Should not be called on incompatible type")
-    }
-}
-
-impl<'wren, L: Location> SetValue<'wren, L> for f64 {
-    unsafe fn set_slot(&self, vm: &mut RawContext<'wren, L>, slot: Slot) {
-        ffi::wrenSetSlotDouble(vm.as_ptr(), slot, *self);
-    }
-}
-
-impl<'wren, L: Location> GetValue<'wren, L> for f64 {
-    const COMPATIBLE_TYPES: BitFlags<WrenType> = make_bitflags!(WrenType::{Num});
-    unsafe fn get_slot_unchecked(
-        vm: &mut RawContext<'wren, L>,
-        slot: Slot,
-        slot_type: WrenType,
-    ) -> Self {
-        if WrenType::Num == slot_type {
-            ffi::wrenGetSlotDouble(vm.as_ptr(), slot)
-        } else {
-            Self::NAN
-        }
     }
 }
 

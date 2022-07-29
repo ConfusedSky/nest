@@ -10,6 +10,7 @@ use wren_sys::WrenVM;
 
 use super::{context, Context, ErrorContext, ErrorKind, SystemUserData, VmUserData};
 
+#[allow(clippy::redundant_pub_crate)]
 pub(super) unsafe fn get_system_user_data<'s, V>(vm: *mut WrenVM) -> &'s mut SystemUserData<'s, V> {
     let user_data = ffi::wrenGetUserData(vm);
     if user_data.is_null() {
@@ -144,7 +145,7 @@ unsafe extern "C" fn error_fn<'wren, V: 'wren + VmUserData<'wren, V>>(
     user_data.on_error(Context::new_unchecked(vm), kind);
 }
 
-pub(super) fn init_config<'wren, V>() -> ffi::WrenConfiguration
+pub fn init_config<'wren, V>() -> ffi::WrenConfiguration
 where
     V: 'wren + VmUserData<'wren, V>,
 {

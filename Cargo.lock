@@ -1212,6 +1212,7 @@ name = "wren"
 version = "0.1.0"
 dependencies = [
  "enumflags2",
+ "num-traits",
  "static_assertions",
  "wren_macros",
  "wren_sys",

@@ -3,6 +3,7 @@
 #![allow(unsafe_code)]
 #![allow(clippy::module_name_repetitions)]
 #![allow(clippy::option_if_let_else)]
+// #![deny(missing_docs)]
 
 pub mod context;
 mod fiber;

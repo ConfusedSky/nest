@@ -23,6 +23,7 @@ pub fn init_module<'wren>() -> Module<'wren> {
     bigint_class.methods.insert("+(_)", add);
     bigint_class.methods.insert("-(_)", sub);
     bigint_class.methods.insert("*(_)", mul);
+    bigint_class.methods.insert("/(_)", div);
     bigint_class.static_methods.insert("fib(_)", fib);
     bigint_class.static_methods.insert("fastfib(_)", fast_fib);
     bigint_class.static_methods.insert("ZERO", zero);
@@ -90,6 +91,10 @@ fn sub(mut context: Context) {
 
 fn mul(mut context: Context) {
     implement_operator(&mut context, "*(_)", &|a, b| a * b, &|a, b| a * b);
+}
+
+fn div(mut context: Context) {
+    implement_operator(&mut context, "*(_)", &|a, b| a / b, &|a, b| a / b);
 }
 
 fn zero(mut context: Context) {
