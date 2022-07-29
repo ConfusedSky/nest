@@ -1,7 +1,7 @@
 #![allow(unsafe_code)]
 
 use num_bigint::{BigInt, ToBigInt};
-use num_traits::{One, Zero};
+use num_traits::{Num, One, Zero};
 use wren::{
     context::{Foreign, NoTypeInfo},
     ForeignClassMethods, GetValue, Handle, WrenType,
@@ -70,7 +70,7 @@ fn implement_operator<'wren, B, I>(
 {
     let this = unsafe { ForeignClass::<'wren, BigInt>::get_slot(context, 0) };
     let result = {
-        match get_data(context, method) {
+        match get_data(context, method, false) {
             Ok(Data::BigInt(i)) => big_int_method(&*this, &*i),
             Ok(Data::Integer(i)) => integer_method(&*this, i),
             Err(s) => {
@@ -180,13 +180,29 @@ fn fast_fib(mut context: Context) {
     send_new_foreign(&mut context, result);
 }
 
-fn get_data<'wren>(context: &mut Context<'wren>, method: &str) -> Result<Data<'wren>, String> {
+fn get_data<'wren>(
+    context: &mut Context<'wren>,
+    method: &str,
+    accept_string: bool,
+) -> Result<Data<'wren>, String> {
     // TODO: Implement better reflection so this error message is possible on the
     // rust side
     // "BigInt.%(method) expects a BigInt or an Integer got %(value): %(value.type)"
-    let error = format!("BigInt.{method} expects a BigInt or an Integer");
+    let error = format!(
+        "BigInt.{method} expects a BigInt{} or an Integer",
+        if accept_string { ", String" } else { "" }
+    );
     let slot_type = unsafe { context.get_slot_type(1) };
     match slot_type {
+        WrenType::String if accept_string => {
+            let slot = unsafe { String::get_slot_unchecked(context, 1, WrenType::String) };
+            let bi = BigInt::from_str_radix(&slot, 10)
+                .map_err(|_| format!("Failed to parse \"{slot}\" as an integer!"))?;
+            send_new_foreign(context, bi);
+            let slot = unsafe { ForeignClass::<BigInt>::try_get_slot_unchecked(context, 0) };
+            let slot = slot.map_err(|_| error)?;
+            Ok(Data::BigInt(slot))
+        }
         WrenType::Num => {
             let slot = unsafe { f64::get_slot_unchecked(context, 1, WrenType::Num) };
             // We only take integers here
@@ -207,7 +223,7 @@ fn get_data<'wren>(context: &mut Context<'wren>, method: &str) -> Result<Data<'w
 }
 
 fn internal_set_value<'wren>(context: &mut Context<'wren>, method: &str) -> Result<BigInt, String> {
-    let data = get_data(context, method)?;
+    let data = get_data(context, method, true)?;
 
     Ok(match data {
         Data::BigInt(i) => i.as_ref().clone(),

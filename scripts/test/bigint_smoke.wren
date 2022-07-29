@@ -4,6 +4,7 @@ import "bigint" for BigInt, Test
 System.print(BigInt.ZERO) // expect: 0
 System.print(BigInt.ONE) // expect: 1
 System.print(BigInt.new(10)) // expect: 10
+System.print(BigInt.new("123456789")) // expect: 123456789
 var b = BigInt.new()
 b.setValue(10)
 System.print(b)
@@ -15,19 +16,26 @@ System.print(b)
 System.print(Fiber.new {
     b.setValue(12.5)
 }.try())
-// expect: BigInt.setValue expects a BigInt or an Integer
+// expect: BigInt.setValue expects a BigInt, String or an Integer
 
 System.print(Fiber.new {
     b.setValue(Test.new())
     System.print(b)
 }.try())
-// expect: BigInt.setValue expects a BigInt or an Integer
+// expect: BigInt.setValue expects a BigInt, String or an Integer
 
 System.print(Fiber.new {
     b.setValue("This is a potato")
     System.print(b)
 }.try())
-// expect: BigInt.setValue expects a BigInt or an Integer
+// expect: Failed to parse "This is a potato" as an integer!
+
+System.print(Fiber.new {
+    b.setValue(12345)
+    b = b + "12345"
+    System.print(b)
+}.try())
+// expect: BigInt.+(_) expects a BigInt or an Integer
 
 var fib1 = Fn.new {|n|
     var a = BigInt.ZERO
