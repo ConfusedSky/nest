@@ -7,6 +7,7 @@ foreign class BigInt {
     foreign +(value)
     foreign -(value)
     foreign *(value)
+    foreign pow(value)
     foreign setValue(value)
 
     foreign static fib(n)

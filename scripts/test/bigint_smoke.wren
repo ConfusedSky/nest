@@ -4,6 +4,7 @@ import "bigint" for BigInt, Test
 System.print(BigInt.ZERO) // expect: 0
 System.print(BigInt.ONE) // expect: 1
 System.print(BigInt.new(10)) // expect: 10
+System.print(BigInt.new(10).pow(3)) // expect: 1000
 System.print(BigInt.new("123456789")) // expect: 123456789
 var b = BigInt.new()
 b.setValue(10)

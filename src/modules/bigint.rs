@@ -24,6 +24,7 @@ pub fn init_module<'wren>() -> Module<'wren> {
     bigint_class.methods.insert("-(_)", sub);
     bigint_class.methods.insert("*(_)", mul);
     bigint_class.methods.insert("/(_)", div);
+    bigint_class.methods.insert("pow(_)", pow);
     bigint_class.static_methods.insert("new(_)", new);
     bigint_class.static_methods.insert("fib(_)", fib);
     bigint_class.static_methods.insert("fastfib(_)", fast_fib);
@@ -97,6 +98,27 @@ fn mul(mut context: Context) {
 
 fn div(mut context: Context) {
     implement_operator(&mut context, "*(_)", &|a, b| a / b, &|a, b| a / b);
+}
+
+fn pow<'wren>(mut context: Context<'wren>) {
+    let (this, n) = context.try_get_stack::<(ForeignClass<'wren, BigInt>, f64)>();
+    let n = match n {
+        #[allow(clippy::cast_possible_truncation)]
+        #[allow(clippy::cast_sign_loss)]
+        #[allow(clippy::cast_lossless)]
+        Ok(n) if (n.trunc() - n).abs() < f64::EPSILON && n > 0.0 && n < u32::MAX as f64 => n as u32,
+        _ => {
+            context.abort_fiber(format!(
+                "BigInt.pow(_) needs to be passed a positive integer with a max value of {}",
+                u32::MAX
+            ));
+            return;
+        }
+    };
+
+    let result = this.unwrap().pow(n);
+
+    send_new_foreign(&mut context, result);
 }
 
 fn new(mut context: Context) {
@@ -198,6 +220,7 @@ fn get_data<'wren>(
             let slot = unsafe { String::get_slot_unchecked(context, 1, WrenType::String) };
             let bi = BigInt::from_str_radix(&slot, 10)
                 .map_err(|_| format!("Failed to parse \"{slot}\" as an integer!"))?;
+            // TODO: Do this better later
             send_new_foreign(context, bi);
             let slot = unsafe { ForeignClass::<BigInt>::try_get_slot_unchecked(context, 0) };
             let slot = slot.map_err(|_| error)?;
