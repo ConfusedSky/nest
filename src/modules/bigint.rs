@@ -24,6 +24,7 @@ pub fn init_module<'wren>() -> Module<'wren> {
     bigint_class.methods.insert("-(_)", sub);
     bigint_class.methods.insert("*(_)", mul);
     bigint_class.methods.insert("/(_)", div);
+    bigint_class.static_methods.insert("new(_)", new);
     bigint_class.static_methods.insert("fib(_)", fib);
     bigint_class.static_methods.insert("fastfib(_)", fast_fib);
     bigint_class.static_methods.insert("ZERO", zero);
@@ -54,7 +55,8 @@ fn set_value<'wren>(
     context: &mut Context<'wren>,
     mut this: ForeignClass<'wren, BigInt>,
 ) -> Result<(), String> {
-    internal_set_value(context, &mut this, "setValue")
+    *this = internal_set_value(context, "setValue")?;
+    Ok(())
 }
 
 fn implement_operator<'wren, B, I>(
@@ -95,6 +97,14 @@ fn mul(mut context: Context) {
 
 fn div(mut context: Context) {
     implement_operator(&mut context, "*(_)", &|a, b| a / b, &|a, b| a / b);
+}
+
+fn new(mut context: Context) {
+    let this = internal_set_value(&mut context, "new(_)");
+    match this {
+        Ok(this) => send_new_foreign(&mut context, this),
+        Err(e) => context.abort_fiber(e),
+    }
 }
 
 fn zero(mut context: Context) {
@@ -196,21 +206,15 @@ fn get_data<'wren>(context: &mut Context<'wren>, method: &str) -> Result<Data<'w
     }
 }
 
-fn internal_set_value<'wren>(
-    context: &mut Context<'wren>,
-    this: &mut ForeignClass<'wren, BigInt>,
-    method: &str,
-) -> Result<(), String> {
+fn internal_set_value<'wren>(context: &mut Context<'wren>, method: &str) -> Result<BigInt, String> {
     let data = get_data(context, method)?;
 
-    match data {
-        Data::BigInt(i) => *this.as_mut() = i.as_ref().clone(),
+    Ok(match data {
+        Data::BigInt(i) => i.as_ref().clone(),
         // This shouldn't error since we checked to make sure the value
         // is an integer earlier
-        Data::Integer(i) => *this.as_mut() = i.to_bigint().unwrap(),
-    }
-
-    Ok(())
+        Data::Integer(i) => i.to_bigint().unwrap(),
+    })
 }
 
 fn send_new_foreign(context: &mut Context, data: BigInt) {

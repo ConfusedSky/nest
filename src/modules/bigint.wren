@@ -3,11 +3,6 @@ foreign class BigInt {
     foreign static ONE
 
     construct new() {}
-    static new(value) {
-        var res = BigInt.new()
-        res.setValue(value)
-        return res
-    }
     foreign toString
     foreign +(value)
     foreign -(value)
@@ -16,6 +11,7 @@ foreign class BigInt {
 
     foreign static fib(n)
     foreign static fastfib(n)
+    foreign static new(value) 
 }
 
 foreign class Test {
