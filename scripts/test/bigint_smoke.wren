@@ -31,6 +31,12 @@ System.print(Fiber.new {
 // expect: Failed to parse "This is a potato" as an integer!
 
 System.print(Fiber.new {
+    b.setValue("12.12345")
+    System.print(b)
+}.try())
+// expect: Failed to parse "12.12345" as an integer!
+
+System.print(Fiber.new {
     b.setValue(12345)
     b = b + "12345"
     System.print(b)
