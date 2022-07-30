@@ -1,4 +1,5 @@
 #![deny(clippy::all)]
+#![warn(rust_2018_idioms)]
 #![warn(clippy::pedantic, clippy::nursery)]
 #![warn(unsafe_code)]
 #![allow(clippy::module_name_repetitions)]
@@ -71,7 +72,7 @@ impl<'wren> wren::VmUserData<'wren, MyUserData<'wren>> for MyUserData<'wren> {
             std::ffi::CString::new(name).ok()
         }
     }
-    fn on_error(&mut self, _: Context<'wren>, kind: wren::ErrorKind) {
+    fn on_error(&mut self, _: Context<'wren>, kind: wren::ErrorKind<'_>) {
         wren::user_data::on_error(kind);
     }
     fn on_write(&mut self, _: Context<'wren>, text: &str) {
@@ -97,7 +98,7 @@ impl<'wren> wren::VmUserData<'wren, MyUserData<'wren>> for MyUserData<'wren> {
     }
     fn bind_foreign_class(&mut self, module: &str, class_name: &str) -> wren::ForeignClassMethods {
         fn helper(
-            user_data: &mut MyUserData,
+            user_data: &mut MyUserData<'_>,
             module: &str,
             class_name: &str,
         ) -> Option<wren::ForeignClassMethods> {

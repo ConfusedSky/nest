@@ -201,7 +201,7 @@ fn capture_methods<'wren>(mut vm: Context<'wren>) {
 }
 
 #[allow(clippy::needless_pass_by_value)]
-fn await_all(mut vm: Context) {
+fn await_all(mut vm: Context<'_>) {
     vm.get_user_data_mut()
         .scheduler
         .as_mut()

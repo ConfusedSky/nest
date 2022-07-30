@@ -84,19 +84,19 @@ fn implement_operator<'wren, B, I>(
     send_new_foreign(context, result);
 }
 
-fn add(mut context: Context) {
+fn add(mut context: Context<'_>) {
     implement_operator(&mut context, "+(_)", &|a, b| a + b, &|a, b| a + b);
 }
 
-fn sub(mut context: Context) {
+fn sub(mut context: Context<'_>) {
     implement_operator(&mut context, "-(_)", &|a, b| a - b, &|a, b| a - b);
 }
 
-fn mul(mut context: Context) {
+fn mul(mut context: Context<'_>) {
     implement_operator(&mut context, "*(_)", &|a, b| a * b, &|a, b| a * b);
 }
 
-fn div(mut context: Context) {
+fn div(mut context: Context<'_>) {
     implement_operator(&mut context, "*(_)", &|a, b| a / b, &|a, b| a / b);
 }
 
@@ -121,7 +121,7 @@ fn pow<'wren>(mut context: Context<'wren>) {
     send_new_foreign(&mut context, result);
 }
 
-fn new(mut context: Context) {
+fn new(mut context: Context<'_>) {
     let this = internal_set_value(&mut context, "new(_)");
     match this {
         Ok(this) => send_new_foreign(&mut context, this),
@@ -129,20 +129,20 @@ fn new(mut context: Context) {
     }
 }
 
-fn zero(mut context: Context) {
+fn zero(mut context: Context<'_>) {
     send_new_foreign(&mut context, Zero::zero());
 }
 
-fn one(mut context: Context) {
+fn one(mut context: Context<'_>) {
     send_new_foreign(&mut context, One::one());
 }
 
 #[foreign_method]
-fn to_string(this: ForeignClass<BigInt>) -> String {
+fn to_string(this: ForeignClass<'_, BigInt>) -> String {
     this.to_string()
 }
 
-fn fib(mut context: Context) {
+fn fib(mut context: Context<'_>) {
     let (_, n) = context.try_get_stack::<((), f64)>();
     let n = match n {
         #[allow(clippy::cast_possible_truncation)]
@@ -165,7 +165,7 @@ fn fib(mut context: Context) {
     send_new_foreign(&mut context, f0);
 }
 
-fn fast_fib(mut context: Context) {
+fn fast_fib(mut context: Context<'_>) {
     #[allow(clippy::many_single_char_names)]
     fn helper(n: usize) -> (BigInt, BigInt) {
         if n == 0 {
@@ -256,7 +256,7 @@ fn internal_set_value<'wren>(context: &mut Context<'wren>, method: &str) -> Resu
     })
 }
 
-fn send_new_foreign(context: &mut Context, data: BigInt) {
+fn send_new_foreign(context: &mut Context<'_>, data: BigInt) {
     let (user_data, context) = context.get_user_data_mut_with_context();
     let class_handle = get_class_handle(context, user_data);
     match &class_handle {
