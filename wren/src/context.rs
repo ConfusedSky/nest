@@ -34,10 +34,10 @@ pub struct Context<'wren, T, L: Location>(
 
 impl<'wren, V, L: Location> Context<'wren, V, L> {
     const unsafe fn transmute<V2, L2: Location>(&self) -> &Context<'wren, V2, L2> {
-        &*((self as *const Context<V, L>).cast::<Context<V2, L2>>())
+        &*((self as *const Context<'_, V, L>).cast::<Context<'_, V2, L2>>())
     }
     unsafe fn transmute_mut<V2, L2: Location>(&mut self) -> &mut Context<'wren, V2, L2> {
-        &mut *((self as *mut Context<V, L>).cast::<Context<V2, L2>>())
+        &mut *((self as *mut Context<'_, V, L>).cast::<Context<'_, V2, L2>>())
     }
 
     // NOTE THESE ARE ALL DOWNCASTS SO THIS IS SAFE
@@ -188,7 +188,7 @@ impl<'wren, T> Context<'wren, T, Native> {
         args: &Args,
     ) -> Result<()> {
         let slot_count =
-            <Handle as SetValue<'wren, Native>>::REQUIRED_SLOTS + Args::TOTAL_REQUIRED_SLOTS;
+            <Handle<'wren> as SetValue<'wren, Native>>::REQUIRED_SLOTS + Args::TOTAL_REQUIRED_SLOTS;
 
         // make sure there enough slots to send over the subject
         // and all it's args
@@ -475,7 +475,7 @@ impl<'wren, L: Location> Context<'wren, NoTypeInfo, L> {
 
 pub trait ForeignCallOutput: Sized {
     type Output;
-    fn to_output<T>(self, context: &mut Context<T, Foreign>) -> Option<Self::Output>;
+    fn to_output<T>(self, context: &mut Context<'_, T, Foreign>) -> Option<Self::Output>;
 }
 
 impl<'wren, S: AsRef<str>, Set: SetValue<'wren, Foreign>> ForeignCallOutput
@@ -483,7 +483,7 @@ impl<'wren, S: AsRef<str>, Set: SetValue<'wren, Foreign>> ForeignCallOutput
 {
     type Output = Set;
 
-    fn to_output<'a, T>(self, context: &mut Context<T, Foreign>) -> Option<Self::Output> {
+    fn to_output<'a, T>(self, context: &mut Context<'_, T, Foreign>) -> Option<Self::Output> {
         match self {
             Ok(v) => Some(v),
             Err(s) => {
@@ -497,7 +497,7 @@ impl<'wren, S: AsRef<str>, Set: SetValue<'wren, Foreign>> ForeignCallOutput
 impl<'wren, S: SetValue<'wren, Foreign>> ForeignCallOutput for S {
     type Output = S;
 
-    fn to_output<T>(self, _context: &mut Context<T, Foreign>) -> Option<Self::Output> {
+    fn to_output<T>(self, _context: &mut Context<'_, T, Foreign>) -> Option<Self::Output> {
         Some(self)
     }
 }
@@ -535,6 +535,6 @@ mod assert {
     // the whole purpose of it is to make it easier to access
     // the wren api, without having to sacrifice size, performance or ergonomics
     // So they should be directly castable
-    static_assertions::assert_eq_align!(Context<T, Native>, *mut WrenVM);
-    static_assertions::assert_eq_size!(Context<T, Native>, *mut WrenVM);
+    static_assertions::assert_eq_align!(Context<'_, T, Native>, *mut WrenVM);
+    static_assertions::assert_eq_size!(Context<'_, T, Native>, *mut WrenVM);
 }

@@ -216,34 +216,34 @@ mod test {
         let returnTest = context.make_call_handle(cstr!("returnTest"));
 
         // We should not be able to convert any other value but a fiber to a fiber
-        let true_handle: Handle = context.try_call(&Test, &returnTrue, &()).unwrap();
+        let true_handle: Handle<'_> = context.try_call(&Test, &returnTrue, &()).unwrap();
         let true_fiber = fiber_methods.construct(context, true_handle);
         assert!(true_fiber.is_err());
 
-        let test_handle: Handle = context.try_call(&Test, &returnTest, &()).unwrap();
+        let test_handle: Handle<'_> = context.try_call(&Test, &returnTest, &()).unwrap();
         let test_fiber = fiber_methods.construct(context, test_handle);
         assert!(test_fiber.is_err());
 
-        let fiber_handle: Handle = context.try_call(&Test, &returnFiber, &()).unwrap();
+        let fiber_handle: Handle<'_> = context.try_call(&Test, &returnFiber, &()).unwrap();
         let fiber = fiber_methods.construct(context, fiber_handle);
         assert!(fiber.is_ok());
 
         // Test getting directly from vm
-        let true_fiber = context.try_call::<Fiber, _>(&Test, &returnTrue, &());
+        let true_fiber = context.try_call::<Fiber<'_>, _>(&Test, &returnTrue, &());
         assert!(true_fiber.is_err());
 
-        let test_fiber = context.try_call::<Fiber, _>(&Test, &returnTest, &());
+        let test_fiber = context.try_call::<Fiber<'_>, _>(&Test, &returnTest, &());
         assert!(test_fiber.is_err());
 
-        let fiber = context.try_call::<Fiber, _>(&Test, &returnFiber, &());
+        let fiber = context.try_call::<Fiber<'_>, _>(&Test, &returnFiber, &());
         assert!(fiber.is_ok());
     }
 
     #[test]
     #[allow(non_snake_case)]
     fn test_transfer() {
-        fn test_await(mut vm: Context<context::Foreign>) {
-            let (_, fiber) = vm.try_get_stack::<((), Handle)>();
+        fn test_await(mut vm: Context<'_, context::Foreign>) {
+            let (_, fiber) = vm.try_get_stack::<((), Handle<'_>)>();
             vm.get_user_data_mut().handle = fiber.ok();
         }
 

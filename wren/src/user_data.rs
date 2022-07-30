@@ -28,10 +28,10 @@ pub trait UserData<'wren, T> {
         ForeignClassMethods::default()
     }
     fn on_write(&mut self, vm: Context<'wren, T, context::Foreign>, text: &str) {}
-    fn on_error(&mut self, vm: Context<'wren, T, context::Foreign>, kind: ErrorKind) {}
+    fn on_error(&mut self, vm: Context<'wren, T, context::Foreign>, kind: ErrorKind<'_>) {}
 }
 
-pub fn on_error(kind: super::ErrorKind) {
+pub fn on_error(kind: super::ErrorKind<'_>) {
     match kind {
         super::ErrorKind::Compile(ctx) => {
             println!("[{} line {}] [Error] {}", ctx.module, ctx.line, ctx.msg);

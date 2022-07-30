@@ -15,7 +15,7 @@ impl<'wren> VmUserData<'wren, Self> for UserData<'wren> {
     fn on_error(
         &mut self,
         _: super::Context<'wren, Self, context::Foreign>,
-        kind: super::ErrorKind,
+        kind: super::ErrorKind<'_>,
     ) {
         super::user_data::on_error(kind);
     }

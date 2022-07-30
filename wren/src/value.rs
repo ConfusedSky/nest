@@ -320,7 +320,7 @@ impl<'wren, L: Location> SetValue<'wren, L> for CString {
 }
 
 unsafe fn send_string_to_vm<S: AsRef<str>, L: Location>(
-    vm: &mut RawContext<L>,
+    vm: &mut RawContext<'_, L>,
     value: S,
     slot: Slot,
 ) {
@@ -341,7 +341,7 @@ impl<'wren, L: Location> SetValue<'wren, L> for &str {
 }
 
 unsafe fn generic_get_string<L: Location>(
-    vm: &mut RawContext<L>,
+    vm: &mut RawContext<'_, L>,
     slot: Slot,
     slot_type: WrenType,
 ) -> Option<String> {

@@ -3,6 +3,8 @@
 #![allow(unsafe_code)]
 #![allow(clippy::module_name_repetitions)]
 #![allow(clippy::option_if_let_else)]
+#![warn(rust_2018_idioms)]
+#![warn(rustdoc::all)]
 // #![deny(missing_docs)]
 
 pub mod context;
@@ -143,7 +145,7 @@ where
             let user_data = ffi::wrenGetUserData(self.vm.as_ptr());
             // Create a new box object and let it free itself before the
             // vm is freed
-            drop(Box::<SystemUserData<V>>::from_raw(user_data.cast()));
+            drop(Box::<SystemUserData<'_, V>>::from_raw(user_data.cast()));
             ffi::wrenFreeVM(self.as_ptr());
         }
     }
@@ -171,7 +173,7 @@ where
 
             config.userData = user_data.cast::<c_void>();
 
-            let mut vm: Context<V, context::Native> =
+            let mut vm: Context<'_, V, context::Native> =
                 Context::new_unchecked(ffi::wrenNewVM(&mut config));
             (*user_data).system_methods = Some(SystemMethods::new(&mut vm));
 
