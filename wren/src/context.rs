@@ -453,6 +453,13 @@ impl<'wren, L: Location> Context<'wren, NoTypeInfo, L> {
     /// # Safety
     /// Not sure why this isn't safe, but calling it too often with too large
     /// a number can cause memory corruption
+    ///
+    /// # TODO
+    /// Looks like this should only be called from a foreign context
+    /// Unfortunately this isn't as simple as just moving it to
+    /// the native context because lots of foreign code requires
+    /// ensuring slots so this is going to be a bigger project
+    /// [wren-lang/wren#1089](https://github.com/wren-lang/wren/issues/1089)
     pub unsafe fn ensure_slots(&mut self, num_slots: Slot) {
         wren_sys::wrenEnsureSlots(self.as_ptr(), num_slots);
     }
