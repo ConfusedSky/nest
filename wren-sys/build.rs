@@ -1,34 +1,46 @@
 extern crate bindgen;
 
+use std::borrow::Borrow;
 use std::env;
-use std::path::Path;
-use std::process::Command;
-use which::which;
+use std::fs::remove_file;
+use std::path::{Path, PathBuf};
 
 fn main() {
     let manifest_dir = env::var("CARGO_MANIFEST_DIR").unwrap();
-    let wren_dir = format!("{}/lib/wren", manifest_dir);
-    let wren_h = format!("{}/src/include/wren.h", wren_dir);
-    let wren_c = format!("{}/lib/wren.c", wren_dir);
+    let wren_dir = format!("{manifest_dir}/lib/wren");
+    let wren_h = format!("{wren_dir}/src/include/wren.h");
+    let mut headers = Vec::new();
+    let mut c_files = Vec::new();
+    let mut inc_files = Vec::new();
 
-    println!("cargo:rerun-if-changed={}", wren_h);
-    println!("cargo:rerun-if-changed={}", wren_c);
+    let wren_src = PathBuf::from(&wren_dir).join("src");
+    let sub_dirs = ["include", "optional", "vm"];
+
+    for dir in sub_dirs {
+        let sub_dir = wren_src.join(dir);
+
+        for file in sub_dir
+            .read_dir()
+            .expect("Unable to read source files")
+            .flatten()
+        {
+            let file_path = file.path();
+            let file_type = file_path.extension();
+            if let Some(file_type) = file_type {
+                match file_type.to_string_lossy().borrow() {
+                    "c" => c_files.push(file_path),
+                    "h" => headers.push(file_path),
+                    "inc" => inc_files.push(file_path),
+                    _ => {}
+                }
+            }
+        }
+    }
+
     println!("cargo:rerun-if-env-changed=WREN_DEBUG");
-
-    let wren_c_path = Path::new(wren_c.as_str());
-
-    if !wren_c_path.exists() {
-        // TODO: don't require generate amalgamation
-        // and build source direct
-        let script = format!("{}/util/generate_amalgamation.py", wren_dir);
-        let python =
-            which("python3").expect("wren_sys requires python3 to generate almalgamation!");
-        let result = Command::new(python)
-            .current_dir(wren_dir)
-            .arg(script)
-            .output()
-            .expect("Amalgamation script failed to run");
-        std::fs::write(wren_c_path, &result.stdout).expect("Failed writing wren.c");
+    for file in headers.iter().chain(c_files.iter()).chain(inc_files.iter()) {
+        let file = file.to_string_lossy();
+        println!("cargo:rerun-if-changed={file}");
     }
 
     // let debug = true;
@@ -41,11 +53,24 @@ fn main() {
     };
 
     let mut build = cc::Build::new();
-    build.file(wren_c_path).warnings(false);
+    build
+        .warnings(false)
+        .include(format!("{wren_dir}/src/include"))
+        .include(format!("{wren_dir}/src/optional"))
+        .include(format!("{wren_dir}/src/vm"))
+        .files(c_files.iter());
     if debug {
         build.define("DEBUG", None);
     }
     build.compile("wren");
+
+    // Write the bindings to the $OUT_DIR/bindings.rs file.
+    let dir = env::var("OUT_DIR").unwrap();
+    let out_path = Path::new(dir.as_str()).join("bindings.rs");
+
+    if out_path.exists() {
+        remove_file(&out_path).expect("Unable to remove existing bindings!")
+    }
 
     // The bindgen::Builder is the main entry point
     // to bindgen, and lets you build up options for
@@ -59,10 +84,7 @@ fn main() {
         // Unwrap the Result and panic on failure.
         .expect("Unable to generate bindings");
 
-    // Write the bindings to the $OUT_DIR/bindings.rs file.
-    let dir = env::var("OUT_DIR").unwrap();
-    let out_path = Path::new(dir.as_str());
     bindings
-        .write_to_file(out_path.join("bindings.rs"))
+        .write_to_file(out_path)
         .expect("Couldn't write bindings!");
 }
