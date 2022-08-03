@@ -8,7 +8,6 @@ use std::path::{Path, PathBuf};
 fn main() {
     let manifest_dir = env::var("CARGO_MANIFEST_DIR").unwrap();
     let wren_dir = format!("{manifest_dir}/lib/wren");
-    let wren_h = format!("{wren_dir}/src/include/wren.h");
     let mut headers = Vec::new();
     let mut c_files = Vec::new();
     let mut inc_files = Vec::new();
@@ -38,8 +37,9 @@ fn main() {
     }
 
     println!("cargo:rerun-if-env-changed=WREN_DEBUG");
+    println!("cargo:rerun-if-changed=headers.h");
     for file in headers.iter().chain(c_files.iter()).chain(inc_files.iter()) {
-        let file = file.to_string_lossy();
+        let file = file.display();
         println!("cargo:rerun-if-changed={file}");
     }
 
@@ -76,9 +76,10 @@ fn main() {
     // to bindgen, and lets you build up options for
     // the resulting bindings.
     let bindings = bindgen::Builder::default()
+        .clang_arg(format!("-I{wren_dir}/src/include"))
         // The input header we would like to generate
         // bindings for.
-        .header(wren_h)
+        .header("headers.h")
         // Finish the builder and generate the bindings.
         .generate()
         // Unwrap the Result and panic on failure.

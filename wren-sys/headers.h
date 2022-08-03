@@ -1,0 +1,8 @@
+#include "./lib/wren/src/vm/wren_vm.h"
+#include "./lib/wren/src/include/wren.h"
+#include "./lib/wren/src/vm/wren_debug.h"
+#include "./lib/wren/src/vm/wren_compiler.h"
+#include "./lib/wren/src/vm/wren_math.h"
+#include "./lib/wren/src/vm/wren_primitive.h"
+#include "./lib/wren/src/vm/wren_utils.h"
+#include "./lib/wren/src/vm/wren_value.h"
