@@ -8,7 +8,6 @@ class FileFlags {
   static create    { 0x10 }
   static truncate  { 0x20 }
   static exclusive { 0x40 }
-  static exclusive2{ 0b10 }
 }
 
 class Stdout {
