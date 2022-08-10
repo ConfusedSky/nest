@@ -1,4 +1,4 @@
-import "../hello"
+import "../scripts/hello"
 // expect: I am running in Rust after being loaded from a file!
 
 // Note that there is also a system print in the factorial module

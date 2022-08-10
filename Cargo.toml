@@ -15,8 +15,8 @@ path = "src/main.rs"
 leaks = []
 
 [[test]]
-name = "tests"
-path = "tests/main.rs"
+name = "test"
+path = "test/main.rs"
 
 [[bench]]
 name = "call_benchmarks"

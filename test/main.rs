@@ -8,7 +8,7 @@ wren_macros::generate_tests!();
 
 #[test]
 fn should_work_without_extension() -> Result<(), Box<dyn std::error::Error>> {
-    test_script("scripts/test/empty")
+    test_script("test/empty")
 }
 
 fn test_script(script: &str) -> Result<(), Box<dyn std::error::Error>> {
@@ -21,11 +21,11 @@ fn test_script(script: &str) -> Result<(), Box<dyn std::error::Error>> {
     }
 
     if !script_path.is_file() {
-        panic!("Script file does not exist at {:?}", script_path);
+        panic!("Script file does not exist at {script_path:?}");
     }
 
     let text =
-        read_to_string(&script_path).unwrap_or_else(|_| panic!("Failed to read {:?}", script_path));
+        read_to_string(&script_path).unwrap_or_else(|_| panic!("Failed to read {script_path:?}"));
     let expectations = text.split('\n');
     let expectation = "// expect";
     let expectations =

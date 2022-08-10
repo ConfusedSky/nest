@@ -163,7 +163,7 @@ impl<'wren> GetValue<'wren, Native> for Fiber<'wren> {
         _slot: super::Slot,
         _slot_type: WrenType,
     ) -> Self {
-        panic!("Getting a fiber raw is an illigal operation");
+        panic!("Getting a fiber unchecked is an illigal operation");
     }
     unsafe fn get_slot(vm: &mut Raw<'wren, Native>, slot: super::Slot) -> Self {
         let handle = Handle::get_slot(vm, slot);
