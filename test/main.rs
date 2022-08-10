@@ -1,21 +1,22 @@
 use assert_cmd::prelude::*; // Add methods on commands
 use itertools::Itertools;
 use predicates::prelude::*; // Used for writing assertions
-use std::{borrow::Cow, fs::read_to_string, path::Path, process::Command}; // Run programs
+use std::{borrow::Cow, fs::read_to_string, path::PathBuf, process::Command}; // Run programs
 
 // TODO: Make failure output better
 wren_macros::generate_tests!();
 
 #[test]
 fn should_work_without_extension() -> Result<(), Box<dyn std::error::Error>> {
-    test_script("test/empty")
+    let manifest_dir =
+        std::env::var("CARGO_MANIFEST_DIR").expect("WE SHOULD HAVE ACCESS TO THE MANIFEST DIR");
+    let dir = PathBuf::from(manifest_dir).join("test");
+    let script = dir.join("empty");
+    test_script(&script.to_string_lossy())
 }
 
 fn test_script(script: &str) -> Result<(), Box<dyn std::error::Error>> {
-    let manifest_dir =
-        std::env::var("CARGO_MANIFEST_DIR").expect("WE SHOULD HAVE ACCESS TO THE MANIFEST DIR");
-    let manifest_path = Path::new(&manifest_dir);
-    let mut script_path = manifest_path.join(script);
+    let mut script_path = PathBuf::from(script);
     if script_path.extension().is_none() {
         script_path.set_extension("wren");
     }

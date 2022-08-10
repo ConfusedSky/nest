@@ -10,6 +10,15 @@ pub fn generate_mod(path: &Path, mod_name: Option<&str>) -> syn::Result<TokenStr
         .expect("We can read the directory")
         .flatten()
     {
+        let file_type = file.file_type().expect("Could not get file type");
+        let file_path = file.path();
+        if file_type.is_dir() {
+            output.extend(generate_mod(&path.join(file_path), None));
+            continue;
+        } else if file_type.is_symlink() {
+            continue;
+        }
+
         let file: PathBuf = file.file_name().into();
         let file = file
             .to_str()
@@ -21,7 +30,8 @@ pub fn generate_mod(path: &Path, mod_name: Option<&str>) -> syn::Result<TokenStr
             }
 
             let file_identifier = syn::Ident::new(name, Span::call_site());
-            let script = "test/".to_string() + file;
+            let script_path = &path.join(file_path);
+            let script = script_path.to_string_lossy();
             let fun = quote::quote!(
                 #[test]
                 fn #file_identifier() -> Result<(), Box<dyn std::error::Error>> {
