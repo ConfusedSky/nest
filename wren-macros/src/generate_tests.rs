@@ -12,18 +12,18 @@ pub fn generate_mod(path: &Path, mod_name: Option<&str>) -> syn::Result<TokenStr
     {
         let file_type = file.file_type().expect("Could not get file type");
         let file_path = file.path();
+        let file_name: PathBuf = file.file_name().into();
+        let file_name = file_name
+            .to_str()
+            .expect("Failed to convert file path to string");
         if file_type.is_dir() {
-            output.extend(generate_mod(&path.join(file_path), None));
+            output.extend(generate_mod(&path.join(file_path), Some(file_name)));
             continue;
         } else if file_type.is_symlink() {
             continue;
         }
 
-        let file: PathBuf = file.file_name().into();
-        let file = file
-            .to_str()
-            .expect("Failed to convert file path to string");
-        let split = file.split('.').collect::<Vec<_>>();
+        let split = file_name.split('.').collect::<Vec<_>>();
         if let [name, extension] = &split[..] {
             if *extension != "wren" {
                 continue;
@@ -35,7 +35,7 @@ pub fn generate_mod(path: &Path, mod_name: Option<&str>) -> syn::Result<TokenStr
             let fun = quote::quote!(
                 #[test]
                 fn #file_identifier() -> Result<(), Box<dyn std::error::Error>> {
-                    test_script(#script)
+                    crate::test_script(#script)
                 }
             );
 
@@ -44,6 +44,7 @@ pub fn generate_mod(path: &Path, mod_name: Option<&str>) -> syn::Result<TokenStr
     }
 
     if let Some(name) = mod_name {
+        let name = syn::Ident::new(name, Span::call_site());
         output = quote::quote!(
             mod #name {
                 #output

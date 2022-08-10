@@ -28,9 +28,8 @@ fn test_script(script: &str) -> Result<(), Box<dyn std::error::Error>> {
     let text =
         read_to_string(&script_path).unwrap_or_else(|_| panic!("Failed to read {script_path:?}"));
     let expectations = text.split('\n');
-    let expectation = "// expect";
     let expectations =
-        expectations.filter_map(|item| item.split(expectation).nth(1).map(str::to_string));
+        expectations.filter_map(|item| item.split("// expect").nth(1).map(str::to_string));
     let mut raw_expectations: Vec<String> = Vec::new();
     let mut ordered_expectations: Vec<String> = Vec::new();
     for e in expectations {
