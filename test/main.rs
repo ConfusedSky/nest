@@ -8,11 +8,7 @@ wren_macros::generate_tests!();
 
 #[test]
 fn should_work_without_extension() -> Result<(), Box<dyn std::error::Error>> {
-    let manifest_dir =
-        std::env::var("CARGO_MANIFEST_DIR").expect("WE SHOULD HAVE ACCESS TO THE MANIFEST DIR");
-    let dir = PathBuf::from(manifest_dir).join("test");
-    let script = dir.join("empty");
-    test_script(&script.to_string_lossy())
+    test_script("test/empty")
 }
 
 fn test_script(script: &str) -> Result<(), Box<dyn std::error::Error>> {
@@ -53,6 +49,9 @@ fn test_script(script: &str) -> Result<(), Box<dyn std::error::Error>> {
 
     let mut cmd = Command::cargo_bin("nest")?;
     cmd.arg(script);
+    let manifest_dir =
+        std::env::var("CARGO_MANIFEST_DIR").expect("WE SHOULD HAVE ACCESS TO THE MANIFEST DIR");
+    cmd.current_dir(manifest_dir);
     cmd.assert()
         .success()
         .stdout(predicate::str::diff(Cow::from(expectations)));

@@ -1,3 +1,5 @@
+// Skip
+
 import "io" for File
 
 var text = File.read("test/io/file/file.txt")
