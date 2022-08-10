@@ -16,6 +16,7 @@ pub fn generate_mod(path: &Path, mod_name: Option<&str>) -> syn::Result<TokenStr
         let file_name = file_name
             .to_str()
             .expect("Failed to convert file path to string");
+
         if file_type.is_dir() {
             output.extend(generate_mod(&path.join(file_path), Some(file_name)));
             continue;
@@ -51,6 +52,7 @@ pub fn generate_mod(path: &Path, mod_name: Option<&str>) -> syn::Result<TokenStr
             }
         );
     }
+
     Ok(output)
 }
 
