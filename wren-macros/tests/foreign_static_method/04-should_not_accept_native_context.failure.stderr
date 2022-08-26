@@ -1,8 +1,16 @@
 error[E0308]: mismatched types
- --> tests/foreign_static_method/04-should_not_accept_native_context.failure.rs:8:17
-  |
-8 | fn foreign_test(context: &mut Context<'_, Native>, a: f64) -> f64 {
-  |                 ^^^^^^^ expected struct `wren::context::Foreign`, found struct `Native`
-  |
-  = note: expected mutable reference `&mut wren::Context<'_, _, wren::context::Foreign>`
-             found mutable reference `&mut wren::Context<'_, wren::test::UserData<'_>, Native>`
+   --> tests/foreign_static_method/04-should_not_accept_native_context.failure.rs:8:17
+    |
+8   | fn foreign_test(context: &mut Context<'_, Native>, a: f64) -> f64 {
+    |                 ^^^^^^^
+    |                 |
+    |                 expected struct `wren::context::Foreign`, found struct `Native`
+    |                 arguments to this function are incorrect
+    |
+    = note: expected mutable reference `&mut wren::Context<'_, _, wren::context::Foreign>`
+               found mutable reference `&mut wren::Context<'_, wren::test::UserData<'_>, Native>`
+note: associated function defined here
+   --> $WORKSPACE/wren/src/context.rs
+    |
+    |     fn to_output<T>(self, context: &mut Context<'_, T, Foreign>) -> Option<Self::Output>;
+    |        ^^^^^^^^^

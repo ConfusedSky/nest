@@ -1,4 +1,4 @@
-// TODO: replace and remove test when we have more foreign types
+// TODO: replace and remove Test when we have more foreign types
 import "bigint" for BigInt, Test
 
 System.print(BigInt.ZERO) // expect: 0

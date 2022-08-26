@@ -1,0 +1,32 @@
+error[E0599]: no function or associated item named `get_slot` found for type `f32` in the current scope
+ --> tests/foreign_static_method/05-invalid-argument-type.failure.rs:7:9
+  |
+7 | fn test(a: f32, b: f32, c: f32) -> f32 {
+  |         ^ function or associated item not found in `f32`
+
+error[E0599]: no function or associated item named `get_slot` found for type `f32` in the current scope
+ --> tests/foreign_static_method/05-invalid-argument-type.failure.rs:7:17
+  |
+7 | fn test(a: f32, b: f32, c: f32) -> f32 {
+  |                 ^ function or associated item not found in `f32`
+
+error[E0599]: no function or associated item named `get_slot` found for type `f32` in the current scope
+ --> tests/foreign_static_method/05-invalid-argument-type.failure.rs:7:25
+  |
+7 | fn test(a: f32, b: f32, c: f32) -> f32 {
+  |                         ^ function or associated item not found in `f32`
+
+error[E0599]: the method `to_output` exists for type `f32`, but its trait bounds were not satisfied
+ --> tests/foreign_static_method/05-invalid-argument-type.failure.rs:6:1
+  |
+6 | #[foreign_static_method]
+  | ^^^^^^^^^^^^^^^^^^^^^^^^ method cannot be called on `f32` due to unsatisfied trait bounds
+  |
+  = note: the following trait bounds were not satisfied:
+          `f32: SetValue<'_, wren::context::Foreign>`
+          which is required by `f32: ForeignCallOutput`
+          `&f32: SetValue<'_, wren::context::Foreign>`
+          which is required by `&f32: ForeignCallOutput`
+          `&mut f32: SetValue<'_, wren::context::Foreign>`
+          which is required by `&mut f32: ForeignCallOutput`
+  = note: this error originates in the attribute macro `foreign_static_method` (in Nightly builds, run with -Z macro-backtrace for more info)
